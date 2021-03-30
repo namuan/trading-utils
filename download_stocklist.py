@@ -8,9 +8,10 @@ from argparse import ArgumentParser
 from ftplib import FTP
 from pathlib import Path
 
+from common import ALL_LISTED_TICKERS_FILE
+
 
 def parse_args():
-    """Parse command line arguments."""
     parser = ArgumentParser(description=__doc__)
     return parser.parse_args()
 
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         "nasdaqlisted": "data/nasdaqlisted.txt",
     }
 
-    all_listed = open("data/alllisted.csv", "w")
+    all_listed = open(ALL_LISTED_TICKERS_FILE, "w")
 
     download_ftp_files(filenames)
     combine_list(filenames, all_listed)

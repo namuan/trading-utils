@@ -21,7 +21,7 @@ All available scripts should provide a basic description and options to run appr
 For eg.
 
 ```shell
-./venv/bin/python3 download_stocklist.py
+./venv/bin/python3 download_stocklist.py --help
 ```
 
 I suggest setting up a quick alias to run the python version in the virtual environment. 
@@ -35,5 +35,5 @@ alias py=./venv/bin/python3
 Now you can run the same script as 
 
 ```shell
-py download_stocklist.py
+py download_stocklist.py --help
 ```

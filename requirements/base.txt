@@ -3,3 +3,6 @@ pandas
 numpy
 tqdm
 yahoo-finance
+requests
+requests-cache
+pandas-datareader
