@@ -1,12 +1,12 @@
 """
-Download stocks open, close, high, low and volume data for all available stocks.
-Make sure you have downloaded the list of tickers using download_stocklist.py script.
+Download open, close, high, low and volume data for all available ETFs.
 """
 
 from argparse import ArgumentParser
 from datetime import datetime
 
-from common.market import load_all_tickers, download_tickers_data
+from common.market import download_tickers_data
+from common.symbols import macro_etfs
 
 
 def parse_args():
@@ -31,4 +31,4 @@ if __name__ == "__main__":
     end = datetime.now()
     start = datetime(end.year - back_period_in_years, end.month, end.day)
 
-    download_tickers_data(load_all_tickers(), start, end, output_dir)
+    download_tickers_data(macro_etfs, start, end, output_dir)
