@@ -19,7 +19,11 @@ def parse_args():
         help="Look back period in years. By default the value is 2 so the script will collect previous 2 years of data.",
     )
     parser.add_argument(
-        "-o", "--output-directory", type=str, default="output", help="Output directory. Default to 'output'"
+        "-o",
+        "--output-directory",
+        type=str,
+        default="output",
+        help="Output directory. Default to 'output'",
     )
     return parser.parse_args()
 
