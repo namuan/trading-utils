@@ -6,3 +6,4 @@ yahoo-finance
 requests
 requests-cache
 pandas-datareader
+stockstats
