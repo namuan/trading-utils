@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     #
     stocks_db = [enrich_data(stock) for stock in stock_tickers]
-    etfs_db = [enrich_data(etf) for etf in etf_tickers]
+    etfs_db = [enrich_data(etf, is_etf=True) for etf in etf_tickers]
 
     combined_db = stocks_db + etfs_db
     file_path = "{}/{}-data.csv".format(output_dir, datetime.now().strftime("%Y-%m-%d"))
