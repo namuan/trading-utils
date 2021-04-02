@@ -8,3 +8,5 @@ requests-cache
 pandas-datareader
 stockstats
 Jinja2
+matplotlib
+mplfinance
