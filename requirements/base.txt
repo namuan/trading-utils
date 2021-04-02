@@ -7,3 +7,4 @@ requests
 requests-cache
 pandas-datareader
 stockstats
+Jinja2
