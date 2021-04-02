@@ -2,6 +2,9 @@ from stockstats import StockDataFrame
 
 from common.filesystem import output_dir
 import pandas as pd
+from finta import TA
+
+DAYS_IN_MONTH = 22
 
 
 def load_ticker_df(ticker):
@@ -12,6 +15,37 @@ def load_ticker_df(ticker):
             parse_dates=True,
         )
     )
+
+
+def convert_to_weekly(daily_candles):
+    mapping = {
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum",
+    }
+    return daily_candles.resample("W").apply(mapping)
+
+
+def with_ignoring_errors(code_to_run, warning_msg):
+    try:
+        code_to_run()
+    except Exception as e:
+        print("{} - {}".format(warning_msg, e))
+
+
+def last_close(close_data, days=-1):
+    try:
+        return close_data.iloc[days]
+    except:
+        return "N/A"
+
+
+def gains(close_data):
+    open = close_data.iloc[0]
+    close = last_close(close_data)
+    return ((close - open) / open) * 100
 
 
 def enrich_data(ticker_symbol, is_etf=False):
@@ -55,5 +89,30 @@ def enrich_data(ticker_symbol, is_etf=False):
     # RSI
     for rsi in [2, 4, 9, 14]:
         data_row[f"rsi_{rsi}"] = ticker_df[f'rsi_{rsi}'][-1]
+
+    # Monthly gains
+    for mg in [1, 2, 3, 6, 9]:
+        data_row["monthly_gains_{}".format(mg)] = gains(
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
+        )
+
+    # Weekly timeframe calculations
+    weekly_ticker_candles = convert_to_weekly(ticker_df)
+
+    def weekly_sma():
+        for ma in [10, 20, 50]:
+            data_row[f"weekly_ma_{ma}"] = TA.SMA(
+                weekly_ticker_candles, period=ma
+            ).iloc[-1]
+
+    with_ignoring_errors(weekly_sma, f"Unable to calculate weekly ma for {ticker_symbol}")
+
+    def weekly_ema():
+        for ema in [10, 20, 50]:
+            data_row[f"weekly_ema_{ema}"] = TA.EMA(
+                weekly_ticker_candles, period=ema
+            ).iloc[-1]
+
+    with_ignoring_errors(weekly_ema, f"Unable to calculate weekly ema for {ticker_symbol}")
 
     return data_row
