@@ -27,4 +27,4 @@ if __name__ == "__main__":
     end = datetime.now()
     start = datetime(end.year - back_period_in_years, end.month, end.day)
 
-    download_tickers_data(macro_etfs, start, end, output_dir)
+    download_tickers_data(macro_etfs, start, end)

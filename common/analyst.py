@@ -48,4 +48,12 @@ def enrich_data(ticker_symbol, is_etf=False):
     for ema in [10, 20, 30, 50, 100, 200]:
         data_row[f"ema_{ema}"] = ticker_df[f"close_{ema}_ema"].iloc[-1]
 
+    # Average True Range
+    for atr in [10, 20, 30, 60]:
+        data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
+
+    # RSI
+    for rsi in [2, 4, 9, 14]:
+        data_row[f"rsi_{rsi}"] = ticker_df[f'rsi_{rsi}'][-1]
+
     return data_row

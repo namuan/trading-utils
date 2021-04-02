@@ -1,4 +1,5 @@
 export PROJECTNAME=$(shell basename "$(PWD)")
+PY=./venv/bin/python3
 
 .SILENT: ;               # no need for @
 
@@ -9,15 +10,29 @@ setup: ## Setup Virtual Env
 deps: ## Install dependencies
 	./venv/bin/pip3 install -r requirements/dev.txt
 
-lint: ## Runs black for code formatting
+lint: ## Run black for code formatting
 	./venv/bin/black . --exclude venv
 
 clean: ## Clean package
 	find . -type d -name '__pycache__' | xargs rm -rf
 	rm -rf build dist
 
-bpython: ## Runs bpython
+bpython: ## Run bpython
 	./venv/bin/bpython
+
+ftplist: ## Download stocks from Nasdaq FTP Server
+	$(PY) download_stocklist.py
+
+stocksohlcv: ## Download OHLCV of all available stocks
+	$(PY) download_stocks_ohlcv.py
+
+etfsohlcv: ## Download OHLCV of all Macro ETFs
+	$(PY) download_macro_etfs.py
+
+enrich: ## Enrich data and calculate indicators
+	$(PY) stocks_data_enricher.py -v
+
+weekend: ftplist stocksohlcv etfsohlcv enrich ## Refreshes stock list, download OHLCV data and run analysis
 
 .PHONY: help
 .DEFAULT_GOAL := help

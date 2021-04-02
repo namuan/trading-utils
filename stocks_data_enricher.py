@@ -4,6 +4,8 @@ Enrich Stocks and ETF data with different indicators and generates a CSV file fo
 
 import argparse
 from datetime import datetime
+import subprocess
+from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
@@ -16,11 +18,15 @@ from common.symbols import macro_etfs
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "-v", "--view-in-browser", action="store_true", default=False, help="Open dTale in browser"
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    view_in_browser = args.view_in_browser
 
     stock_tickers = load_all_tickers()
     etf_tickers = macro_etfs.keys()
@@ -35,4 +41,9 @@ if __name__ == "__main__":
     scanner_df = pd.DataFrame(combined_db, copy=True)
     scanner_df.to_csv(file_path, index=False)
     print("Generated output {}".format(file_path))
-    print(f"./venv/bin/dtale --open-browser --csv-path {file_path}")
+    dtale_path = Path("venv").joinpath("bin").joinpath("dtale")
+    view_in_browser_cmd = f"{dtale_path.as_posix()} --open-browser --csv-path {file_path}"
+    if view_in_browser:
+        subprocess.call(view_in_browser_cmd, shell=True)
+    else:
+        print(view_in_browser_cmd)
