@@ -1,8 +1,9 @@
-from stockstats import StockDataFrame
-
-from common.filesystem import output_dir
 import pandas as pd
 from finta import TA
+from stockstats import StockDataFrame
+
+from common import with_ignoring_errors
+from common.filesystem import output_dir
 
 DAYS_IN_MONTH = 22
 
@@ -26,13 +27,6 @@ def convert_to_weekly(daily_candles):
         "volume": "sum",
     }
     return daily_candles.resample("W").apply(mapping)
-
-
-def with_ignoring_errors(code_to_run, warning_msg):
-    try:
-        code_to_run()
-    except Exception as e:
-        print("{} - {}".format(warning_msg, e))
 
 
 def last_close(close_data, days=-1):

@@ -18,13 +18,19 @@ def parse_args():
         default=2,
         help="Look back period in years. By default the value is 2 so the script will collect previous 2 years of data.",
     )
+    parser.add_argument("-t", "--tickers", help="Ticker symbol")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    tickers = args.tickers
     back_period_in_years = args.back_period_in_years
     end = datetime.now()
     start = datetime(end.year - back_period_in_years, end.month, end.day)
+    if not tickers:
+        tickers = load_all_tickers()
+    else:
+        tickers = tickers.split(",")
 
-    download_tickers_data(load_all_tickers(), start, end)
+    download_tickers_data(tickers, start, end)
