@@ -4,3 +4,4 @@ venv/
 data/
 output/
 cache.sqlite
+__pycache__/
