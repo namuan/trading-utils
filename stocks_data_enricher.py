@@ -19,7 +19,11 @@ from common.symbols import macro_etfs
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-v", "--view-in-browser", action="store_true", default=False, help="Open dTale in browser"
+        "-v",
+        "--view-in-browser",
+        action="store_true",
+        default=False,
+        help="Open dTale in browser",
     )
     return parser.parse_args()
 
@@ -31,8 +35,12 @@ if __name__ == "__main__":
     stock_tickers = load_all_tickers()
     etf_tickers = macro_etfs.keys()
     print(f"Analysing {len(stock_tickers)} stocks and {len(etf_tickers)} etfs")
-    stocks_db = filter(lambda val: val, [enrich_data(stock) for stock in tqdm(stock_tickers)])
-    etfs_db = filter(lambda val: val, [enrich_data(etf, is_etf=True) for etf in tqdm(etf_tickers)])
+    stocks_db = filter(
+        lambda val: val, [enrich_data(stock) for stock in tqdm(stock_tickers)]
+    )
+    etfs_db = filter(
+        lambda val: val, [enrich_data(etf, is_etf=True) for etf in tqdm(etf_tickers)]
+    )
 
     combined_db = list(stocks_db) + list(etfs_db)
     file_path = "{}/{}-data.csv".format(
@@ -42,7 +50,9 @@ if __name__ == "__main__":
     scanner_df.to_csv(file_path, index=False)
     print("Generated output {}".format(file_path))
     dtale_path = Path("venv").joinpath("bin").joinpath("dtale")
-    view_in_browser_cmd = f"{dtale_path.as_posix()} --open-browser --csv-path {file_path}"
+    view_in_browser_cmd = (
+        f"{dtale_path.as_posix()} --open-browser --csv-path {file_path}"
+    )
     if view_in_browser:
         subprocess.call(view_in_browser_cmd, shell=True)
     else:

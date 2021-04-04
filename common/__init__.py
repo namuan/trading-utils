@@ -1,4 +1,5 @@
 ALL_LISTED_TICKERS_FILE = "data/alllisted.csv"
+LARGE_CAP_TICKERS_FILE = "data/large-cap.csv"
 
 
 def with_ignoring_errors(code_to_run, warning_msg):

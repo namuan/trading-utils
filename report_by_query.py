@@ -14,12 +14,16 @@ def parse_args():
     parser.add_argument("-t", "--title", type=str, required=True)
     parser.add_argument("-q", "--query", type=str, required=True)
     parser.add_argument(
-        "-v", "--view-in-browser", action="store_true", default=False, help="Generate HTML Report"
+        "-v",
+        "--view-in-browser",
+        action="store_true",
+        default=False,
+        help="Generate HTML Report",
     )
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
 
     select_top = args.count
@@ -37,8 +41,8 @@ if __name__ == '__main__':
 
     selected_stocks = (
         enriched_stocks_df.query(query)
-            .sort_values(by=sort_by, ascending=False)
-            .head(n=select_top)
+        .sort_values(by=sort_by, ascending=False)
+        .head(n=select_top)
     )
 
     report_data = add_reporting_data(selected_stocks)

@@ -52,7 +52,18 @@ def plt_charts(fig, num, df, ticker):
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument("-b", "--base-ticker", help="Base ticker to compare relative strength", default="SPY")
+    parser.add_argument(
+        "-b",
+        "--base-ticker",
+        help="Base ticker to compare relative strength",
+        default="SPY",
+    )
+    parser.add_argument(
+        "-m",
+        "--market-type",
+        help="Select Market for analysis. Choose between all(All tickers), large-cap(S&P500)",
+        default="all",
+    )
     return parser.parse_args()
 
 
@@ -66,12 +77,10 @@ def sort_stocks(k):
 def generate_charts(title: str, selected_stocks, stocks_rs_data):
     dt_now = datetime.now()
     fig = plt.figure(figsize=(15, 10))
-    fig.suptitle(
-        f"S&P 500 {title} ({dt_now.strftime('%d %B %Y')}) "
-    )
+    fig.suptitle(f"S&P 500 {title} ({dt_now.strftime('%d %B %Y')}) ")
     print("Plotting {} -> {}".format(title, selected_stocks))
     for num, stock in enumerate(selected_stocks):
-        plt_charts(fig, num, stocks_rs_data[stock][-1 * DAYS_IN_MONTH:], stock)
+        plt_charts(fig, num, stocks_rs_data[stock][-1 * DAYS_IN_MONTH :], stock)
 
     file_path = (
         f"output/{dt_now.strftime('%Y-%m-%d')}-{title.lower()}-relative-strength.png"
@@ -82,8 +91,9 @@ def generate_charts(title: str, selected_stocks, stocks_rs_data):
 def main():
     args = parse_args()
     base_ticker = args.base_ticker
+    market_type = args.market_type
     left_df = load_ticker_df(base_ticker)
-    all_tickers = load_all_tickers()
+    all_tickers = load_all_tickers(market_type=market_type)
     stocks_rs_data = {}
     for num, ticker in enumerate(all_tickers):
         try:
@@ -100,16 +110,23 @@ def main():
         except:
             print(f"Unable to calculate relative strength of {ticker}")
 
-    leaders = list(itertools.islice(
-        sorted(stocks_rs_data, key=lambda k: sort_stocks(stocks_rs_data[k]), reverse=True),
-        10
-    ))
+    leaders = list(
+        itertools.islice(
+            sorted(
+                stocks_rs_data,
+                key=lambda k: sort_stocks(stocks_rs_data[k]),
+                reverse=True,
+            ),
+            10,
+        )
+    )
     generate_charts("Leaders", leaders, stocks_rs_data)
 
-    laggards = list(itertools.islice(
-        sorted(stocks_rs_data, key=lambda k: sort_stocks(stocks_rs_data[k])),
-        10
-    ))
+    laggards = list(
+        itertools.islice(
+            sorted(stocks_rs_data, key=lambda k: sort_stocks(stocks_rs_data[k])), 10
+        )
+    )
     generate_charts("Laggards", laggards, stocks_rs_data)
 
 

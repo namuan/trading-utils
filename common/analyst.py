@@ -82,12 +82,12 @@ def enrich_data(ticker_symbol, is_etf=False):
 
     # RSI
     for rsi in [2, 4, 9, 14]:
-        data_row[f"rsi_{rsi}"] = ticker_df[f'rsi_{rsi}'][-1]
+        data_row[f"rsi_{rsi}"] = ticker_df[f"rsi_{rsi}"][-1]
 
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
         )
 
     # Weekly timeframe calculations
@@ -95,11 +95,13 @@ def enrich_data(ticker_symbol, is_etf=False):
 
     def weekly_sma():
         for ma in [10, 20, 50]:
-            data_row[f"weekly_ma_{ma}"] = TA.SMA(
-                weekly_ticker_candles, period=ma
-            ).iloc[-1]
+            data_row[f"weekly_ma_{ma}"] = TA.SMA(weekly_ticker_candles, period=ma).iloc[
+                -1
+            ]
 
-    with_ignoring_errors(weekly_sma, f"Unable to calculate weekly ma for {ticker_symbol}")
+    with_ignoring_errors(
+        weekly_sma, f"Unable to calculate weekly ma for {ticker_symbol}"
+    )
 
     def weekly_ema():
         for ema in [10, 20, 50]:
@@ -107,6 +109,8 @@ def enrich_data(ticker_symbol, is_etf=False):
                 weekly_ticker_candles, period=ema
             ).iloc[-1]
 
-    with_ignoring_errors(weekly_ema, f"Unable to calculate weekly ema for {ticker_symbol}")
+    with_ignoring_errors(
+        weekly_ema, f"Unable to calculate weekly ema for {ticker_symbol}"
+    )
 
     return data_row

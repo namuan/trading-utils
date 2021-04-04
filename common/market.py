@@ -5,12 +5,15 @@ import requests_cache
 from pandas_datareader import data as pdr
 from tqdm import tqdm
 
-from common import ALL_LISTED_TICKERS_FILE
+from common import ALL_LISTED_TICKERS_FILE, LARGE_CAP_TICKERS_FILE
 from common.filesystem import output_dir
 
 
-def load_all_tickers():
-    return pd.read_csv(ALL_LISTED_TICKERS_FILE).Symbol.tolist()
+def load_all_tickers(market_type="all"):
+    file_to_load = ALL_LISTED_TICKERS_FILE
+    if market_type == "large-cap":
+        file_to_load = LARGE_CAP_TICKERS_FILE
+    return pd.read_csv(file_to_load).Symbol.tolist()
 
 
 def download_ticker_data(ticker, start, end):

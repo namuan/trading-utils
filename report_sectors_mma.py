@@ -20,7 +20,7 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
 
     all_tickers = macro_etfs
@@ -30,7 +30,9 @@ if __name__ == '__main__':
             convert_to_weekly(
                 StockDataFrame.retype(
                     pd.read_csv(
-                        f"{output_dir()}/{ticker}.csv", index_col="Date", parse_dates=True
+                        f"{output_dir()}/{ticker}.csv",
+                        index_col="Date",
+                        parse_dates=True,
                     )
                 )
             )

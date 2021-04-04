@@ -71,6 +71,9 @@ $ py report_by_query.py -o monthly_gains_3 -c 20 -t "Short Term Mean Reversion" 
 
 ## Sectors Analysis
 
+Make sure you run `make weekend` to download all pre-requisite data.
+
+### Sector Trends
 Generate Multiple Moving Average charts for different sectors
 
 ```shell
@@ -79,3 +82,17 @@ $ py report_sectors_mma.py
 
 ![Sectors MMA](docs/images/sectors-mma.gif)
 
+### Relative Strength (not RSI) using Price Momentum Oscillator 
+
+```shell
+# Find Leaders/Laggards in the whole market against SPY
+$ py report_relative_strength.py -b SPY
+
+# Find Leaders/Laggards in the whole market against QQQ
+$ py report_relative_strength.py -b QQQ
+
+# Find Leaders/Laggards but only in large-cap (S&P 500)
+# Requires downloading the list from BarChart https://www.barchart.com/stocks/indices/sp/sp500
+# Save the csv file as 'large-cap.csv' in 'data' folder
+$ py report_relative_strength.py -m large-cap -b SPY
+```
