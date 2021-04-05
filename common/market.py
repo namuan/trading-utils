@@ -2,11 +2,30 @@ from datetime import timedelta
 
 import pandas as pd
 import requests_cache
+import yfinance as yf
 from pandas_datareader import data as pdr
 from tqdm import tqdm
 
 from common import ALL_LISTED_TICKERS_FILE, LARGE_CAP_TICKERS_FILE
 from common.filesystem import output_dir
+
+yf.pdr_override()
+
+
+def download_with_yf(ticker, period, interval):
+    try:
+        opts = dict(
+            tickers=ticker,
+            period=period,
+            interval=interval,
+            auto_adjust=True,
+            progress=False,
+        )
+        df = yf.download(**opts)
+        df.to_csv(f"{output_dir()}/{ticker}-{interval}.csv")
+        return df
+    except Exception as e:
+        print("ERROR: Unable to download {}".format(ticker), e)
 
 
 def load_all_tickers(market_type="all"):

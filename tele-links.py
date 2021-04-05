@@ -1,8 +1,8 @@
+import time
 from datetime import datetime
 from pathlib import Path
 
 import schedule
-import time
 
 from common.tele_notifier import send_message_to_telegram
 

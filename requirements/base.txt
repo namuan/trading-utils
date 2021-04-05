@@ -12,3 +12,4 @@ matplotlib
 mplfinance
 schedule
 python-dotenv
+pytz
