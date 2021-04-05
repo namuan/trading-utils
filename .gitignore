@@ -5,3 +5,5 @@ data/
 output/
 cache.sqlite
 __pycache__/
+webpages.txt
+.env

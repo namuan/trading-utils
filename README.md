@@ -96,3 +96,11 @@ $ py report_relative_strength.py -b QQQ
 # Save the csv file as 'large-cap.csv' in 'data' folder
 $ py report_relative_strength.py -m large-cap -b SPY
 ```
+
+## Telegram assistants
+
+Read links from `webpages.txt` and send over Telegram on a defined schedule
+
+```shell
+py tele-links
+```

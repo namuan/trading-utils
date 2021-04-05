@@ -10,3 +10,5 @@ stockstats
 Jinja2
 matplotlib
 mplfinance
+schedule
+python-dotenv
