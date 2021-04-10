@@ -5,11 +5,21 @@ import requests_cache
 import yfinance as yf
 from pandas_datareader import data as pdr
 from tqdm import tqdm
+from yahoo_earnings_calendar import YahooEarningsCalendar
 
 from common import ALL_LISTED_TICKERS_FILE, LARGE_CAP_TICKERS_FILE
 from common.filesystem import output_dir
 
 yf.pdr_override()
+
+yec = YahooEarningsCalendar()
+
+
+def download_earnings_between(date_from, date_to):
+    try:
+        return yec.earnings_between(date_from, date_to)
+    except:
+        return {}
 
 
 def download_with_yf(ticker, period, interval):

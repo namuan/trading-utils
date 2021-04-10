@@ -11,3 +11,8 @@ def mkdir(dir_name, clean_up=True):
 
 def output_dir():
     return mkdir("output", clean_up=False)
+
+
+def earnings_file_path():
+    output_file = "earnings.json"
+    return Path(output_dir()).joinpath(output_file)

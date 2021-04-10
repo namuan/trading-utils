@@ -13,3 +13,4 @@ mplfinance
 schedule
 python-dotenv
 pytz
+yahoo_earnings_calendar

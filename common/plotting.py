@@ -8,9 +8,7 @@ from common.market import download_with_yf
 
 
 def plot_intraday(ticker, period="1d", interval="1m"):
-    data = download_with_yf(
-        ticker, period=period, interval=interval
-    )
+    data = download_with_yf(ticker, period=period, interval=interval)
     print(f"Plotting {ticker}")
     intraday = data.resample("30T").agg(
         {

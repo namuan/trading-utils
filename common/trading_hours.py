@@ -4,7 +4,7 @@ from pytz import timezone
 
 
 def eastern_datetime(dt):
-    eastern = timezone('US/Eastern')
+    eastern = timezone("US/Eastern")
     return dt.astimezone(eastern)
 
 

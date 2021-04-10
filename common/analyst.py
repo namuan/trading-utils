@@ -1,11 +1,17 @@
+from datetime import datetime
+
 import pandas as pd
 from finta import TA
 from stockstats import StockDataFrame
 
 from common import with_ignoring_errors
-from common.filesystem import output_dir
+from common.filesystem import output_dir, earnings_file_path
 
 DAYS_IN_MONTH = 22
+
+
+def load_earnings_tickers():
+    return pd.read_json(earnings_file_path().as_posix())
 
 
 def load_ticker_df(ticker):
@@ -48,6 +54,15 @@ def enrich_data(ticker_symbol, is_etf=False):
     except FileNotFoundError:
         return {}
 
+    earnings_df = load_earnings_tickers()
+    earnings_date = None
+    if not earnings_df.empty:
+        ticker_earnings = earnings_df[earnings_df["ticker"] == ticker_symbol]
+        if not ticker_earnings.empty:
+            earnings_date = datetime.strptime(
+                ticker_earnings.get("startdatetime").values[0], "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
+
     last_close_date = ticker_df.index[-1]
     last_trading_day = ticker_df.iloc[-1]
     stock_data_52_weeks = ticker_df["close"][-256:]
@@ -66,6 +81,9 @@ def enrich_data(ticker_symbol, is_etf=False):
         "boll": ticker_df["boll"].iloc[-1],
         "boll_ub": ticker_df["boll_ub"].iloc[-1],
         "boll_lb": ticker_df["boll_lb"].iloc[-1],
+        "earnings_date": datetime.strftime(earnings_date, "%Y-%m-%d")
+        if earnings_date
+        else "Not Available",
     }
 
     # Simple Moving Average
