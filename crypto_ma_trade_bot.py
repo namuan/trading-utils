@@ -197,16 +197,19 @@ class TradeBasedOnSignal(object):
         try:
             if signal == "BUY":
                 currency_account_balance = context["CURRENCY_BALANCE"]
-                exchange.create_market_buy_order(market, currency_account_balance / 2)
+                coin_amount_to_buy = (currency_account_balance / 2) / close_price
+                context["trade_amount"] = coin_amount_to_buy
+                exchange.create_market_buy_order(market, coin_amount_to_buy)
             elif signal == "SELL":
                 coin_account_balance = context["COIN_BALANCE"]
+                context["trade_amount"] = coin_account_balance
                 exchange.create_market_sell_order(market, coin_account_balance)
 
             context["trade_done"] = True
-            message = f"""🔔 {signal} {market} at {close_price}"""
+            message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             logging.info(message)
-        except:
-            logging.error(f"🚨 Unable to place {signal} order for {market} at {close_price}")
+        except Exception:
+            logging.exception(f"🚨 Unable to place {signal} order for {market} at {close_price}")
 
 
 class RecordTransactionInDatabase(object):
@@ -218,12 +221,13 @@ class RecordTransactionInDatabase(object):
             signal = context["signal"]
             market = context["market"]
             close_price = context["close"]
+            trade_amount = context["trade_amount"]
             entry_row = {
                 "trade_dt": current_dt,
                 "signal": signal,
                 "market": market,
                 "close_price": close_price,
-                "trade_price": ""
+                "trade_amount": trade_amount
             }
             db_table.insert(entry_row)
 
@@ -235,7 +239,7 @@ class PublishTransactionOnTelegram(object):
             signal = context["signal"]
             market = context["market"]
             close_price = context["close"]
-            message = f"""🔔 {signal} {market} at {close_price}"""
+            message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             send_message_to_telegram(message, override_chat_id=GROUP_CHAT_ID)
 
 
