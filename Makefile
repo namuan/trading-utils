@@ -34,6 +34,25 @@ enrich: ## Enrich data and calculate indicators
 
 weekend: ftplist stocksohlcv etfsohlcv enrich ## Refreshes stock list, download OHLCV data and run analysis
 
+deploy: clean ## Copies any changed file to the server
+	ssh ${PROJECTNAME} -C 'bash -l -c "mkdir -vp ./${PROJECTNAME}"'
+	rsync -avzr \
+		.env \
+		common \
+		scripts \
+		crypto_ma_trade_bot.py \
+		requirements \
+		${PROJECTNAME}:./${PROJECTNAME}
+
+start: deploy ## Sets up a screen session on the server and start the app
+	ssh ${PROJECTNAME} -C 'bash -l -c "./${PROJECTNAME}/scripts/setup_apps.sh"'
+
+stop: deploy ## Stop any running screen session on the server
+	ssh ${PROJECTNAME} -C 'bash -l -c "./${PROJECTNAME}/scripts/stop_apps.sh"'
+
+ssh: ## SSH into the target VM
+	ssh ${PROJECTNAME}
+
 .PHONY: help
 .DEFAULT_GOAL := help
 
