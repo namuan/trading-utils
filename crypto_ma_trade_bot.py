@@ -54,31 +54,26 @@ def exchange_factory(exchange_id):
     return exchange_clazz({"apiKey": EXCHANGE_API_KEY, "secret": EXCHANGE_API_SECRET})
 
 
-class InitScript(object):
-    def _init_script(self):
-        handlers = [
-            logging.StreamHandler(),
-        ]
+def init_logging():
+    handlers = [
+        logging.StreamHandler(),
+    ]
 
-        logging.basicConfig(
-            handlers=handlers,
-            format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-            level=logging.INFO,
-        )
-        logging.captureWarnings(capture=True)
+    logging.basicConfig(
+        handlers=handlers,
+        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.INFO,
+    )
+    logging.captureWarnings(capture=True)
 
-    def _init_db(self):
+
+class SetupDatabase(object):
+    def run(self, context):
         home_dir = os.getenv("HOME")
         table_name = "trades"
         db = dataset.connect(f"sqlite:///{home_dir}/crypto_trade_diary.db")
-        table = db.create_table(table_name)
-        return table
-
-    def run(self, context):
-        self._init_script()
-        db_table = self._init_db()
-        context["db_table"] = db_table
+        context["db_table"] = db.create_table(table_name)
 
 
 class ReadConfiguration(object):
@@ -197,7 +192,7 @@ class TradeBasedOnSignal(object):
         try:
             if signal == "BUY":
                 currency_account_balance = context["CURRENCY_BALANCE"]
-                coin_amount_to_buy = (currency_account_balance / 2) / close_price
+                coin_amount_to_buy = currency_account_balance / close_price
                 context["trade_amount"] = coin_amount_to_buy
                 exchange.create_market_buy_order(market, coin_amount_to_buy)
             elif signal == "SELL":
@@ -245,10 +240,10 @@ class PublishTransactionOnTelegram(object):
 
 if __name__ == "__main__":
     args = parse_args()
-    context = {"args": args}
-    InitScript().run(context)
+    init_logging()
 
     procedure = [
+        SetupDatabase(),
         ReadConfiguration(),
         FetchDataFromExchange(),
         LoadDataInDataFrame(),
@@ -262,6 +257,7 @@ if __name__ == "__main__":
     ]
     wait_period = args.wait_in_minutes
     while True:
+        context = {"args": args}
         for step in procedure:
             logging.info("==> Running step: {}".format(step.__class__.__name__))
             logging.debug(context)
