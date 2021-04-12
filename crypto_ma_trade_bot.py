@@ -98,8 +98,11 @@ class FetchDataFromExchange(object):
             )
         )
         exchange = exchange_factory(exchange_id)
-        candle_data = exchange.fetch_ohlcv(market, candle_tf, limit=300)
-        context["candle_data"] = candle_data
+        try:
+            candle_data = exchange.fetch_ohlcv(market, candle_tf, limit=300)
+            context["candle_data"] = candle_data
+        except Exception:
+            logging.exception(f"Unable to get prices for {market}")
 
 
 class LoadDataInDataFrame(object):
@@ -204,7 +207,9 @@ class TradeBasedOnSignal(object):
             message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             logging.info(message)
         except Exception:
-            logging.exception(f"🚨 Unable to place {signal} order for {market} at {close_price}")
+            error_message = f"🚨 Unable to place {signal} order for {market} at {close_price}"
+            logging.exception(error_message)
+            send_message_to_telegram(error_message, override_chat_id=GROUP_CHAT_ID)
 
 
 class RecordTransactionInDatabase(object):
