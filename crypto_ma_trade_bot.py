@@ -167,6 +167,13 @@ class FetchAccountInfoFromExchange(object):
         exchange: Exchange = exchange_factory(exchange_id)
         account_balance = exchange.fetch_free_balance()
         logging.info(f"Free Balance: {account_balance}")
+        account_balance_msg = [
+            "| Coin    | Balance    |",
+            "| --- | --- |"
+        ]
+        for k, v in account_balance.items():
+            account_balance_msg.append(f"|{k}|{v}|")
+        print("\n".join(account_balance_msg))
         context["CURRENCY_BALANCE"] = account_balance.get(CURRENCY)
         context["COIN_BALANCE"] = account_balance.get(COIN)
 
