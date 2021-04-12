@@ -167,13 +167,7 @@ class FetchAccountInfoFromExchange(object):
         exchange: Exchange = exchange_factory(exchange_id)
         account_balance = exchange.fetch_free_balance()
         logging.info(f"Free Balance: {account_balance}")
-        account_balance_msg = [
-            "| Coin    | Balance    |",
-            "| --- | --- |"
-        ]
-        for k, v in account_balance.items():
-            account_balance_msg.append(f"|{k}|{v}|")
-        print("\n".join(account_balance_msg))
+        context["account_balance"] = account_balance
         context["CURRENCY_BALANCE"] = account_balance.get(CURRENCY)
         context["COIN_BALANCE"] = account_balance.get(COIN)
 
@@ -248,6 +242,14 @@ class PublishTransactionOnTelegram(object):
             close_price = context["close"]
             message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             send_message_to_telegram(message, override_chat_id=GROUP_CHAT_ID)
+            account_balance = context["account_balance"]
+            account_balance_msg = [
+                "| Coin    | Balance    |",
+                "| --- | --- |"
+            ]
+            for k, v in account_balance.items():
+                account_balance_msg.append(f"|{k}|{v}|")
+            send_message_to_telegram("\n".join(account_balance_msg), override_chat_id=GROUP_CHAT_ID)
 
 
 if __name__ == "__main__":
