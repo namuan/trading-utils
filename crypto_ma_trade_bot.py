@@ -240,16 +240,15 @@ class PublishTransactionOnTelegram(object):
             signal = context["signal"]
             market = context["market"]
             close_price = context["close"]
+            account_balance = context["account_balance"]
+
+            account_balance_msg = ["Balance before trade"]
+            for k, v in account_balance.items():
+                account_balance_msg.append(f"*{k}* => {v}")
+            send_message_to_telegram(", ".join(account_balance_msg), override_chat_id=GROUP_CHAT_ID)
+
             message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             send_message_to_telegram(message, override_chat_id=GROUP_CHAT_ID)
-            account_balance = context["account_balance"]
-            account_balance_msg = [
-                "| Coin    | Balance    |",
-                "| --- | --- |"
-            ]
-            for k, v in account_balance.items():
-                account_balance_msg.append(f"|{k}|{v}|")
-            send_message_to_telegram("\n".join(account_balance_msg), override_chat_id=GROUP_CHAT_ID)
 
 
 if __name__ == "__main__":
