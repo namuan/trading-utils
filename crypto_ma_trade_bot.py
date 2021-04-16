@@ -98,11 +98,8 @@ class FetchDataFromExchange(object):
             )
         )
         exchange = exchange_factory(exchange_id)
-        try:
-            candle_data = exchange.fetch_ohlcv(market, candle_tf, limit=300)
-            context["candle_data"] = candle_data
-        except Exception:
-            logging.exception(f"Unable to get prices for {market}")
+        candle_data = exchange.fetch_ohlcv(market, candle_tf, limit=300)
+        context["candle_data"] = candle_data
 
 
 class LoadDataInDataFrame(object):
@@ -272,9 +269,13 @@ if __name__ == "__main__":
     while True:
         context = {"args": args}
         for step in procedure:
-            logging.info("==> Running step: {}".format(step.__class__.__name__))
-            logging.debug(context)
-            step.run(context)
+            step_name = step.__class__.__name__
+            try:
+                logging.info(f"==> Running step: {step_name}")
+                logging.debug(context)
+                step.run(context)
+            except Exception:
+                logging.exception(f"Failure in step {step_name}")
 
         logging.info(f"😴 Sleeping for {wait_period} minutes")
         time.sleep(60 * wait_period)
