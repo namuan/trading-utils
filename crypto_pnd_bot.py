@@ -61,7 +61,7 @@ class ReadConfiguration(object):
         context["market"] = MARKET
 
 
-class FetchDataFromExchange(object):
+class FetchMarketsSummaryFromExchange(object):
     def run(self, context):
         exchange_id = context["exchange"]
         candle_tf = context["candle_tf"]
@@ -74,8 +74,9 @@ class FetchDataFromExchange(object):
             )
         )
         exchange = exchange_factory(exchange_id)
-        candle_data = exchange.fetch_ohlcv(market, candle_tf, limit=300)
-        context["candle_data"] = candle_data
+        # exchange.options['fetchTickers']['method'] = "publicGetMarketsSummaries"
+        data = exchange.fetch_tickers()
+        context["data"] = data
 
 
 def main(args):
@@ -83,17 +84,8 @@ def main(args):
     procedure = [
         SetupDatabase(),
         ReadConfiguration(),
-        FetchDataFromExchange(),
+        FetchMarketsSummaryFromExchange(),
         PrintContext(),
-
-        # LoadDataInDataFrame(),
-        # CalculateIndicators(),
-        # IdentifyBuySellSignal(),
-        # LoadLastTransactionFromDatabase(),
-        # FetchAccountInfoFromExchange(),
-        # TradeBasedOnSignal(),
-        # RecordTransactionInDatabase(),
-        # PublishTransactionOnTelegram(),
     ]
     run(procedure, args)
 
