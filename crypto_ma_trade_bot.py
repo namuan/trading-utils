@@ -17,6 +17,8 @@ from dataset import Table
 from dotenv import load_dotenv
 from stockstats import StockDataFrame
 
+from common.logger import init_logging
+from common.steps_runner import run
 from common.tele_notifier import send_message_to_telegram
 
 load_dotenv()
@@ -44,13 +46,17 @@ def parse_args():
         "--wait-in-minutes",
         type=int,
         help="Wait between running in minutes",
-        default=5
+        default=5,
     )
     parser.add_argument(
         "-r", "--run-once", action="store_true", default=False, help="Run once"
     )
     parser.add_argument(
-        "-d", "--dry-run", action="store_true", default=False, help="Dry run so won't trigger any transaction"
+        "-d",
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Dry run so won't trigger any transaction",
     )
     return parser.parse_args()
 
@@ -58,20 +64,6 @@ def parse_args():
 def exchange_factory(exchange_id):
     exchange_clazz = getattr(ccxt, exchange_id)
     return exchange_clazz({"apiKey": EXCHANGE_API_KEY, "secret": EXCHANGE_API_SECRET})
-
-
-def init_logging():
-    handlers = [
-        logging.StreamHandler(),
-    ]
-
-    logging.basicConfig(
-        handlers=handlers,
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging.INFO,
-    )
-    logging.captureWarnings(capture=True)
 
 
 class SetupDatabase(object):
@@ -179,17 +171,24 @@ class FetchAccountInfoFromExchange(object):
 
 
 class TradeBasedOnSignal(object):
-    def _same_as_previous_signal(self, current_signal, last_signal, last_transaction_signal):
-        return last_signal == current_signal or last_transaction_signal == current_signal
+    def _same_as_previous_signal(
+            self, current_signal, last_signal, last_transaction_signal
+    ):
+        return (
+                last_signal == current_signal or last_transaction_signal == current_signal
+        )
 
     def run(self, context):
         current_signal = context["signal"]
         last_signal = context.get("last_signal", "NA")
         last_transaction_signal = context["last_transaction_signal"]
 
-        if self._same_as_previous_signal(current_signal, last_signal, last_transaction_signal):
+        if self._same_as_previous_signal(
+                current_signal, last_signal, last_transaction_signal
+        ):
             logging.info(
-                f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}")
+                f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
+            )
             return
 
         exchange_id = context["exchange"]
@@ -212,14 +211,17 @@ class TradeBasedOnSignal(object):
                     exchange.create_market_buy_order(market, coin_amount_to_buy)
                 else:
                     logging.info(
-                        f"Dry Run: {current_signal} => Currency account balance: {currency_account_balance}")
+                        f"Dry Run: {current_signal} => Currency account balance: {currency_account_balance}"
+                    )
             elif current_signal == "SELL":
                 coin_account_balance = context["COIN_BALANCE"]
                 context["trade_amount"] = coin_account_balance
                 if not args.dry_run:
                     exchange.create_market_sell_order(market, coin_account_balance)
                 else:
-                    logging.info(f"Dry Run: {current_signal} =>, Coin account balance: {coin_account_balance}")
+                    logging.info(
+                        f"Dry Run: {current_signal} =>, Coin account balance: {coin_account_balance}"
+                    )
 
             context["trade_done"] = True
             message = f"""🔔 {current_signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
@@ -245,7 +247,7 @@ class RecordTransactionInDatabase(object):
                 "signal": signal,
                 "market": market,
                 "close_price": close_price,
-                "trade_amount": trade_amount
+                "trade_amount": trade_amount,
             }
             db_table.insert(entry_row)
 
@@ -262,15 +264,15 @@ class PublishTransactionOnTelegram(object):
             account_balance_msg = ["Balance before trade"]
             for k, v in account_balance.items():
                 account_balance_msg.append(f"*{k}* => {v}")
-            send_message_to_telegram(", ".join(account_balance_msg), override_chat_id=GROUP_CHAT_ID)
+            send_message_to_telegram(
+                ", ".join(account_balance_msg), override_chat_id=GROUP_CHAT_ID
+            )
 
             message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             send_message_to_telegram(message, override_chat_id=GROUP_CHAT_ID)
 
 
-if __name__ == "__main__":
-    args = parse_args()
-    run_once = args.run_once
+def main(args):
     init_logging()
 
     procedure = [
@@ -286,20 +288,9 @@ if __name__ == "__main__":
         RecordTransactionInDatabase(),
         PublishTransactionOnTelegram(),
     ]
-    wait_period = args.wait_in_minutes
-    while True:
-        context = {"args": args}
-        for step in procedure:
-            step_name = step.__class__.__name__
-            try:
-                logging.info(f"==> Running step: {step_name}")
-                logging.debug(context)
-                step.run(context)
-            except Exception:
-                logging.exception(f"Failure in step {step_name}")
+    run(procedure, args)
 
-        if run_once:
-            break
 
-        logging.info(f"😴 Sleeping for {wait_period} minutes")
-        time.sleep(60 * wait_period)
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
