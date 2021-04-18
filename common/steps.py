@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 
 import dataset
 
@@ -15,4 +16,9 @@ class SetupDatabase(object):
 
 class PrintContext(object):
     def run(self, context):
+        data = {}
+        if 'data' in context:
+            data = context.get("data", {})
+            del context["data"]
         logging.info(context)
+        logging.info(json.dumps(data, indent=4))
