@@ -26,7 +26,7 @@ EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
 EXCHANGE_API_SECRET = os.getenv("EXCHANGE_API_SECRET")
 EXCHANGE = os.getenv("EXCHANGE")
 
-CANDLE_TIME_FRAME = "5m"
+CANDLE_TIME_FRAME = "1h"
 CURRENCY = "USDT"
 COIN = "XLM"
 MARKET = f"{COIN}/{CURRENCY}"
@@ -45,6 +45,12 @@ def parse_args():
         type=int,
         help="Wait between running in minutes",
         default=5
+    )
+    parser.add_argument(
+        "-r", "--run-once", action="store_true", default=False, help="Run once"
+    )
+    parser.add_argument(
+        "-d", "--dry-run", action="store_true", default=False, help="Dry run so won't trigger any transaction"
     )
     return parser.parse_args()
 
@@ -129,8 +135,10 @@ class CalculateIndicators(object):
         slow_ma = [25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
         indicators["fast_ema"] = self._gmma(df, fast_ma)
         indicators["slow_ema"] = self._gmma(df, slow_ma)
+        indicators["adx"] = df["dx_14_ema"].iloc[-1]
 
         context["indicators"] = indicators
+        logging.info(f"Indicators => {indicators}")
 
 
 class IdentifyBuySellSignal(object):
@@ -138,9 +146,10 @@ class IdentifyBuySellSignal(object):
         indicators = context["indicators"]
         fast_ema = indicators["fast_ema"]
         slow_ema = indicators["slow_ema"]
-        if fast_ema > slow_ema:
+        adx = indicators["adx"]
+        if fast_ema > slow_ema and adx > 35:
             context["signal"] = "BUY"
-        elif fast_ema < slow_ema:
+        elif fast_ema < slow_ema and adx > 35:
             context["signal"] = "SELL"
         else:
             context["signal"] = "NO_SIGNAL"
@@ -186,26 +195,37 @@ class TradeBasedOnSignal(object):
         exchange_id = context["exchange"]
         exchange: Exchange = exchange_factory(exchange_id)
 
-        signal = context["signal"]
+        args = context["args"]
         market = context["market"]
         close_price = context["close"]
         context["last_signal"] = current_signal
         try:
-            if signal == "BUY":
+            if current_signal == "NO_SIGNAL":
+                logging.info("😞 NO SIGNAL")
+                return
+
+            if current_signal == "BUY":
                 currency_account_balance = context["CURRENCY_BALANCE"]
                 coin_amount_to_buy = currency_account_balance / close_price
                 context["trade_amount"] = coin_amount_to_buy
-                exchange.create_market_buy_order(market, coin_amount_to_buy)
-            elif signal == "SELL":
+                if not args.dry_run:
+                    exchange.create_market_buy_order(market, coin_amount_to_buy)
+                else:
+                    logging.info(
+                        f"Dry Run: {current_signal} => Currency account balance: {currency_account_balance}")
+            elif current_signal == "SELL":
                 coin_account_balance = context["COIN_BALANCE"]
                 context["trade_amount"] = coin_account_balance
-                exchange.create_market_sell_order(market, coin_account_balance)
+                if not args.dry_run:
+                    exchange.create_market_sell_order(market, coin_account_balance)
+                else:
+                    logging.info(f"Dry Run: {current_signal} =>, Coin account balance: {coin_account_balance}")
 
             context["trade_done"] = True
-            message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
+            message = f"""🔔 {current_signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             logging.info(message)
         except Exception:
-            error_message = f"🚨 Unable to place {signal} order for {market} at {close_price}"
+            error_message = f"🚨 Unable to place {current_signal} order for {market} at {close_price}"
             logging.exception(error_message)
             send_message_to_telegram(error_message, override_chat_id=GROUP_CHAT_ID)
 
@@ -250,6 +270,7 @@ class PublishTransactionOnTelegram(object):
 
 if __name__ == "__main__":
     args = parse_args()
+    run_once = args.run_once
     init_logging()
 
     procedure = [
@@ -276,6 +297,9 @@ if __name__ == "__main__":
                 step.run(context)
             except Exception:
                 logging.exception(f"Failure in step {step_name}")
+
+        if run_once:
+            break
 
         logging.info(f"😴 Sleeping for {wait_period} minutes")
         time.sleep(60 * wait_period)

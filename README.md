@@ -119,4 +119,14 @@ Send quick analysis on SPY during market hours.
 py tele_spy_trade_bot.py
 ```
 
+## Crypto Bots
+
+Make sure you define a few variables before starting up these bots
+
+```shell
+export EXCHANGE_API_KEY = 
+export EXCHANGE_API_SECRET = 
+export EXCHANGE = ""
+```
+
 
