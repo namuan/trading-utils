@@ -1,8 +1,6 @@
 import ccxt
-import os
 
-EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
-EXCHANGE_API_SECRET = os.getenv("EXCHANGE_API_SECRET")
+from common.environment import EXCHANGE_API_KEY, EXCHANGE_API_SECRET
 
 
 def exchange_factory(exchange_id):

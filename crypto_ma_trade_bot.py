@@ -3,30 +3,24 @@ Crypto Bot running based on a given strategy
 """
 import functools
 import logging
-import os
-import time
 from argparse import ArgumentParser
 from datetime import datetime
 from operator import add
 
-import ccxt
-import dataset
 import pandas as pd
 from ccxt import Exchange
 from dataset import Table
 from dotenv import load_dotenv
 from stockstats import StockDataFrame
 
+from common.environment import EXCHANGE, GROUP_CHAT_ID
+from common.exchange import exchange_factory
 from common.logger import init_logging
+from common.steps import SetupDatabase
 from common.steps_runner import run
 from common.tele_notifier import send_message_to_telegram
 
 load_dotenv()
-
-GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
-EXCHANGE_API_KEY = os.getenv("EXCHANGE_API_KEY")
-EXCHANGE_API_SECRET = os.getenv("EXCHANGE_API_SECRET")
-EXCHANGE = os.getenv("EXCHANGE")
 
 CANDLE_TIME_FRAME = "1h"
 CURRENCY = "USDT"
@@ -37,9 +31,18 @@ MARKET = f"{COIN}/{CURRENCY}"
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-c",
-        "--config-file",
-        help="Configuration file",
+        "-t",
+        "--table-name",
+        type=str,
+        help="Database table name",
+        default="trades"
+    )
+    parser.add_argument(
+        "-f",
+        "--db-file",
+        type=str,
+        help="Database file name",
+        default='crypto_trade_diary.db'
     )
     parser.add_argument(
         "-w",
@@ -61,23 +64,8 @@ def parse_args():
     return parser.parse_args()
 
 
-def exchange_factory(exchange_id):
-    exchange_clazz = getattr(ccxt, exchange_id)
-    return exchange_clazz({"apiKey": EXCHANGE_API_KEY, "secret": EXCHANGE_API_SECRET})
-
-
-class SetupDatabase(object):
-    def run(self, context):
-        home_dir = os.getenv("HOME")
-        table_name = "trades"
-        db = dataset.connect(f"sqlite:///{home_dir}/crypto_trade_diary.db")
-        context["db_table"] = db.create_table(table_name)
-
-
 class ReadConfiguration(object):
     def run(self, context):
-        args = context["args"]
-        logging.info("Reading configuration from {}".format(args.config_file))
         context["exchange"] = EXCHANGE
         context["candle_tf"] = CANDLE_TIME_FRAME
         context["market"] = MARKET
