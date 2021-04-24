@@ -35,6 +35,7 @@ if __name__ == "__main__":
     input_file = "{}/{}-data.csv".format(
         output_dir(), datetime.now().strftime("%Y-%m-%d")
     )
+    print(f"Reading from file: {input_file}")
 
     enriched_stocks_df = pd.read_csv(input_file, index_col="symbol")
     print(enriched_stocks_df.columns)
