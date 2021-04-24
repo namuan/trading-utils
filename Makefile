@@ -35,7 +35,7 @@ enrich: ## Enrich data and calculate indicators
 weekend: ftplist stocksohlcv etfsohlcv enrich ## Refreshes stock list, download OHLCV data and run analysis
 
 deploy: clean ## Copies any changed file to the server
-	ssh ${PROJECTNAME} -C 'bash -l -c "mkdir -vp ./${PROJECTNAME}"'
+	ssh ${PROJECTNAME} -C 'bash -l -c "mkdir -vp ./${PROJECTNAME}/output"'
 	rsync -avzr \
 		.env \
 		common \

@@ -7,10 +7,12 @@ from argparse import ArgumentParser
 from datetime import datetime
 from operator import add
 
+import mplfinance as mpf
 import pandas as pd
 from ccxt import Exchange
 from dataset import Table
 from dotenv import load_dotenv
+from mplfinance.plotting import make_addplot
 from stockstats import StockDataFrame
 
 from common.environment import EXCHANGE, GROUP_CHAT_ID
@@ -18,7 +20,7 @@ from common.exchange import exchange_factory
 from common.logger import init_logging
 from common.steps import SetupDatabase
 from common.steps_runner import run
-from common.tele_notifier import send_message_to_telegram
+from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
 
 load_dotenv()
 
@@ -92,9 +94,10 @@ class LoadDataInDataFrame(object):
     def run(self, context):
         candle_data = context["candle_data"]
         df = pd.DataFrame.from_records(
-            candle_data, columns=["datetime", "open", "high", "low", "close", "volume"]
+            candle_data, columns=["datetime", "open", "high", "low", "close", "volume"],
         )
-        df.set_index("datetime", inplace=True)
+        df["Date"] = pd.to_datetime(df.datetime, unit='ms')
+        df.set_index("Date", inplace=True)
         context["df"] = StockDataFrame.retype(df)
 
 
@@ -113,12 +116,35 @@ class CalculateIndicators(object):
         indicators = {}
         fast_ma = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]
         slow_ma = [25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
+        context["ma_range"] = fast_ma + slow_ma
         indicators["fast_ema"] = self._gmma(df, fast_ma)
         indicators["slow_ema"] = self._gmma(df, slow_ma)
         indicators["adx"] = df["dx_14_ema"].iloc[-1]
 
         context["indicators"] = indicators
         logging.info(f"Indicators => {indicators}")
+
+
+class GenerateChart:
+    def run(self, context):
+        df = context["df"]
+        context["chart_name"] = chart_title = f"_{CURRENCY}_{COIN}_{CANDLE_TIME_FRAME}"
+        ma_range = context["ma_range"]
+        additional_plots = []
+        for ma in ma_range:
+            additional_plots.append(
+                make_addplot(
+                    df["close_{}_ema".format(ma)],
+                    type="line",
+                    width=0.3,
+                )
+            )
+
+        context["chart_file_path"] = chart_file_path = f"output/{chart_title.lower()}-mma.png"
+        save = dict(fname=chart_file_path)
+        fig, axes = mpf.plot(df, type="line", addplot=additional_plots, savefig=save,
+                             returnfig=True, )
+        fig.savefig(save["fname"])
 
 
 class IdentifyBuySellSignal(object):
@@ -248,6 +274,7 @@ class PublishTransactionOnTelegram(object):
             market = context["market"]
             close_price = context["close"]
             account_balance = context["account_balance"]
+            chart_file_path = context["chart_file_path"]
 
             account_balance_msg = ["Balance before trade"]
             for k, v in account_balance.items():
@@ -258,6 +285,7 @@ class PublishTransactionOnTelegram(object):
 
             message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             send_message_to_telegram(message, override_chat_id=GROUP_CHAT_ID)
+            send_file_to_telegram("MMA", chart_file_path, override_chat_id=GROUP_CHAT_ID)
 
 
 def main(args):
@@ -269,6 +297,7 @@ def main(args):
         FetchDataFromExchange(),
         LoadDataInDataFrame(),
         CalculateIndicators(),
+        GenerateChart(),
         IdentifyBuySellSignal(),
         LoadLastTransactionFromDatabase(),
         FetchAccountInfoFromExchange(),

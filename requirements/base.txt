@@ -9,7 +9,7 @@ pandas-datareader
 stockstats
 Jinja2
 matplotlib
-mplfinance
+mplfinance==0.12.7a10
 schedule
 python-dotenv
 pytz
