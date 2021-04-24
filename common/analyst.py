@@ -54,6 +54,11 @@ def historical_vol(ticker_candles, vol_calc):
     return rets.rolling(window=vol_calc).std() * np.sqrt(252)
 
 
+def smooth_trend(df):
+    pos_neg = np.where(df > df.shift(periods=1), 1, -1)
+    return pos_neg.sum()
+
+
 def enrich_data(ticker_symbol, is_etf=False):
     try:
         ticker_df = load_ticker_df(ticker_symbol)
@@ -96,9 +101,9 @@ def enrich_data(ticker_symbol, is_etf=False):
     }
 
     # Simple and Exponential Moving Average
-    fast_ma = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]
-    slow_ma = [25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
-    other_ma = [10, 20, 30, 50, 100, 200]
+    fast_ma = [3, 5, 7, 9, 11, 13, 15]
+    slow_ma = [30, 35, 40, 45, 50, 55, 60]
+    other_ma = [10, 20, 100, 200]
     ma_range = fast_ma + slow_ma + other_ma
     for ma in ma_range:
         data_row[f"ma_{ma}"] = ticker_df[f"close_{ma}_sma"].iloc[-1]
@@ -126,6 +131,11 @@ def enrich_data(ticker_symbol, is_etf=False):
     # Historical Volatility
     for vol_calc in [9, 14, 21, 50]:
         data_row["hv_{}".format(vol_calc)] = historical_vol(ticker_df, vol_calc).iloc[-1]
+
+    # Trend smoothness
+    for mo in [30, 60, 90, 180]:
+        smoothness = smooth_trend(stock_data_52_weeks[-mo:])
+        data_row[f"smooth_{mo}"] = smoothness
 
     # Weekly timeframe calculations
     weekly_ticker_candles = convert_to_weekly(ticker_df)
