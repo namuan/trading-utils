@@ -23,7 +23,7 @@ def get_user_followers():
 
 
 def get_twitter_home_timeline():
-    return with_limit_handled(lambda: api.home_timeline())
+    return with_limit_handled(lambda: api.home_timeline(count=200, exclude_replies=True))
 
 
 def with_limit_handled(func):

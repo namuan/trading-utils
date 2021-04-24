@@ -66,7 +66,8 @@ def main(poll_freq_in_secs):
     home_timeline = get_twitter_home_timeline()
     logging.info("==> Found tweets {}".format(len(home_timeline)))
     for tweet in home_timeline:
-        mention_acct = tweet.author.name
+        tweet_author_name = tweet.author.name
+        tweet_author_screen_name = tweet.author.screen_name
         tweet_id = tweet.id
         tweet_posted_date = tweet.created_at
         formatted_posted_dt = tweet_posted_date.strftime("%H:%M(%d %B)")
@@ -75,13 +76,13 @@ def main(poll_freq_in_secs):
         if tweet_already_processed(tweet_id):
             logging.warning(
                 "Old Tweet from {} at {} -> {} - already processed".format(
-                    mention_acct, tweet_posted_date, tweet_id
+                    tweet_author_screen_name, tweet_posted_date, tweet_id
                 )
             )
             continue
         else:
             entity = dict(
-                twitter_handle=mention_acct,
+                twitter_handle=tweet_author_screen_name,
                 tweet=tweet_text,
                 tweet_id=tweet_id,
                 posted_at=tweet_posted_date,
@@ -92,7 +93,7 @@ def main(poll_freq_in_secs):
             continue
 
         try:
-            header = f"""👀 [{mention_acct}](https://twitter.com/{mention_acct}/status/{tweet_id}) at {formatted_posted_dt}"""
+            header = f"""👀 {tweet_author_name} at [{formatted_posted_dt}](https://twitter.com/{tweet_author_screen_name}/status/{tweet_id})"""
             send_message_to_telegram(
                 header, disable_web_preview=False, override_chat_id=GROUP_CHAT_ID
             )
