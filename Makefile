@@ -31,11 +31,11 @@ etfsohlcv: ## Download OHLCV of all Macro ETFs
 	$(PY) download_macro_etfs.py
 
 enrich: ## Enrich data and calculate indicators
-	$(PY) stocks_data_enricher.py -v
+	$(PY) stocks_data_enricher.py
 	$(PY) tele_message.py -m "Completed data enrichment"
 
 dtale: ## Open DTale
-	$(DTALE) --open-browser --csv-path $(csvfile)
+	$(DTALE) --open-browser --csv-path $(csvpath)
 
 weekend: ftplist stocksohlcv etfsohlcv enrich ## Refreshes stock list, download OHLCV data and run analysis
 
