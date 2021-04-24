@@ -27,7 +27,7 @@ if __name__ == "__main__":
     args = parse_args()
 
     select_top = args.count
-    sort_by = args.sort_by
+    sort_by = args.sort_by.split(",")
     query = args.query
     heading = args.title
     view_in_browser = args.view_in_browser
@@ -42,11 +42,11 @@ if __name__ == "__main__":
 
     selected_stocks = (
         enriched_stocks_df.query(query)
-        .sort_values(by=sort_by, ascending=False)
-        .head(n=select_top)
+            .sort_values(by=sort_by, ascending=False)
+            .head(n=select_top)
     )
-
     report_data = add_reporting_data(selected_stocks)
+    print("Selected Stocks: {}".format(", ".join([f"${d.get('symbol')}" for d in report_data])))
     template_data = {"sort_by": sort_by, "query": query, "report_data": report_data}
     report_title = f"Stocks Report: {heading}"
     print("Generating report for: {}".format(report_title))
