@@ -47,6 +47,7 @@ deploy: clean ## Copies any changed file to the server
 		scripts \
 		crypto_ma_trade_bot.py \
 		tele_links.py \
+		tele_twitter.py \
 		webpages.txt \
 		requirements \
 		${PROJECTNAME}:./${PROJECTNAME}

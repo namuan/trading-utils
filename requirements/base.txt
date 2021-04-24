@@ -16,3 +16,5 @@ pytz
 yahoo_earnings_calendar
 ccxt
 dataset
+tweepy
+peewee
