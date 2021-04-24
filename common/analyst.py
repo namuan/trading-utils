@@ -63,6 +63,9 @@ def enrich_data(ticker_symbol, is_etf=False):
                 ticker_earnings.get("startdatetime").values[0], "%Y-%m-%dT%H:%M:%S.%fZ"
             )
 
+    if ticker_df.empty:
+        return {}
+
     last_close_date = ticker_df.index[-1]
     last_trading_day = ticker_df.iloc[-1]
     stock_data_52_weeks = ticker_df["close"][-256:]
@@ -87,11 +90,15 @@ def enrich_data(ticker_symbol, is_etf=False):
     }
 
     # Simple Moving Average
-    for ma in [10, 20, 30, 50, 100, 200]:
+    fast_ma = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]
+    slow_ma = [25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
+    other_ma = [10, 20, 30, 50, 100, 200]
+    ma_range = fast_ma + slow_ma + other_ma
+    for ma in ma_range:
         data_row[f"ma_{ma}"] = ticker_df[f"close_{ma}_sma"].iloc[-1]
 
     # Exp Moving Average
-    for ema in [10, 20, 30, 50, 100, 200]:
+    for ema in ma_range:
         data_row[f"ema_{ema}"] = ticker_df[f"close_{ema}_ema"].iloc[-1]
 
     # Average True Range
@@ -105,14 +112,18 @@ def enrich_data(ticker_symbol, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
+
+    # ADX
+    for adx_period in [9, 14, 21]:
+        data_row[f"adx_{adx_period}"] = ticker_df[f"dx_{adx_period}_ema"].iloc[-1]
 
     # Weekly timeframe calculations
     weekly_ticker_candles = convert_to_weekly(ticker_df)
 
     def weekly_sma():
-        for ma in [10, 20, 50]:
+        for ma in ma_range:
             data_row[f"weekly_ma_{ma}"] = TA.SMA(weekly_ticker_candles, period=ma).iloc[
                 -1
             ]
@@ -122,7 +133,7 @@ def enrich_data(ticker_symbol, is_etf=False):
     )
 
     def weekly_ema():
-        for ema in [10, 20, 50]:
+        for ema in ma_range:
             data_row[f"weekly_ema_{ema}"] = TA.EMA(
                 weekly_ticker_candles, period=ema
             ).iloc[-1]
