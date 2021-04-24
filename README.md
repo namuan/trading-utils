@@ -108,7 +108,7 @@ export BOT_TOKEN = "<telegram-bot-token>"
 Read links from `webpages.txt` and send over Telegram on a defined schedule.
 
 ```shell
-py tele-links
+py tele_links
 ```
 
 Send quick analysis on SPY during market hours.
