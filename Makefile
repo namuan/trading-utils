@@ -1,5 +1,6 @@
 export PROJECTNAME=$(shell basename "$(PWD)")
 PY=./venv/bin/python3
+DTALE=./venv/bin/dtale
 
 .SILENT: ;               # no need for @
 
@@ -31,6 +32,10 @@ etfsohlcv: ## Download OHLCV of all Macro ETFs
 
 enrich: ## Enrich data and calculate indicators
 	$(PY) stocks_data_enricher.py -v
+	$(PY) tele_message.py -m "Completed data enrichment"
+
+dtale: ## Open DTale
+	$(DTALE) --open-browser --csv-path $(csvfile)
 
 weekend: ftplist stocksohlcv etfsohlcv enrich ## Refreshes stock list, download OHLCV data and run analysis
 
