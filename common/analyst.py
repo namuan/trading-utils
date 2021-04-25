@@ -7,6 +7,7 @@ from finta import TA
 from stockstats import StockDataFrame
 
 from common import with_ignoring_errors
+from common.candle_pattern import identify_candle_pattern
 from common.filesystem import output_dir, earnings_file_path
 
 DAYS_IN_MONTH = 22
@@ -188,6 +189,8 @@ def enrich_data(ticker_symbol, is_etf=False):
     data_row["daily_strat_direction"] = daily_strat_direction
     data_row["daily_strat"] = daily_strat
     data_row["daily_strat_candle"] = daily_strat_candle
+
+    data_row["candle_type"] = identify_candle_pattern(ticker_df)
 
     # Weekly timeframe calculations
     weekly_ticker_candles = resample_candles(ticker_df, "W")
