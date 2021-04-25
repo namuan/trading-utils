@@ -1,5 +1,6 @@
 import logging
 
+
 def init_logging():
     handlers = [
         logging.StreamHandler(),

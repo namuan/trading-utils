@@ -9,7 +9,9 @@ def send_link(website_url):
         return
 
     try:
-        send_message_to_telegram(website_url, disable_web_preview=False, override_chat_id=GROUP_CHAT_ID)
+        send_message_to_telegram(
+            website_url, disable_web_preview=False, override_chat_id=GROUP_CHAT_ID
+        )
     except Exception as e:
         print(f"Error processing: {website_url} - {str(e)}")
 

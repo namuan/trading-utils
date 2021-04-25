@@ -21,18 +21,14 @@ MARKET = f"{COIN}/{CURRENCY}"
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-t",
-        "--table-name",
-        type=str,
-        help="Database table name",
-        default='pumps'
+        "-t", "--table-name", type=str, help="Database table name", default="pumps"
     )
     parser.add_argument(
         "-f",
         "--db-file",
         type=str,
         help="Database file name",
-        default='crypto_pumps.db'
+        default="crypto_pumps.db",
     )
     parser.add_argument(
         "-r", "--run-once", action="store_true", default=False, help="Run once"

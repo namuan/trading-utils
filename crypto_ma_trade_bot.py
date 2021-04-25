@@ -33,18 +33,14 @@ MARKET = f"{COIN}/{CURRENCY}"
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-t",
-        "--table-name",
-        type=str,
-        help="Database table name",
-        default="trades"
+        "-t", "--table-name", type=str, help="Database table name", default="trades"
     )
     parser.add_argument(
         "-f",
         "--db-file",
         type=str,
         help="Database file name",
-        default='crypto_trade_diary.db'
+        default="crypto_trade_diary.db",
     )
     parser.add_argument(
         "-w",
@@ -94,9 +90,10 @@ class LoadDataInDataFrame(object):
     def run(self, context):
         candle_data = context["candle_data"]
         df = pd.DataFrame.from_records(
-            candle_data, columns=["datetime", "open", "high", "low", "close", "volume"],
+            candle_data,
+            columns=["datetime", "open", "high", "low", "close", "volume"],
         )
-        df["Date"] = pd.to_datetime(df.datetime, unit='ms')
+        df["Date"] = pd.to_datetime(df.datetime, unit="ms")
         df.set_index("Date", inplace=True)
         context["df"] = StockDataFrame.retype(df)
 
@@ -140,10 +137,17 @@ class GenerateChart:
                 )
             )
 
-        context["chart_file_path"] = chart_file_path = f"output/{chart_title.lower()}-mma.png"
+        context[
+            "chart_file_path"
+        ] = chart_file_path = f"output/{chart_title.lower()}-mma.png"
         save = dict(fname=chart_file_path)
-        fig, axes = mpf.plot(df, type="line", addplot=additional_plots, savefig=save,
-                             returnfig=True, )
+        fig, axes = mpf.plot(
+            df,
+            type="line",
+            addplot=additional_plots,
+            savefig=save,
+            returnfig=True,
+        )
         fig.savefig(save["fname"])
 
 
@@ -186,10 +190,10 @@ class FetchAccountInfoFromExchange(object):
 
 class TradeBasedOnSignal(object):
     def _same_as_previous_signal(
-            self, current_signal, last_signal, last_transaction_signal
+        self, current_signal, last_signal, last_transaction_signal
     ):
         return (
-                last_signal == current_signal or last_transaction_signal == current_signal
+            last_signal == current_signal or last_transaction_signal == current_signal
         )
 
     def run(self, context):
@@ -198,7 +202,7 @@ class TradeBasedOnSignal(object):
         last_transaction_signal = context["last_transaction_signal"]
 
         if self._same_as_previous_signal(
-                current_signal, last_signal, last_transaction_signal
+            current_signal, last_signal, last_transaction_signal
         ):
             logging.info(
                 f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
@@ -285,7 +289,9 @@ class PublishTransactionOnTelegram(object):
 
             message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
             send_message_to_telegram(message, override_chat_id=GROUP_CHAT_ID)
-            send_file_to_telegram("MMA", chart_file_path, override_chat_id=GROUP_CHAT_ID)
+            send_file_to_telegram(
+                "MMA", chart_file_path, override_chat_id=GROUP_CHAT_ID
+            )
 
 
 def main(args):

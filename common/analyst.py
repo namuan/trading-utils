@@ -159,7 +159,9 @@ def enrich_data(ticker_symbol, is_etf=False):
     # Average True Range
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
-        data_row[f"natr_{atr}"] = ((ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100).iloc[-1]
+        data_row[f"natr_{atr}"] = (
+            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+        ).iloc[-1]
 
     # RSI
     for rsi in [2, 4, 9, 14]:
@@ -168,7 +170,7 @@ def enrich_data(ticker_symbol, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
         )
 
     # ADX
@@ -177,7 +179,9 @@ def enrich_data(ticker_symbol, is_etf=False):
 
     # Historical Volatility
     for vol_calc in [9, 14, 21, 50]:
-        data_row["hv_{}".format(vol_calc)] = historical_vol(ticker_df, vol_calc).iloc[-1]
+        data_row["hv_{}".format(vol_calc)] = historical_vol(ticker_df, vol_calc).iloc[
+            -1
+        ]
 
     # Trend smoothness
     for mo in [30, 60, 90, 180]:
@@ -207,14 +211,18 @@ def enrich_data(ticker_symbol, is_etf=False):
         weekly_ema, f"Unable to calculate weekly ema for {ticker_symbol}"
     )
 
-    weekly_strat_direction, weekly_strat, weekly_strat_candle = calculate_strat(weekly_ticker_candles)
+    weekly_strat_direction, weekly_strat, weekly_strat_candle = calculate_strat(
+        weekly_ticker_candles
+    )
     data_row["weekly_strat_direction"] = weekly_strat_direction
     data_row["weekly_strat"] = weekly_strat
     data_row["weekly_strat_candle"] = weekly_strat_candle
 
     # Monthly timeframe calculations
     monthly_ticker_candles = resample_candles(ticker_df, "M")
-    monthly_strat_direction, monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
+    monthly_strat_direction, monthly_strat, monthly_strat_candle = calculate_strat(
+        monthly_ticker_candles
+    )
     data_row["monthly_strat_direction"] = monthly_strat_direction
     data_row["monthly_strat"] = monthly_strat
     data_row["monthly_strat_candle"] = monthly_strat_candle

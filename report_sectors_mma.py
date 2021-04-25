@@ -35,7 +35,7 @@ if __name__ == "__main__":
                         parse_dates=True,
                     )
                 ),
-                "W"
+                "W",
             )
         )
         for ticker in tqdm(all_tickers, "Reading data")

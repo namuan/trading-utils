@@ -42,11 +42,15 @@ if __name__ == "__main__":
 
     selected_stocks = (
         enriched_stocks_df.query(query)
-            .sort_values(by=sort_by, ascending=False)
-            .head(n=select_top)
+        .sort_values(by=sort_by, ascending=False)
+        .head(n=select_top)
     )
     report_data = add_reporting_data(selected_stocks)
-    print("Selected Stocks: {}".format(", ".join([f"${d.get('symbol')}" for d in report_data])))
+    print(
+        "Selected Stocks: {}".format(
+            ", ".join([f"${d.get('symbol')}" for d in report_data])
+        )
+    )
     template_data = {"sort_by": sort_by, "query": query, "report_data": report_data}
     report_title = f"Stocks Report: {heading}"
     print("Generating report for: {}".format(report_title))
