@@ -2,14 +2,14 @@
 Generate Multiple Moving Average charts for different sectors
 """
 import argparse
+from time import time_ns
 
 import mplfinance as mpf
 import pandas as pd
 from stockstats import StockDataFrame
-from time import time_ns
 from tqdm import tqdm
 
-from common.analyst import convert_to_weekly
+from common.analyst import resample_candles
 from common.filesystem import output_dir
 from common.reporting import generate_report, convert_to_html
 from common.symbols import macro_etfs
@@ -27,14 +27,15 @@ if __name__ == "__main__":
     print(f"All Tickers: {all_tickers}")
     stocks_df = {
         ticker: StockDataFrame.retype(
-            convert_to_weekly(
+            resample_candles(
                 StockDataFrame.retype(
                     pd.read_csv(
                         f"{output_dir()}/{ticker}.csv",
                         index_col="Date",
                         parse_dates=True,
                     )
-                )
+                ),
+                "W"
             )
         )
         for ticker in tqdm(all_tickers, "Reading data")
