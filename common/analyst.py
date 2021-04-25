@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import numpy as np
@@ -25,7 +26,7 @@ def load_ticker_df(ticker):
     )
 
 
-def convert_to_weekly(daily_candles):
+def resample_candles(daily_candles, time_frame):
     mapping = {
         "open": "first",
         "high": "max",
@@ -33,7 +34,7 @@ def convert_to_weekly(daily_candles):
         "close": "last",
         "volume": "sum",
     }
-    return daily_candles.resample("W").apply(mapping)
+    return daily_candles.resample(time_frame).apply(mapping)
 
 
 def last_close(close_data, days=-1):
@@ -59,6 +60,48 @@ def smooth_trend(df):
     return pos_neg.sum()
 
 
+def calc_strat_n(first_candle, second_candle):
+    strat_n = "0"
+    if first_candle.high > second_candle.high and first_candle.low > second_candle.low:
+        strat_n = "2"
+
+    if first_candle.low < second_candle.low and first_candle.high < second_candle.high:
+        strat_n = "2"
+
+    if first_candle.high > second_candle.high and first_candle.low < second_candle.low:
+        strat_n = "3"
+
+    if first_candle.high < second_candle.high and first_candle.low > second_candle.low:
+        strat_n = "1"
+
+    return strat_n
+
+
+def calculate_strat(ticker_df):
+    try:
+        last_candle = ticker_df.iloc[-1]
+        candle_2 = ticker_df.iloc[-2]
+        candle_3 = ticker_df.iloc[-3]
+
+        strat_n = calc_strat_n(last_candle, candle_2)
+        if strat_n == 2:
+            strat_direction = "up" if last_candle.high > candle_2.high else "down"
+        else:
+            strat_direction = "na"
+
+        strat_prev_n = calc_strat_n(candle_2, candle_3)
+
+        if last_candle.close > last_candle.open:
+            strat_candle = "green"
+        else:
+            strat_candle = "red"
+
+        return strat_direction, f"{strat_prev_n}-{strat_n}", strat_candle
+    except Exception:
+        logging.warning(f"Unable to calculate strat: {ticker_df}")
+        return "na", "na", "na"
+
+
 def enrich_data(ticker_symbol, is_etf=False):
     try:
         ticker_df = load_ticker_df(ticker_symbol)
@@ -82,7 +125,11 @@ def enrich_data(ticker_symbol, is_etf=False):
     stock_data_52_weeks = ticker_df["close"][-256:]
     high_52_weeks = stock_data_52_weeks.max()
     low_52_weeks = stock_data_52_weeks.min()
+    daily_strat_direction, daily_strat, daily_strat_candle = calculate_strat(ticker_df)
     data_row = {
+        "daily_strat_direction": daily_strat_direction,
+        "daily_strat": daily_strat,
+        "daily_strat_candle": daily_strat_candle,
         "symbol": ticker_symbol,
         "is_etf": is_etf,
         "last_close": last_trading_day["close"],
@@ -138,7 +185,7 @@ def enrich_data(ticker_symbol, is_etf=False):
         data_row[f"smooth_{mo}"] = smoothness
 
     # Weekly timeframe calculations
-    weekly_ticker_candles = convert_to_weekly(ticker_df)
+    weekly_ticker_candles = resample_candles(ticker_df, "W")
 
     def weekly_sma():
         for ma in ma_range:
@@ -159,5 +206,17 @@ def enrich_data(ticker_symbol, is_etf=False):
     with_ignoring_errors(
         weekly_ema, f"Unable to calculate weekly ema for {ticker_symbol}"
     )
+
+    weekly_strat_direction, weekly_strat, weekly_strat_candle = calculate_strat(weekly_ticker_candles)
+    data_row["weekly_strat_direction"] = weekly_strat_direction
+    data_row["weekly_strat"] = weekly_strat
+    data_row["weekly_strat_candle"] = weekly_strat_candle
+
+    # Monthly timeframe calculations
+    monthly_ticker_candles = resample_candles(ticker_df, "M")
+    monthly_strat_direction, monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
+    data_row["monthly_strat_direction"] = monthly_strat_direction
+    data_row["monthly_strat"] = monthly_strat
+    data_row["monthly_strat_candle"] = monthly_strat_candle
 
     return data_row
