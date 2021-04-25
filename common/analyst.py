@@ -84,7 +84,7 @@ def calculate_strat(ticker_df):
         candle_3 = ticker_df.iloc[-3]
 
         strat_n = calc_strat_n(last_candle, candle_2)
-        if strat_n == 2:
+        if strat_n == "2":
             strat_direction = "up" if last_candle.high > candle_2.high else "down"
         else:
             strat_direction = "na"
@@ -125,11 +125,7 @@ def enrich_data(ticker_symbol, is_etf=False):
     stock_data_52_weeks = ticker_df["close"][-256:]
     high_52_weeks = stock_data_52_weeks.max()
     low_52_weeks = stock_data_52_weeks.min()
-    daily_strat_direction, daily_strat, daily_strat_candle = calculate_strat(ticker_df)
     data_row = {
-        "daily_strat_direction": daily_strat_direction,
-        "daily_strat": daily_strat,
-        "daily_strat_candle": daily_strat_candle,
         "symbol": ticker_symbol,
         "is_etf": is_etf,
         "last_close": last_trading_day["close"],
@@ -160,7 +156,7 @@ def enrich_data(ticker_symbol, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -170,7 +166,7 @@ def enrich_data(ticker_symbol, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
 
     # ADX
@@ -187,6 +183,11 @@ def enrich_data(ticker_symbol, is_etf=False):
     for mo in [30, 60, 90, 180]:
         smoothness = smooth_trend(stock_data_52_weeks[-mo:])
         data_row[f"smooth_{mo}"] = smoothness
+
+    daily_strat_direction, daily_strat, daily_strat_candle = calculate_strat(ticker_df)
+    data_row["daily_strat_direction"] = daily_strat_direction
+    data_row["daily_strat"] = daily_strat
+    data_row["daily_strat_candle"] = daily_strat_candle
 
     # Weekly timeframe calculations
     weekly_ticker_candles = resample_candles(ticker_df, "W")
@@ -220,6 +221,7 @@ def enrich_data(ticker_symbol, is_etf=False):
 
     # Monthly timeframe calculations
     monthly_ticker_candles = resample_candles(ticker_df, "M")
+
     monthly_strat_direction, monthly_strat, monthly_strat_candle = calculate_strat(
         monthly_ticker_candles
     )
