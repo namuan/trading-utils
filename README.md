@@ -105,18 +105,42 @@ export CHAT_ID = "<telegram-chat-where-the-messages-will-be-pushed>"
 export BOT_TOKEN = "<telegram-bot-token>"
 ```
 
+### Send Reminder links over Telegram
+
 Read links from `webpages.txt` and send over Telegram on a defined schedule.
+See `run()` in [tele_links](tele_links.py) for changing schedule.
+I use it to send me links like `https://swingtradebot.com/equities/general-market-analysis` before market open.
 
 ```shell
 py tele_links
 ```
 
-Send quick analysis on SPY during market hours.
+### Spy analysis
+
+Send quick analysis on SPY during market hours. 
+See `outside_trading_hours()` in [trading_hours](common/trading_hours.py) for changing schedule.
 
 ![SPY Bot](docs/images/telegram-spy-bot.png)
 
 ```shell
 py tele_spy_trade_bot.py
+```
+
+### Twitter to Telegram
+
+Requires setting up following environment variables.
+
+```shell
+export TWITTER_CONSUMER_KEY=
+export TWITTER_CONSUMER_SECRET=
+export TWITTER_ACCESS_TOKEN_KEY=
+export TWITTER_ACCESS_TOKEN_SECRET=
+```
+
+Forward tweets from your followers to a telegram channel.
+
+```shell
+py tele_twitter.py
 ```
 
 ## Crypto Bots
@@ -129,4 +153,8 @@ export EXCHANGE_API_SECRET =
 export EXCHANGE = ""
 ```
 
+See [crypto_ma_trade_bot.py](crypto_ma_trade_bot.py) for an example.
 
+## LICENSE
+
+[MIT License](LICENSE)
