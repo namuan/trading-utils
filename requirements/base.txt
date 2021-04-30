@@ -18,3 +18,5 @@ ccxt
 dataset
 tweepy
 peewee
+dotmap
+flatten-dict

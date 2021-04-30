@@ -155,6 +155,44 @@ export EXCHANGE = ""
 
 See [crypto_ma_trade_bot.py](crypto_ma_trade_bot.py) for an example.
 
+## Options
+
+Uses [Tradier](https://developer.tradier.com/) for fetching data.
+Make sure you signup and have the following variables set in environment. 
+See `.env.example` for more details.
+
+```shell
+export TRADIER_TOKEN=
+```
+
+#### Options price tracker
+
+Track prices for given underlyings every hour in the market session.
+See `inside_trading_hours()` in [trading_hours](common/trading_hours.py) for when it runs.
+The data is stored in a sqlite database file `sqlite:///{home_dir}/options_tracker.db`.
+
+```shell
+py options_price_tracker.py -t SPX,XHB,XLC,XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLR,XLK,XME,XOP,GDX,IYR,XLU
+```
+
+Two tables are created for each symbol.
+
+![](docs/images/options_price_tracker_tables.png)
+
+`{ticker-name}_options` table contains options data.
+
+![](docs/images/options_price_tracker_options_table.png)
+
+`{ticker-name}_stocks` table contains corresponding data for underlying along with the technical analysis.
+
+![](docs/images/options_price_tracker_stock_table.png)
+
+I usually run this on a server so there is a task in the [Makefile](Makefile) to copy the data from remote server to local home folder.
+
+```shell
+make syncoptionspricedata
+```
+
 ## LICENSE
 
 [MIT License](LICENSE)

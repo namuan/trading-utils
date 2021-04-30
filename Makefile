@@ -48,6 +48,7 @@ deploy: clean ## Copies any changed file to the server
 		crypto_ma_trade_bot.py \
 		tele_links.py \
 		tele_twitter.py \
+		options_price_tracker.py \
 		webpages.txt \
 		requirements \
 		${PROJECTNAME}:./${PROJECTNAME}
@@ -60,6 +61,9 @@ stop: deploy ## Stop any running screen session on the server
 
 ssh: ## SSH into the target VM
 	ssh ${PROJECTNAME}
+
+syncoptionspricedata: ## Sync options price tracker database
+	rsync -avzr ${PROJECTNAME}:./options_tracker.db ~/options_tracker.db
 
 .PHONY: help
 .DEFAULT_GOAL := help
