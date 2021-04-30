@@ -39,12 +39,14 @@ def populate_additional_info(ticker):
 
 def build_response_message(ticker):
     logging.info("Processing ticker: {}".format(ticker))
-    chart_link = build_chart_link(ticker)
+    daily_chart_link = build_chart_link(ticker)
+    weekly_chart_link = build_chart_link(ticker, time_period="W")
     sites_urls = build_links_in_markdown(ticker)
     additional_info = populate_additional_info(ticker)
     disclaimer = "_ Disclaimer: Position size calculated for ~1% risk on 10K account. Not financial advice _"
     return (
-        chart_link,
+        daily_chart_link,
+        weekly_chart_link,
         sites_urls + os.linesep + additional_info + disclaimer,
     )
 
@@ -55,8 +57,9 @@ def generate_report(ticker, update: Update, context: CallbackContext):
     update.message.reply_text(f"Looking up #{ticker}", quote=True)
 
     try:
-        chart_link, full_message = build_response_message(ticker)
-        bot.send_photo(cid, chart_link)
+        daily_chart_link, weekly_chart_link, full_message = build_response_message(ticker)
+        bot.send_photo(cid, daily_chart_link)
+        bot.send_photo(cid, weekly_chart_link)
         bot.send_message(
             cid, full_message, disable_web_page_preview=True, parse_mode="Markdown"
         )
