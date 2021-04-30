@@ -36,10 +36,12 @@ if __name__ == "__main__":
     etf_tickers = macro_etfs.keys()
     print(f"Analysing {len(stock_tickers)} stocks and {len(etf_tickers)} etfs")
     stocks_db = filter(
-        lambda val: val, [fetch_data_from_cache(stock, is_etf=False) for stock in tqdm(stock_tickers)]
+        lambda val: val,
+        [fetch_data_from_cache(stock, is_etf=False) for stock in tqdm(stock_tickers)],
     )
     etfs_db = filter(
-        lambda val: val, [fetch_data_from_cache(etf, is_etf=True) for etf in tqdm(etf_tickers)]
+        lambda val: val,
+        [fetch_data_from_cache(etf, is_etf=True) for etf in tqdm(etf_tickers)],
     )
 
     combined_db = list(stocks_db) + list(etfs_db)

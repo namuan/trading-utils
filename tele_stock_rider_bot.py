@@ -45,10 +45,7 @@ def build_response_message(ticker):
     disclaimer = "_ Disclaimer: Position size calculated for ~1% risk on 10K account. Not financial advice _"
     return (
         chart_link,
-        sites_urls
-        + os.linesep
-        + additional_info
-        + disclaimer,
+        sites_urls + os.linesep + additional_info + disclaimer,
     )
 
 
@@ -60,7 +57,9 @@ def generate_report(ticker, update: Update, context: CallbackContext):
     try:
         chart_link, full_message = build_response_message(ticker)
         bot.send_photo(cid, chart_link)
-        bot.send_message(cid, full_message, disable_web_page_preview=True, parse_mode="Markdown")
+        bot.send_message(
+            cid, full_message, disable_web_page_preview=True, parse_mode="Markdown"
+        )
     except NameError as e:
         bot.send_message(cid, str(e))
 

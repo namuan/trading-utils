@@ -11,7 +11,7 @@ jinja_env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), trim_blocks=True)
 
 def build_chart_link(ticker):
     time_period = "d"
-    ta = "sma_20,sma_50,sma_200,macd_b_12_26_9,rsi_b_14"
+    ta = "sma_20,sma_50,sma_200,bb_20_2,macd_b_12_26_9,rsi_b_14"
     random_fn = random.random()
     payload = {"t": ticker, "ta": ta, "p": time_period, "x": f"{random_fn}.jpg"}
     # Reference
@@ -62,19 +62,22 @@ def convert_to_html(output_file: Path, open_page=True):
 
 def build_links_in_markdown(ticker):
     sites = {
-        'FinViz': "https://www.finviz.com/quote.ashx?t={}",
-        'MarketChameleon': "https://marketchameleon.com/Overview/{}/",
-        'BarChart': "https://www.barchart.com/stocks/quotes/{}/options",
-        'StockInvest': "https://stockinvest.us/technical-analysis/{}",
-        'TradingView': "https://www.tradingview.com/chart/?symbol={}",
-        'SwingTradeBot': "https://swingtradebot.com/equities/{}",
-        'StockTwits': "https://stocktwits.com/symbol/{}",
-        'Y Finance': "https://finance.yahoo.com/quote/{}/holders?p=ZZZ",
-        'OAI Earnings': "https://tools.optionsai.com/earnings/{}",
-        'Straddle': "https://optionstrat.com/build/straddle/{}",
-        'Long Call': "https://optionstrat.com/build/long-call/{}",
-        'Short Put': "https://optionstrat.com/build/short-put/{}",
-        'Credit Spread': "https://optionstrat.com/build/bull-put-spread/{}",
+        "FinViz": "https://www.finviz.com/quote.ashx?t={}",
+        "MarketChameleon": "https://marketchameleon.com/Overview/{}/",
+        "BarChart": "https://www.barchart.com/stocks/quotes/{}/options",
+        "StockInvest": "https://stockinvest.us/technical-analysis/{}",
+        "TradingView": "https://www.tradingview.com/chart/?symbol={}",
+        "SwingTradeBot": "https://swingtradebot.com/equities/{}",
+        "StockTwits": "https://stocktwits.com/symbol/{}",
+        "Y Finance": "https://finance.yahoo.com/quote/{}/holders?p=ZZZ",
+        "OAI Earnings": "https://tools.optionsai.com/earnings/{}",
+        "Straddle": "https://optionstrat.com/build/straddle/{}",
+        "Long Call": "https://optionstrat.com/build/long-call/{}",
+        "Short Put": "https://optionstrat.com/build/short-put/{}",
+        "Credit Spread": "https://optionstrat.com/build/bull-put-spread/{}",
     }
-    all_links = [f"[{site_title}]({site_link.format(ticker)})" for site_title, site_link in sites.items()]
+    all_links = [
+        f"[{site_title}]({site_link.format(ticker)})"
+        for site_title, site_link in sites.items()
+    ]
     return " | ".join(all_links)
