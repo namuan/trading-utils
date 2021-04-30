@@ -20,3 +20,4 @@ tweepy
 peewee
 dotmap
 flatten-dict
+python-telegram-bot

@@ -7,7 +7,7 @@ from datetime import datetime
 import dataset
 from tqdm import tqdm
 
-from common.analyst import enrich_data
+from common.analyst import fetch_data_on_demand
 from common.logger import init_logging
 from common.options import combined_options_df
 from common.trading_hours import inside_trading_hours
@@ -36,7 +36,7 @@ def download_stock_analysis_data(db, ticker: str):
     table = db.create_table(
         table_name, primary_id="last_updated", primary_type=db.types.string
     )
-    stocks_data = enrich_data(ticker)
+    stocks_data = fetch_data_on_demand(ticker)
     stocks_data["last_updated"] = ticker + "_" + current_dt
     table.upsert(stocks_data, ["last_updated"])
 

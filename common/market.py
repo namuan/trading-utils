@@ -46,7 +46,7 @@ def load_all_tickers(market_type="all"):
 
 
 def download_ticker_data(ticker, start, end):
-    expire_after = timedelta(days=5)
+    expire_after = timedelta(hours=1)
     session = requests_cache.CachedSession(
         cache_name="cache", backend="sqlite", expire_after=expire_after
     )

@@ -3,14 +3,14 @@ Enrich Stocks and ETF data with different indicators and generates a CSV file fo
 """
 
 import argparse
-from datetime import datetime
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
 
-from common.analyst import enrich_data
+from common.analyst import fetch_data_from_cache
 from common.filesystem import output_dir
 from common.market import load_all_tickers
 from common.symbols import macro_etfs
@@ -36,10 +36,10 @@ if __name__ == "__main__":
     etf_tickers = macro_etfs.keys()
     print(f"Analysing {len(stock_tickers)} stocks and {len(etf_tickers)} etfs")
     stocks_db = filter(
-        lambda val: val, [enrich_data(stock) for stock in tqdm(stock_tickers)]
+        lambda val: val, [fetch_data_from_cache(stock, is_etf=False) for stock in tqdm(stock_tickers)]
     )
     etfs_db = filter(
-        lambda val: val, [enrich_data(etf, is_etf=True) for etf in tqdm(etf_tickers)]
+        lambda val: val, [fetch_data_from_cache(etf, is_etf=True) for etf in tqdm(etf_tickers)]
     )
 
     combined_db = list(stocks_db) + list(etfs_db)

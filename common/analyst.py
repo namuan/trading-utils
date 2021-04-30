@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime
 
 import numpy as np
@@ -8,7 +9,9 @@ from stockstats import StockDataFrame
 
 from common import with_ignoring_errors
 from common.candle_pattern import identify_candle_pattern
+from common.environment import TRADING_RISK_FACTOR, TRADING_ACCOUNT_VALUE
 from common.filesystem import output_dir, earnings_file_path
+from common.market import download_ticker_data
 
 DAYS_IN_MONTH = 22
 
@@ -103,16 +106,31 @@ def calculate_strat(ticker_df):
         return "na", "na", "na"
 
 
-def enrich_data(ticker_symbol, is_etf=False):
+def calculate_position_size(account_value, risk_factor, recent_volatility):
+    if math.isnan(recent_volatility) or recent_volatility == 0:
+        return -1
+    return account_value * risk_factor / recent_volatility
+
+
+def fetch_data_on_demand(ticker):
+    end = datetime.now()
+    start = datetime(end.year - 2, end.month, end.day)
+    ticker_df = StockDataFrame.retype(download_ticker_data(ticker, start, end))
+    if ticker_df.empty:
+        raise NameError("️⚠️  Unable to lookup {}".format(ticker))
+    return enrich_data(ticker, ticker_df)
+
+
+def fetch_data_from_cache(ticker, is_etf):
     try:
-        ticker_df = load_ticker_df(ticker_symbol)
+        ticker_df = load_ticker_df(ticker)
     except FileNotFoundError:
         return {}
 
     earnings_df = load_earnings_tickers()
     earnings_date = None
     if not earnings_df.empty:
-        ticker_earnings = earnings_df[earnings_df["ticker"] == ticker_symbol]
+        ticker_earnings = earnings_df[earnings_df["ticker"] == ticker]
         if not ticker_earnings.empty:
             earnings_date = datetime.strptime(
                 ticker_earnings.get("startdatetime").values[0], "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -121,15 +139,20 @@ def enrich_data(ticker_symbol, is_etf=False):
     if ticker_df.empty:
         return {}
 
+    return enrich_data(ticker, ticker_df, earnings_date=earnings_date, is_etf=is_etf)
+
+
+def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     last_close_date = ticker_df.index[-1]
     last_trading_day = ticker_df.iloc[-1]
+    last_close_price = last_trading_day["close"]
     stock_data_52_weeks = ticker_df["close"][-256:]
     high_52_weeks = stock_data_52_weeks.max()
     low_52_weeks = stock_data_52_weeks.min()
     data_row = {
         "symbol": ticker_symbol,
         "is_etf": is_etf,
-        "last_close": last_trading_day["close"],
+        "last_close": last_close_price,
         "last_close_date": last_close_date,
         "high_52_weeks": high_52_weeks,
         "low_52_weeks": low_52_weeks,
@@ -144,6 +167,12 @@ def enrich_data(ticker_symbol, is_etf=False):
         else "Not Available",
     }
 
+    # Position Sizing with Risk Management
+    recent_volatility = ticker_df["atr_20"].iloc[-1]
+    data_row['position_size'] = calculate_position_size(TRADING_ACCOUNT_VALUE, TRADING_RISK_FACTOR, recent_volatility)
+    data_row["trailing_stop_loss"] = recent_volatility
+    data_row["stop_loss"] = last_close_price - recent_volatility
+
     # Simple and Exponential Moving Average
     fast_ma = [3, 5, 7, 9, 11, 13, 15]
     slow_ma = [30, 35, 40, 45, 50, 55, 60]
@@ -157,7 +186,7 @@ def enrich_data(ticker_symbol, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -167,7 +196,7 @@ def enrich_data(ticker_symbol, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
 
     # ADX

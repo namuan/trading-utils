@@ -49,6 +49,7 @@ deploy: clean ## Copies any changed file to the server
 		tele_links.py \
 		tele_twitter.py \
 		options_price_tracker.py \
+		tele_stock_rider_bot.py \
 		webpages.txt \
 		requirements \
 		${PROJECTNAME}:./${PROJECTNAME}

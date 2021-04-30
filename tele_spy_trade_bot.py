@@ -5,7 +5,7 @@ from datetime import datetime
 
 import schedule
 
-from common.analyst import enrich_data
+from common.analyst import fetch_data_on_demand
 from common.plotting import plot_intraday
 from common.reporting import build_chart_link
 from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
@@ -49,7 +49,7 @@ def run_analysis(telegram=True, output_dir="output"):
     spx_plt = plot_intraday(ticker, period="2d")
     spx_plt.savefig(plt_output_file)
     spx_plt.close()
-    spy_data = enrich_data(ticker)
+    spy_data = fetch_data_on_demand(ticker)
     report = compile_report(spy_data)
     chart_link = build_chart_link(ticker)
     if telegram:
