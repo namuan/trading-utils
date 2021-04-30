@@ -71,7 +71,7 @@ $ py report_by_query.py -o monthly_gains_3 -c 20 -t "Short Term Mean Reversion" 
 
 Make sure you run `make weekend` to download all pre-requisite data.
 
-### Sector Trends
+#### Sector Trends
 
 Generate Multiple Moving Average charts for different sectors
 
@@ -81,7 +81,7 @@ $ py report_sectors_mma.py
 
 ![Sectors MMA](docs/images/sectors-mma.gif)
 
-### Relative Strength (not RSI) using Price Momentum Oscillator
+#### Relative Strength (not RSI) using Price Momentum Oscillator
 
 ```shell
 # Find Leaders/Laggards in the whole market against SPY
@@ -105,7 +105,7 @@ export CHAT_ID = "<telegram-chat-where-the-messages-will-be-pushed>"
 export BOT_TOKEN = "<telegram-bot-token>"
 ```
 
-### Send Reminder links over Telegram
+#### Send Reminder links over Telegram
 
 Read links from `webpages.txt` and send over Telegram on a defined schedule.
 See `run()` in [tele_links](tele_links.py) for changing schedule.
@@ -115,7 +115,7 @@ I use it to send me links like `https://swingtradebot.com/equities/general-marke
 py tele_links
 ```
 
-### Spy analysis
+#### Spy analysis
 
 Send quick analysis on SPY during market hours. 
 See `outside_trading_hours()` in [trading_hours](common/trading_hours.py) for changing schedule.
@@ -126,7 +126,7 @@ See `outside_trading_hours()` in [trading_hours](common/trading_hours.py) for ch
 py tele_spy_trade_bot.py
 ```
 
-### Twitter to Telegram
+#### Twitter to Telegram
 
 Requires setting up following environment variables.
 
