@@ -3,7 +3,7 @@ from telegram import Update
 
 def start(update: Update, _) -> None:
     update.message.reply_text(
-        "Welcome to thetagang bot. Type a symbol with a $ sign. Eg: $TSLA"
+        "👋 Enter a stock ticker with a $ sign. Eg: $TSLA"
     )
 
 
