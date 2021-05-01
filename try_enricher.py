@@ -10,7 +10,7 @@ plt.ioff()
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", None)
 
-ticker = "AIW"
+ticker = "AAPL"
 
 # weekly_options.set_index('Symbol', inplace=True)
 # cboe_options = pd.read_csv(f"data/cboesymboldirequityindex.csv")

@@ -38,7 +38,7 @@ def resample_candles(daily_candles, time_frame):
         "close": "last",
         "volume": "sum",
     }
-    return daily_candles.resample(time_frame).apply(mapping)
+    return StockDataFrame.retype(daily_candles.resample(time_frame).apply(mapping))
 
 
 def last_close(close_data, days=-1):
@@ -203,6 +203,12 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
             ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
 
+    # Close change delta
+    for ccr in [1, 3, 7, 22, 55]:
+        data_row["daily_close_change_delta_{}".format(ccr)] = ticker_df[
+            "close_-{}_d".format(ccr)
+        ].iloc[-1]
+
     # ADX
     for adx_period in [9, 14, 21]:
         data_row[f"adx_{adx_period}"] = ticker_df[f"dx_{adx_period}_ema"].iloc[-1]
@@ -227,6 +233,12 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # Weekly timeframe calculations
     weekly_ticker_candles = resample_candles(ticker_df, "W")
+
+    # Weekly Close change delta
+    for ccr in [1, 3, 7, 22]:
+        data_row["weekly_close_change_delta_{}".format(ccr)] = weekly_ticker_candles[
+            "close_-{}_d".format(ccr)
+        ].iloc[-1]
 
     def weekly_sma():
         for ma in ma_range:
@@ -257,6 +269,12 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # Monthly timeframe calculations
     monthly_ticker_candles = resample_candles(ticker_df, "M")
+
+    # Monthly Close change delta
+    for ccr in [1, 3, 7]:
+        data_row["monthly_close_change_delta_{}".format(ccr)] = monthly_ticker_candles[
+            "close_-{}_d".format(ccr)
+        ].iloc[-1]
 
     monthly_strat_direction, monthly_strat, monthly_strat_candle = calculate_strat(
         monthly_ticker_candles
