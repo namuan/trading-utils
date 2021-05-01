@@ -20,31 +20,35 @@ from common.reporting import build_links_in_markdown
 
 
 def select_strikes_for(
-        options_df,
-        selected_expiry,
-        option_type,
-        additional_filters,
-        sort_criteria,
-        fetch_limit,
+    options_df,
+    selected_expiry,
+    option_type,
+    additional_filters,
+    sort_criteria,
+    fetch_limit,
 ):
     option_query = f"(expiration_date == '{selected_expiry}') and (option_type == '{option_type}') and {additional_filters}"
     return (
-        options_df.query(option_query)
-            .sort_values(**sort_criteria)
-            .head(n=fetch_limit)
+        options_df.query(option_query).sort_values(**sort_criteria).head(n=fetch_limit)
     )
 
 
 def filter_strikes(options_df, selected_expiry, delta=0.3):
     selected_call_strikes = select_strikes_for(
-        options_df, selected_expiry, option_type="call", additional_filters=f"(greeks_delta < {delta})",
+        options_df,
+        selected_expiry,
+        option_type="call",
+        additional_filters=f"(greeks_delta < {delta})",
         sort_criteria=dict(by="greeks_delta", ascending=False),
-        fetch_limit=1
+        fetch_limit=1,
     )
     selected_put_strikes = select_strikes_for(
-        options_df, selected_expiry, option_type="put", additional_filters=f"(greeks_delta > -{delta})",
+        options_df,
+        selected_expiry,
+        option_type="put",
+        additional_filters=f"(greeks_delta > -{delta})",
         sort_criteria=dict(by="greeks_delta", ascending=True),
-        fetch_limit=1
+        fetch_limit=1,
     )
     return (
         selected_call_strikes.iloc[0].to_dict(),

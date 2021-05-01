@@ -190,7 +190,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -200,7 +200,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
         )
 
     # Close change delta

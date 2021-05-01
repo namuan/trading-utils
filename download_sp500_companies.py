@@ -16,6 +16,6 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    payload = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    payload = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
     large_cap_companies = payload[0]
     large_cap_companies.to_csv(LARGE_CAP_TICKERS_FILE, index=False)
