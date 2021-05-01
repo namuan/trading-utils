@@ -36,7 +36,7 @@ def download_stock_analysis_data(db, ticker: str):
     table = db.create_table(
         table_name, primary_id="last_updated", primary_type=db.types.string
     )
-    stocks_data = fetch_data_on_demand(ticker)
+    stocks_data, _ = fetch_data_on_demand(ticker)
     stocks_data["last_updated"] = ticker + "_" + current_dt
     table.upsert(stocks_data, ["last_updated"])
 

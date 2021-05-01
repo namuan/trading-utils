@@ -18,7 +18,7 @@ from common.reporting import build_chart_link, build_links_in_markdown
 
 
 def populate_additional_info(ticker):
-    d, _ = fetch_data_on_demand(ticker)
+    d, ticker_df = fetch_data_on_demand(ticker)
     return """
 *Close* {:.2f} | *📈(1M)* {:.2f} | *Position* {} | *Trailing SL* {:.2f} | *SL* {:.2f}
     """.format(
@@ -32,6 +32,15 @@ def populate_additional_info(ticker):
 
 def build_response_message(ticker):
     logging.info("Processing ticker: {}".format(ticker))
+    # Get Ticker data
+    # Plot Chart
+    # Get Options Prices
+    # For the next 3 expiries
+    # -> Calculate 30 delta Strangles
+    # -> Plot a line and annotate chart with strike prices
+    # Save plot as file
+    # Send plot over chat
+    # Get additional info and site urls
     daily_chart_link = build_chart_link(ticker)
     weekly_chart_link = build_chart_link(ticker, time_period="W")
     sites_urls = build_links_in_markdown(ticker)
@@ -50,12 +59,7 @@ def generate_report(ticker, update: Update, context: CallbackContext):
     update.message.reply_text(f"Looking up #{ticker}", quote=True)
 
     try:
-        daily_chart_link, weekly_chart_link, full_message = build_response_message(ticker)
-        bot.send_photo(cid, daily_chart_link)
-        bot.send_photo(cid, weekly_chart_link)
-        bot.send_message(
-            cid, full_message, disable_web_page_preview=True, parse_mode="Markdown"
-        )
+        chart_file, _, full_message = build_response_message(ticker)
     except NameError as e:
         bot.send_message(cid, str(e))
 

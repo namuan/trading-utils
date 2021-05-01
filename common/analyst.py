@@ -118,7 +118,7 @@ def fetch_data_on_demand(ticker):
     ticker_df = StockDataFrame.retype(download_ticker_data(ticker, start, end))
     if ticker_df.empty:
         raise NameError("️⚠️  Unable to lookup {}".format(ticker))
-    return enrich_data(ticker, ticker_df)
+    return enrich_data(ticker, ticker_df), ticker_df
 
 
 def fetch_data_from_cache(ticker, is_etf):
