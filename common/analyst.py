@@ -11,7 +11,7 @@ from common import with_ignoring_errors
 from common.candle_pattern import identify_candle_pattern
 from common.environment import TRADING_RISK_FACTOR, TRADING_ACCOUNT_VALUE
 from common.filesystem import output_dir, earnings_file_path
-from common.market import download_ticker_data
+from common.market import download_ticker_data, large_cap_companies
 
 DAYS_IN_MONTH = 22
 
@@ -127,6 +127,9 @@ def fetch_data_from_cache(ticker, is_etf):
     except FileNotFoundError:
         return {}
 
+    if ticker_df.empty:
+        return {}
+
     earnings_df = load_earnings_tickers()
     earnings_date = None
     if not earnings_df.empty:
@@ -136,13 +139,7 @@ def fetch_data_from_cache(ticker, is_etf):
                 ticker_earnings.get("startdatetime").values[0], "%Y-%m-%dT%H:%M:%S.%fZ"
             )
 
-    if ticker_df.empty:
-        return {}
-
-    return (
-        enrich_data(ticker, ticker_df, earnings_date=earnings_date, is_etf=is_etf),
-        ticker_df,
-    )
+    return enrich_data(ticker, ticker_df, earnings_date=earnings_date, is_etf=is_etf)
 
 
 def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
@@ -152,9 +149,11 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     stock_data_52_weeks = ticker_df["close"][-256:]
     high_52_weeks = stock_data_52_weeks.max()
     low_52_weeks = stock_data_52_weeks.min()
+
     data_row = {
         "symbol": ticker_symbol,
         "is_etf": is_etf,
+        "is_large_cap": ticker_symbol in large_cap_companies,
         "last_close": last_close_price,
         "last_close_date": last_close_date,
         "high_52_weeks": high_52_weeks,
@@ -191,7 +190,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -201,7 +200,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
 
     # ADX

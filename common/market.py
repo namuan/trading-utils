@@ -70,3 +70,6 @@ def download_tickers_data(tickers, start, end):
     if bad_tickers:
         print("Unable to download these tickers")
         print(bad_tickers)
+
+
+large_cap_companies = load_all_tickers(market_type="large-cap")

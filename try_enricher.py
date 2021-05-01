@@ -3,19 +3,20 @@ import json
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from common.analyst import fetch_data_on_demand
+from common.analyst import fetch_data_from_cache
 
 plt.ioff()
 
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", None)
 
-ticker = "AAPL"
+ticker = "AIW"
 
 # weekly_options.set_index('Symbol', inplace=True)
 # cboe_options = pd.read_csv(f"data/cboesymboldirequityindex.csv")
 # print(has_options('AAPL'))
-data, ticker_df = fetch_data_on_demand(ticker)
+# data, ticker_df = fetch_data_on_demand(ticker)
+data = fetch_data_from_cache(ticker, is_etf=False)
 keys = list(data.keys())
 print(json.dumps(keys, indent=4))
 print(data)

@@ -26,7 +26,6 @@ def identify_candle_pattern(ticker_df):
 
     return ",".join(patterns) if patterns else "na"
 
-
 # For Reference
 # // Created by Robert N. 030715
 # // Updated 031115
