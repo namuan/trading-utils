@@ -50,20 +50,20 @@ def download_ticker_data(ticker, start, end):
     session = requests_cache.CachedSession(
         cache_name="cache", backend="sqlite", expire_after=expire_after
     )
-    return pdr.DataReader(
+    ticker_df = pdr.DataReader(
         ticker, data_source="yahoo", start=start, end=end, session=session
     )
+    ticker_df.to_csv(f"{output_dir()}/{ticker}.csv")
+    return ticker_df
 
 
 def download_tickers_data(tickers, start, end):
     print(f"Downloading data for {len(tickers)} tickers")
-
     bad_tickers = []
 
     for t in tqdm(tickers):
         try:
-            df = download_ticker_data(t, start, end)
-            df.to_csv(f"{output_dir()}/{t}.csv")
+            download_ticker_data(t, start, end)
         except Exception as e:
             bad_tickers.append(dict(symbol=t, reason=e))
 

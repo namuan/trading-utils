@@ -62,10 +62,7 @@ def build_links_in_markdown(ticker):
         "StockTwits": "https://stocktwits.com/symbol/{}",
         "Y Finance": "https://finance.yahoo.com/quote/{}/holders?p=ZZZ",
         "OAI Earnings": "https://tools.optionsai.com/earnings/{}",
-        "Straddle": "https://optionstrat.com/build/straddle/{}",
-        "Long Call": "https://optionstrat.com/build/long-call/{}",
-        "Short Put": "https://optionstrat.com/build/short-put/{}",
-        "Credit Spread": "https://optionstrat.com/build/bull-put-spread/{}",
+        "OptionStrat": "https://optionstrat.com/optimize?referrer=stockriderbot",
     }
     all_links = [
         f"[{site_title}]({site_link.format(ticker)})"

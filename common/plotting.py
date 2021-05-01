@@ -31,8 +31,8 @@ def plot_intraday(ticker, period="1d", interval="1m"):
     return plt
 
 
-def save_and_open_plt_fig(plt_fig, file_path, close_fig=True):
-    plt_fig.savefig(file_path)
+def save_and_open_plt_fig(plt_fig, file_path, dpi=1200, close_fig=True):
+    plt_fig.savefig(file_path, dpi=dpi)
     if close_fig:
         plt_fig.close()
     subprocess.call("open {}".format(file_path), shell=True)

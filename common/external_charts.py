@@ -9,7 +9,9 @@ class ChartProvider(Enum):
     STOCK_CHARTS = auto()
 
 
-def build_chart_link(ticker, time_period="d", provider: ChartProvider = ChartProvider.FIN_VIZ):
+def build_chart_link(
+    ticker, time_period="d", provider: ChartProvider = ChartProvider.FIN_VIZ
+):
     # Reference
     # https://github.com/reaganmcf/discord-stock-bot/blob/master/index.js
     # chart_link = "https://elite.finviz.com/chart.ashx?t=aapl&p=d&ta=sma_20,sma_50,sma_200,macd_b_12_26_9,mfi_b_14"

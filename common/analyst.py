@@ -112,12 +112,12 @@ def calculate_position_size(account_value, risk_factor, recent_volatility):
     return account_value * risk_factor / recent_volatility
 
 
-def fetch_data_on_demand(ticker):
+def fetch_data_on_demand(ticker, is_etf=False):
     end = datetime.now()
     start = datetime(end.year - 2, end.month, end.day)
     ticker_df = StockDataFrame.retype(download_ticker_data(ticker, start, end))
     if ticker_df.empty:
-        raise NameError("️⚠️  Unable to lookup {}".format(ticker))
+        raise NameError("️⚠️ Unable to lookup {}".format(ticker))
     return enrich_data(ticker, ticker_df), ticker_df
 
 
@@ -139,7 +139,10 @@ def fetch_data_from_cache(ticker, is_etf):
     if ticker_df.empty:
         return {}
 
-    return enrich_data(ticker, ticker_df, earnings_date=earnings_date, is_etf=is_etf)
+    return (
+        enrich_data(ticker, ticker_df, earnings_date=earnings_date, is_etf=is_etf),
+        ticker_df,
+    )
 
 
 def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
