@@ -13,8 +13,9 @@ from telegram.ext import (
 from common.analyst import fetch_data_on_demand
 from common.bot_wrapper import start, help_command
 from common.environment import TELEGRAM_STOCK_RIDER_BOT
+from common.external_charts import build_chart_link
 from common.logger import init_logging
-from common.reporting import build_chart_link, build_links_in_markdown
+from common.reporting import build_links_in_markdown
 
 
 def populate_additional_info(ticker):

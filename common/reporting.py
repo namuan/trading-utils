@@ -1,23 +1,14 @@
-import random
-from urllib.parse import urlencode
 import subprocess
-from jinja2 import Environment, FileSystemLoader
-from pathlib import Path
+
 from datetime import datetime
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader
+
+from common.external_charts import build_chart_link
 
 TEMPLATE_DIR = Path().joinpath("templates").as_posix()
 jinja_env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), trim_blocks=True)
-
-
-def build_chart_link(ticker, time_period="d"):
-    ta = "sma_20,sma_50,sma_200,bb_20_2,macd_b_12_26_9,rsi_b_14"
-    random_fn = random.random()
-    payload = {"t": ticker, "ta": ta, "p": time_period, "x": f"{random_fn}.jpg"}
-    # Reference
-    # https://github.com/reaganmcf/discord-stock-bot/blob/master/index.js
-    # chart_link = "https://elite.finviz.com/chart.ashx?t=aapl&p=d&ta=sma_20,sma_50,sma_200,macd_b_12_26_9,mfi_b_14"
-    # https://stockcharts.com/c-sc/sc?s=AAPL&p=W&b=5&g=0&i=t8068431644c&r=1619814408069
-    return f"https://stockcharts.com/c-sc/sc?s={ticker}&p={time_period}&b=5&g=0&i=t8068431644c&r=1619814408069"
 
 
 def add_reporting_data(selected_stocks):

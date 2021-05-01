@@ -6,8 +6,8 @@ from datetime import datetime
 import schedule
 
 from common.analyst import fetch_data_on_demand
+from common.external_charts import build_chart_link
 from common.plotting import plot_intraday
-from common.reporting import build_chart_link
 from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
 from common.trading_hours import outside_trading_hours
 
