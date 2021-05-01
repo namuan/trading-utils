@@ -1,3 +1,8 @@
+import warnings
+
+warnings.filterwarnings("ignore")
+
+
 def identify_candle_pattern(ticker_df):
     last_candle = ticker_df.iloc[-1]
     c = last_candle.close
@@ -7,15 +12,15 @@ def identify_candle_pattern(ticker_df):
 
     patterns = []
     is_doji = (
-        abs(c - o) / (h - l) < 0.1
-        and (h - max(c, o)) > (3 * abs(c - o))
-        and (min(c, o) - l) > (3 * abs(c - o))
+            abs(c - o) / (h - l) < 0.1
+            and (h - max(c, o)) > (3 * abs(c - o))
+            and (min(c, o) - l) > (3 * abs(c - o))
     )
 
     is_hanging_man = (
-        0.3 > abs(c - o) / (h - l) >= 0.1
-        and (min(c, o) - l) >= (2 * abs(c - o))
-        and (h - max(c, o)) > (0.25 * abs(c - o))
+            0.3 > abs(c - o) / (h - l) >= 0.1
+            and (min(c, o) - l) >= (2 * abs(c - o))
+            and (h - max(c, o)) > (0.25 * abs(c - o))
     )
 
     if is_doji:
