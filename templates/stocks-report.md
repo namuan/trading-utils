@@ -18,7 +18,7 @@ Sort By: {{ stocks["sort_by"] }}
 | ATR(20) | {{ '%0.2f' % stock['atr_20'] }} |
 | 💹 1 Month Gain | {{ '%0.2f' % stock['monthly_gains_1'] }}% |
 | 💹 💹 3 Months Gain | {{ '%0.2f' % stock['monthly_gains_3'] }}% |
-| 🔢 Position Size (based on 10K/~1% risk) | {{ '%0.2f' % stock['position_size'] }} |
+| 🔢 Position Size (based on ~1% risk along with SL below) | {{ '%0.2f' % stock['position_size'] }} |
 | 💸 Purchase Price | {{ '%0.2f' % (stock['position_size']|float * stock['last_close']|float) }} |
 | **1 ATR(20)** | |
 | ▶️ Trailing Stop Loss | {{ '%0.2f' % stock['atr_20'] }} | 

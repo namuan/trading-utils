@@ -41,7 +41,7 @@ def build_response_message(ticker):
     )
     sites_urls = build_links_in_markdown(ticker)
     additional_info = populate_additional_info(ticker)
-    disclaimer = "_ Disclaimer: Position size calculated for ~1% risk on 10K account. Not financial advice _"
+    disclaimer = "_ Disclaimer: Position size calculated for ~1% risk using given SL. Not financial advice _"
     return (
         daily_chart_link,
         weekly_chart_link,
