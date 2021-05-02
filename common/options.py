@@ -6,6 +6,7 @@ from dotmap import DotMap
 from flatten_dict import flatten
 
 from common.environment import TRADIER_BASE_URL, TRADIER_TOKEN
+from common.filesystem import output_dir
 
 
 def get_data(path, params):
@@ -59,4 +60,8 @@ def combined_options_df(ticker, expiries):
         options_df = process_options_data(option_data)
         options_records.append(options_df.to_dict("records"))
 
-    return pd.DataFrame([item for each_row in options_records for item in each_row])
+    full_options_chain_df = pd.DataFrame([item for each_row in options_records for item in each_row])
+    full_options_chain_df.to_csv(
+        "{}/{}-options-data.csv".format(output_dir(), ticker), index=False
+    )
+    return full_options_chain_df

@@ -20,12 +20,12 @@ from common.reporting import build_links_in_markdown
 
 
 def select_strikes_for(
-    options_df,
-    selected_expiry,
-    option_type,
-    additional_filters,
-    sort_criteria,
-    fetch_limit,
+        options_df,
+        selected_expiry,
+        option_type,
+        additional_filters,
+        sort_criteria,
+        fetch_limit,
 ):
     option_query = f"(expiration_date == '{selected_expiry}') and (option_type == '{option_type}') and {additional_filters}"
     return (
@@ -73,7 +73,7 @@ def build_options_trade_info(ticker, options_df):
     for idx, (call_strike_record, put_strike_record) in enumerate(selected_strikes):
         selected_expiry = call_strike_record.get("expiration_date")
         call_strike = call_strike_record.get("strike")
-        call_credit = call_strike_record.get("ask")
+        call_credit = call_strike_record.get("bid")
         put_strike = put_strike_record.get("strike")
         put_delta = put_strike_record.get("greeks_delta")
         put_credit = put_strike_record.get("bid")
@@ -157,6 +157,14 @@ def main():
     updater.idle()
 
 
+def run_once(ticker):
+    # Testing
+    m = populate_additional_info(ticker)
+    print(m)
+    exit(-1)
+
+
 if __name__ == "__main__":
     init_logging()
+    # run_once("XLU") - Enable for testing
     main()
