@@ -67,10 +67,10 @@ def smooth_trend(df):
 def calc_strat_n(first_candle, second_candle):
     strat_n = "0"
     if first_candle.high > second_candle.high and first_candle.low > second_candle.low:
-        strat_n = "2"
+        strat_n = "2u"
 
     if first_candle.low < second_candle.low and first_candle.high < second_candle.high:
-        strat_n = "2"
+        strat_n = "2d"
 
     if first_candle.high > second_candle.high and first_candle.low < second_candle.low:
         strat_n = "3"
@@ -86,24 +86,21 @@ def calculate_strat(ticker_df):
         last_candle = ticker_df.iloc[-1]
         candle_2 = ticker_df.iloc[-2]
         candle_3 = ticker_df.iloc[-3]
+        candle_4 = ticker_df.iloc[-4]
 
-        strat_n = calc_strat_n(last_candle, candle_2)
-        if strat_n == "2":
-            strat_direction = "up" if last_candle.high > candle_2.high else "down"
-        else:
-            strat_direction = "na"
-
-        strat_prev_n = calc_strat_n(candle_2, candle_3)
+        first_level_strat_n = calc_strat_n(last_candle, candle_2)
+        second_level_strat_n = calc_strat_n(candle_2, candle_3)
+        third_level_strat_n = calc_strat_n(candle_3, candle_4)
 
         if last_candle.close > last_candle.open:
-            strat_candle = "green"
+            last_candle_direction = "green"
         else:
-            strat_candle = "red"
+            last_candle_direction = "red"
 
-        return strat_direction, f"{strat_prev_n}-{strat_n}", strat_candle
+        return f"{third_level_strat_n}-{second_level_strat_n}-{first_level_strat_n}", last_candle_direction
     except Exception:
         logging.warning(f"Unable to calculate strat: {ticker_df}")
-        return "na", "na", "na"
+        return "na", "na"
 
 
 def calculate_position_size(account_value, risk_factor, recent_volatility):
@@ -190,7 +187,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -200,7 +197,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
 
     # Close change delta
@@ -224,8 +221,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         smoothness = smooth_trend(stock_data_52_weeks[-mo:])
         data_row[f"smooth_{mo}"] = smoothness
 
-    daily_strat_direction, daily_strat, daily_strat_candle = calculate_strat(ticker_df)
-    data_row["daily_strat_direction"] = daily_strat_direction
+    daily_strat, daily_strat_candle = calculate_strat(ticker_df)
     data_row["daily_strat"] = daily_strat
     data_row["daily_strat_candle"] = daily_strat_candle
 
@@ -260,10 +256,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         weekly_ema, f"Unable to calculate weekly ema for {ticker_symbol}"
     )
 
-    weekly_strat_direction, weekly_strat, weekly_strat_candle = calculate_strat(
+    weekly_strat, weekly_strat_candle = calculate_strat(
         weekly_ticker_candles
     )
-    data_row["weekly_strat_direction"] = weekly_strat_direction
     data_row["weekly_strat"] = weekly_strat
     data_row["weekly_strat_candle"] = weekly_strat_candle
 
@@ -276,10 +271,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
             "close_-{}_d".format(ccr)
         ].iloc[-1]
 
-    monthly_strat_direction, monthly_strat, monthly_strat_candle = calculate_strat(
+    monthly_strat, monthly_strat_candle = calculate_strat(
         monthly_ticker_candles
     )
-    data_row["monthly_strat_direction"] = monthly_strat_direction
     data_row["monthly_strat"] = monthly_strat
     data_row["monthly_strat_candle"] = monthly_strat_candle
 
