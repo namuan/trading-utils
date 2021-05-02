@@ -43,6 +43,7 @@ deploy: clean ## Copies any changed file to the server
 	ssh ${PROJECTNAME} -C 'bash -l -c "mkdir -vp ./${PROJECTNAME}/output"'
 	rsync -avzr \
 		.env \
+		data \
 		common \
 		scripts \
 		crypto_ma_trade_bot.py \
