@@ -106,7 +106,7 @@ def calculate_strat(ticker_df):
 def calculate_position_size(account_value, risk_factor, recent_volatility):
     if math.isnan(recent_volatility) or recent_volatility == 0:
         return -1
-    return account_value * risk_factor / recent_volatility
+    return math.floor(account_value * (risk_factor / recent_volatility))
 
 
 def fetch_data_on_demand(ticker, is_etf=False):
