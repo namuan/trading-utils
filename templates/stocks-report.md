@@ -8,9 +8,7 @@ Sort By: {{ stocks["sort_by"] }}
 
 ### {{ stock['symbol'] }}
 
-<img src="{{ stock['chart_link'] }}" />
-
-[comment]: <> (data_row["fixed_stop_loss_1_atr_20"] * data_row["position_size"] - total_purchase_price)
+![]({{ stock['chart_link'] }})
 
 |         |                                            |
 | ------------- | ----------------------------------------------- |
