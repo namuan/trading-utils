@@ -9,7 +9,6 @@ import pandas as pd
 from stockstats import StockDataFrame
 from tqdm import tqdm
 
-from common.analyst import resample_candles
 from common.filesystem import output_dir
 from common.reporting import generate_report, convert_to_html
 from common.symbols import macro_etfs
@@ -27,15 +26,10 @@ if __name__ == "__main__":
     print(f"All Tickers: {all_tickers}")
     stocks_df = {
         ticker: StockDataFrame.retype(
-            resample_candles(
-                StockDataFrame.retype(
-                    pd.read_csv(
-                        f"{output_dir()}/{ticker}.csv",
-                        index_col="Date",
-                        parse_dates=True,
-                    )
-                ),
-                "W",
+            pd.read_csv(
+                f"{output_dir()}/{ticker}.csv",
+                index_col="Date",
+                parse_dates=True,
             )
         )
         for ticker in tqdm(all_tickers, "Reading data")
@@ -43,7 +37,7 @@ if __name__ == "__main__":
 
     # price / vol plot
     for ticker, desc in all_tickers.items():
-        ohlcv_df = stocks_df.get(ticker)[-30:]
+        ohlcv_df = stocks_df.get(ticker)[-90:]
         additional_plots = []
         ma_list = [3, 5, 7, 9, 11, 21, 24, 27, 30, 33, 36]
         for ma in ma_list:
