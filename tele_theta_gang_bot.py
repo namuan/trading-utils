@@ -129,7 +129,7 @@ def generate_report(ticker, update: Update, context: CallbackContext):
         bot.send_message(
             cid, full_message, disable_web_page_preview=True, parse_mode="Markdown"
         )
-    except NameError as e:
+    except (NameError, AttributeError) as e:
         bot.send_message(cid, str(e))
 
 
@@ -166,5 +166,5 @@ def run_once(ticker):
 
 if __name__ == "__main__":
     init_logging()
-    # run_once("XLU") - Enable for testing
+    # run_once("GBTC") # - Enable for testing
     main()

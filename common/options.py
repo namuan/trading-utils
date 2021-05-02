@@ -34,14 +34,14 @@ def option_expirations(symbol):
 
 
 def fetch_options_data(ticker, expiries=10):
-    try:
-        expirations_output = option_expirations(ticker)
-        for exp_date in expirations_output.expirations.date[:expiries]:
-            logging.info(">> {} data for {}".format(ticker, exp_date))
-            options_data = option_chain(ticker, exp_date)
-            yield exp_date, options_data
-    except Exception:
-        logging.exception(f"Error downloading options for {ticker}")
+    expirations_output = option_expirations(ticker)
+    if not expirations_output.expirations:
+        raise AttributeError("Unable to find options for {}".format(ticker))
+
+    for exp_date in expirations_output.expirations.date[:expiries]:
+        logging.info(">> {} data for {}".format(ticker, exp_date))
+        options_data = option_chain(ticker, exp_date)
+        yield exp_date, options_data
 
 
 def process_options_data(options_data_single_expiry):
