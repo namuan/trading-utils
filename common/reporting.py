@@ -51,19 +51,22 @@ def convert_to_html(output_file: Path, open_page=True):
     return target_file
 
 
+sites = {
+    "FinViz": "https://www.finviz.com/quote.ashx?t={}",
+    "MarketChameleon": "https://marketchameleon.com/Overview/{}/",
+    "BarChart[Price]": "https://www.barchart.com/stocks/quotes/{}/overview",
+    "BarChart[Options]": "https://www.barchart.com/stocks/quotes/{}/options",
+    "StockInvest": "https://stockinvest.us/technical-analysis/{}",
+    "TradingView": "https://www.tradingview.com/chart/?symbol={}",
+    "SwingTradeBot": "https://swingtradebot.com/equities/{}",
+    "StockTwits[Sentiments]": "https://stocktwits.com/symbol/{}",
+    "Y Finance": "https://finance.yahoo.com/quote/{}/holders?p=ZZZ",
+    "OAI Earnings": "https://tools.optionsai.com/earnings/{}",
+    "OptionStrat[Long Call]": "https://optionstrat.com/build/long-call/{}?referrer=stockriderbot",
+}
+
+
 def build_links_in_markdown(ticker):
-    sites = {
-        "FinViz": "https://www.finviz.com/quote.ashx?t={}",
-        "MarketChameleon": "https://marketchameleon.com/Overview/{}/",
-        "BarChart": "https://www.barchart.com/stocks/quotes/{}/options",
-        "StockInvest": "https://stockinvest.us/technical-analysis/{}",
-        "TradingView": "https://www.tradingview.com/chart/?symbol={}",
-        "SwingTradeBot": "https://swingtradebot.com/equities/{}",
-        "StockTwits": "https://stocktwits.com/symbol/{}",
-        "Y Finance": "https://finance.yahoo.com/quote/{}/holders?p=ZZZ",
-        "OAI Earnings": "https://tools.optionsai.com/earnings/{}",
-        "OptionStrat": "https://optionstrat.com/optimize?referrer=stockriderbot",
-    }
     all_links = [
         f"[{site_title}]({site_link.format(ticker)})"
         for site_title, site_link in sites.items()

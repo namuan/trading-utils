@@ -21,3 +21,4 @@ peewee
 dotmap
 flatten-dict
 python-telegram-bot
+justpy
