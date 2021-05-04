@@ -26,14 +26,15 @@ load_dotenv()
 
 CANDLE_TIME_FRAME = "1h"
 CURRENCY = "USDT"
-COIN = "XLM"
+COIN = "DOGE"
 MARKET = f"{COIN}/{CURRENCY}"
 
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-t", "--table-name", type=str, help="Database table name", default="trades"
+        "-t", "--table-name", type=str, help="Database table name",
+        default="{}_{}_trades".format(COIN.lower(), CURRENCY.lower())
     )
     parser.add_argument(
         "-f",
@@ -41,6 +42,13 @@ def parse_args():
         type=str,
         help="Database file name",
         default="crypto_trade_diary.db",
+    )
+    parser.add_argument(
+        "-b",
+        "--buying-budget",
+        type=int,
+        help="Buying allocation budget in currency amount",
+        default=50
     )
     parser.add_argument(
         "-w",
@@ -163,6 +171,7 @@ class IdentifyBuySellSignal(object):
             context["signal"] = "SELL"
         else:
             context["signal"] = "NO_SIGNAL"
+        logging.info(f"Identified signal => {context.get('signal')}")
 
 
 class LoadLastTransactionFromDatabase(object):
@@ -177,6 +186,26 @@ class LoadLastTransactionFromDatabase(object):
             context["last_transaction_signal"] = "SELL"
 
 
+class CheckIfIsANewSignal:
+    def _same_as_previous_signal(self, current_signal, last_signal, last_transaction_signal):
+        return (
+                last_signal == current_signal or last_transaction_signal == current_signal
+        )
+
+    def run(self, context):
+        current_signal = context["signal"]
+        last_signal = context.get("last_signal", "NA")
+        last_transaction_signal = context["last_transaction_signal"]
+
+        if self._same_as_previous_signal(
+                current_signal, last_signal, last_transaction_signal
+        ):
+            logging.info(
+                f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
+            )
+            context["signal"] = "NO_SIGNAL"
+
+
 class FetchAccountInfoFromExchange(object):
     def run(self, context):
         exchange_id = context["exchange"]
@@ -188,26 +217,56 @@ class FetchAccountInfoFromExchange(object):
         context["COIN_BALANCE"] = account_balance.get(COIN)
 
 
-class TradeBasedOnSignal(object):
-    def _same_as_previous_signal(
-        self, current_signal, last_signal, last_transaction_signal
-    ):
-        return (
-            last_signal == current_signal or last_transaction_signal == current_signal
+class CalculateBuySellAmountBasedOnAllocatedPot:
+    def run(self, context):
+        close_price = context["close"]
+        buying_budget = context["args"].buying_budget
+        currency_balance = context["CURRENCY_BALANCE"]
+
+        allocated_currency = buying_budget * 90 / 100 if currency_balance >= buying_budget else currency_balance
+        coin_amount_to_buy = allocated_currency / close_price
+        context["buy_trade_amount"] = coin_amount_to_buy
+
+        coin_account_balance = context["COIN_BALANCE"]
+        context["sell_trade_amount"] = coin_account_balance
+        logging.info(
+            f"Trade amount calculation: Buying {coin_amount_to_buy} {CURRENCY}, Selling {coin_account_balance} {COIN}"
         )
 
+
+class ExecuteBuyTradeIfSignaled:
     def run(self, context):
         current_signal = context["signal"]
-        last_signal = context.get("last_signal", "NA")
-        last_transaction_signal = context["last_transaction_signal"]
+        close_price = context["close"]
+        exchange_id = context["exchange"]
+        exchange: Exchange = exchange_factory(exchange_id)
+        market = context["market"]
 
-        if self._same_as_previous_signal(
-            current_signal, last_signal, last_transaction_signal
-        ):
-            logging.info(
-                f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
-            )
-            return
+        try:
+            if current_signal != "BUY":
+                logging.info(f"😞 Current signal ({current_signal}) is not BUY")
+                return
+
+            trade_amount = context["buy_trade_amount"]
+            if not args.dry_run:
+                exchange.create_market_buy_order(market, trade_amount)
+            else:
+                logging.info(
+                    f"Dry Run: {current_signal} => Trade amount: {trade_amount}"
+                )
+
+            context["trade_done"] = True
+            message = f"""🔔 {current_signal} ({trade_amount}) {market} at {close_price}"""
+            logging.info(message)
+        except Exception:
+            error_message = f"🚨 Unable to place {current_signal} order for {market} at {close_price}"
+            logging.exception(error_message)
+            send_message_to_telegram(error_message, override_chat_id=GROUP_CHAT_ID)
+
+
+class ExecuteSellTradeIfSignaled:
+    def run(self, context):
+        current_signal = context["signal"]
 
         exchange_id = context["exchange"]
         exchange: Exchange = exchange_factory(exchange_id)
@@ -217,32 +276,20 @@ class TradeBasedOnSignal(object):
         close_price = context["close"]
         context["last_signal"] = current_signal
         try:
-            if current_signal == "NO_SIGNAL":
-                logging.info("😞 NO SIGNAL")
+            if current_signal != "SELL":
+                logging.info(f"😞 Current signal ({current_signal}) is not SELL")
                 return
 
-            if current_signal == "BUY":
-                currency_account_balance = context["CURRENCY_BALANCE"]
-                coin_amount_to_buy = currency_account_balance / close_price
-                context["trade_amount"] = coin_amount_to_buy
-                if not args.dry_run:
-                    exchange.create_market_buy_order(market, coin_amount_to_buy)
-                else:
-                    logging.info(
-                        f"Dry Run: {current_signal} => Currency account balance: {currency_account_balance}"
-                    )
-            elif current_signal == "SELL":
-                coin_account_balance = context["COIN_BALANCE"]
-                context["trade_amount"] = coin_account_balance
-                if not args.dry_run:
-                    exchange.create_market_sell_order(market, coin_account_balance)
-                else:
-                    logging.info(
-                        f"Dry Run: {current_signal} =>, Coin account balance: {coin_account_balance}"
-                    )
+            trade_amount = context["sell_trade_amount"]
+            if not args.dry_run:
+                exchange.create_market_sell_order(market, trade_amount)
+            else:
+                logging.info(
+                    f"Dry Run: {current_signal} =>, Trade amount: {trade_amount}"
+                )
 
             context["trade_done"] = True
-            message = f"""🔔 {current_signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
+            message = f"""🔔 {current_signal} ({trade_amount}) {market} at {close_price}"""
             logging.info(message)
         except Exception:
             error_message = f"🚨 Unable to place {current_signal} order for {market} at {close_price}"
@@ -259,7 +306,7 @@ class RecordTransactionInDatabase(object):
             signal = context["signal"]
             market = context["market"]
             close_price = context["close"]
-            trade_amount = context["trade_amount"]
+            trade_amount = context.get("buy_trade_amount", context.get("sell_trade_amount", "N/A"))
             entry_row = {
                 "trade_dt": current_dt,
                 "signal": signal,
@@ -306,8 +353,11 @@ def main(args):
         GenerateChart(),
         IdentifyBuySellSignal(),
         LoadLastTransactionFromDatabase(),
+        CheckIfIsANewSignal(),  # Based on the code in TradeBasedOnSignal
         FetchAccountInfoFromExchange(),
-        TradeBasedOnSignal(),
+        CalculateBuySellAmountBasedOnAllocatedPot(),  # Do the refactoring first then implement this
+        ExecuteBuyTradeIfSignaled(),
+        ExecuteSellTradeIfSignaled(),
         RecordTransactionInDatabase(),
         PublishTransactionOnTelegram(),
     ]
