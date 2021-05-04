@@ -362,9 +362,9 @@ def main(args):
         GenerateChart(),
         IdentifyBuySellSignal(),
         LoadLastTransactionFromDatabase(),
-        CheckIfIsANewSignal(),  # Based on the code in TradeBasedOnSignal
+        CheckIfIsANewSignal(),
         FetchAccountInfoFromExchange(),
-        CalculateBuySellAmountBasedOnAllocatedPot(),  # Do the refactoring first then implement this
+        CalculateBuySellAmountBasedOnAllocatedPot(),
         ExecuteBuyTradeIfSignaled(),
         ExecuteSellTradeIfSignaled(),
         RecordTransactionInDatabase(),
