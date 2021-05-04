@@ -25,16 +25,17 @@ from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
 load_dotenv()
 
 CANDLE_TIME_FRAME = "1h"
-CURRENCY = "USDT"
-COIN = "DOGE"
-MARKET = f"{COIN}/{CURRENCY}"
 
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
-        "-t", "--table-name", type=str, help="Database table name",
-        default="{}_{}_trades".format(COIN.lower(), CURRENCY.lower())
+        "-c", "--coin", type=str, help="Coin",
+        required=True
+    )
+    parser.add_argument(
+        "-m", "--stable-coin", type=str, help="Stable coin",
+        required=True
     )
     parser.add_argument(
         "-f",
@@ -72,9 +73,11 @@ def parse_args():
 
 class ReadConfiguration(object):
     def run(self, context):
+        args = context["args"]
+        market = f"{args.coin}/{args.stable_coin}"
         context["exchange"] = EXCHANGE
         context["candle_tf"] = CANDLE_TIME_FRAME
-        context["market"] = MARKET
+        context["market"] = market
 
 
 class FetchDataFromExchange(object):
@@ -133,7 +136,9 @@ class CalculateIndicators(object):
 class GenerateChart:
     def run(self, context):
         df = context["df"]
-        context["chart_name"] = chart_title = f"_{CURRENCY}_{COIN}_{CANDLE_TIME_FRAME}"
+        args = context["args"]
+        chart_title = f"_{args.coin}_{args.stable_coin}_{CANDLE_TIME_FRAME}"
+        context["chart_name"] = chart_title
         ma_range = context["ma_range"]
         additional_plots = []
         for ma in ma_range:
@@ -208,17 +213,19 @@ class CheckIfIsANewSignal:
 
 class FetchAccountInfoFromExchange(object):
     def run(self, context):
+        args = context["args"]
         exchange_id = context["exchange"]
         exchange: Exchange = exchange_factory(exchange_id)
         account_balance = exchange.fetch_free_balance()
         logging.info(f"Free Balance: {account_balance}")
         context["account_balance"] = account_balance
-        context["CURRENCY_BALANCE"] = account_balance.get(CURRENCY)
-        context["COIN_BALANCE"] = account_balance.get(COIN)
+        context["CURRENCY_BALANCE"] = account_balance.get(args.stable_coin)
+        context["COIN_BALANCE"] = account_balance.get(args.coin)
 
 
 class CalculateBuySellAmountBasedOnAllocatedPot:
     def run(self, context):
+        args = context["args"]
         close_price = context["close"]
         buying_budget = context["args"].buying_budget
         currency_balance = context["CURRENCY_BALANCE"]
@@ -230,7 +237,7 @@ class CalculateBuySellAmountBasedOnAllocatedPot:
         coin_account_balance = context["COIN_BALANCE"]
         context["sell_trade_amount"] = coin_account_balance
         logging.info(
-            f"Trade amount calculation: Buying {coin_amount_to_buy} {CURRENCY}, Selling {coin_account_balance} {COIN}"
+            f"Trade amount calculation: Buying {coin_amount_to_buy} {args.stable_coin}, Selling {coin_account_balance} {args.coin}"
         )
 
 
@@ -315,6 +322,7 @@ class RecordTransactionInDatabase(object):
                 "trade_amount": trade_amount,
             }
             db_table.insert(entry_row)
+            logging.info(f"Updated database: {entry_row}")
 
 
 class PublishTransactionOnTelegram(object):
@@ -339,6 +347,7 @@ class PublishTransactionOnTelegram(object):
             send_file_to_telegram(
                 "MMA", chart_file_path, override_chat_id=GROUP_CHAT_ID
             )
+            logging.info(f"Published message 🛸: {message}")
 
 
 def main(args):

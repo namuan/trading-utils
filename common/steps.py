@@ -8,7 +8,10 @@ import dataset
 class SetupDatabase(object):
     def run(self, context):
         home_dir = os.getenv("HOME")
-        table_name = context["args"].table_name
+        args = context["args"]
+        coin = args.coin
+        stable_currency = args.stable_coin
+        table_name = "{}_{}_trades".format(coin.lower(), stable_currency.lower())
         db_file = context["args"].db_file
         db_connection_string = f"sqlite:///{home_dir}/{db_file}"
         db = dataset.connect(db_connection_string)
