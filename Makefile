@@ -68,6 +68,9 @@ ssh: ## SSH into the target VM
 syncoptionspricedata: ## Sync options price tracker database
 	rsync -avzr ${PROJECTNAME}:./options_tracker.db ~/options_tracker.db
 
+synccryptobotdiary: ## Sync crypto bot diary
+	rsync -avzr ${PROJECTNAME}:./crypto_trade_diary.db ~/crypto_trade_diary.db
+
 .PHONY: help
 .DEFAULT_GOAL := help
 
