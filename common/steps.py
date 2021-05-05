@@ -16,7 +16,9 @@ class SetupDatabase(object):
         db_connection_string = f"sqlite:///{home_dir}/{db_file}"
         db = dataset.connect(db_connection_string)
         context["db_table"] = db.create_table(table_name)
-        logging.info(f"Connecting to database {db_connection_string} and table {table_name}")
+        logging.info(
+            f"Connecting to database {db_connection_string} and table {table_name}"
+        )
 
 
 class PrintContext(object):

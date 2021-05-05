@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from mplfinance.plotting import make_addplot
 from stockstats import StockDataFrame
 
-from common.environment import EXCHANGE, GROUP_CHAT_ID
+from common.environment import EXCHANGE
 from common.exchange import exchange_factory
 from common.logger import init_logging
 from common.steps import SetupDatabase
@@ -29,13 +29,9 @@ CANDLE_TIME_FRAME = "1h"
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)
+    parser.add_argument("-c", "--coin", type=str, help="Coin", required=True)
     parser.add_argument(
-        "-c", "--coin", type=str, help="Coin",
-        required=True
-    )
-    parser.add_argument(
-        "-m", "--stable-coin", type=str, help="Stable coin",
-        required=True
+        "-m", "--stable-coin", type=str, help="Stable coin", required=True
     )
     parser.add_argument(
         "-f",
@@ -49,7 +45,7 @@ def parse_args():
         "--buying-budget",
         type=int,
         help="Buying allocation budget in currency amount",
-        default=50
+        default=50,
     )
     parser.add_argument(
         "-w",
@@ -172,7 +168,7 @@ class IdentifyBuySellSignal(object):
         adx = indicators["adx"]
         if fast_ema > slow_ema and adx > 35:
             context["signal"] = "BUY"
-        elif fast_ema < slow_ema and adx > 35:
+        elif fast_ema < slow_ema:
             context["signal"] = "SELL"
         else:
             context["signal"] = "NO_SIGNAL"
@@ -192,9 +188,11 @@ class LoadLastTransactionFromDatabase(object):
 
 
 class CheckIfIsANewSignal:
-    def _same_as_previous_signal(self, current_signal, last_signal, last_transaction_signal):
+    def _same_as_previous_signal(
+        self, current_signal, last_signal, last_transaction_signal
+    ):
         return (
-                last_signal == current_signal or last_transaction_signal == current_signal
+            last_signal == current_signal or last_transaction_signal == current_signal
         )
 
     def run(self, context):
@@ -203,7 +201,7 @@ class CheckIfIsANewSignal:
         last_transaction_signal = context["last_transaction_signal"]
 
         if self._same_as_previous_signal(
-                current_signal, last_signal, last_transaction_signal
+            current_signal, last_signal, last_transaction_signal
         ):
             logging.info(
                 f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
@@ -230,7 +228,11 @@ class CalculateBuySellAmountBasedOnAllocatedPot:
         buying_budget = context["args"].buying_budget
         currency_balance = context["CURRENCY_BALANCE"]
 
-        allocated_currency = buying_budget * 90 / 100 if currency_balance >= buying_budget else currency_balance
+        allocated_currency = (
+            buying_budget * 90 / 100
+            if currency_balance >= buying_budget
+            else currency_balance
+        )
         coin_amount_to_buy = allocated_currency / close_price
         context["buy_trade_amount"] = coin_amount_to_buy
 
@@ -263,12 +265,14 @@ class ExecuteBuyTradeIfSignaled:
                 )
 
             context["trade_done"] = True
-            message = f"""🔔 {current_signal} ({trade_amount}) {market} at {close_price}"""
+            message = (
+                f"""🔔 {current_signal} ({trade_amount}) {market} at {close_price}"""
+            )
             logging.info(message)
         except Exception:
             error_message = f"🚨 Unable to place {current_signal} order for {market} at {close_price}"
             logging.exception(error_message)
-            send_message_to_telegram(error_message, override_chat_id=GROUP_CHAT_ID)
+            send_message_to_telegram(error_message)
 
 
 class ExecuteSellTradeIfSignaled:
@@ -296,12 +300,14 @@ class ExecuteSellTradeIfSignaled:
                 )
 
             context["trade_done"] = True
-            message = f"""🔔 {current_signal} ({trade_amount}) {market} at {close_price}"""
+            message = (
+                f"""🔔 {current_signal} ({trade_amount}) {market} at {close_price}"""
+            )
             logging.info(message)
         except Exception:
             error_message = f"🚨 Unable to place {current_signal} order for {market} at {close_price}"
             logging.exception(error_message)
-            send_message_to_telegram(error_message, override_chat_id=GROUP_CHAT_ID)
+            send_message_to_telegram(error_message)
 
 
 class RecordTransactionInDatabase(object):
@@ -313,7 +319,9 @@ class RecordTransactionInDatabase(object):
             signal = context["signal"]
             market = context["market"]
             close_price = context["close"]
-            trade_amount = context.get("buy_trade_amount", context.get("sell_trade_amount", "N/A"))
+            trade_amount = context.get(
+                "buy_trade_amount", context.get("sell_trade_amount", "N/A")
+            )
             entry_row = {
                 "trade_dt": current_dt,
                 "signal": signal,
@@ -338,15 +346,11 @@ class PublishTransactionOnTelegram(object):
             account_balance_msg = ["Balance before trade"]
             for k, v in account_balance.items():
                 account_balance_msg.append(f"*{k}* => {v}")
-            send_message_to_telegram(
-                ", ".join(account_balance_msg), override_chat_id=GROUP_CHAT_ID
-            )
+            send_message_to_telegram(", ".join(account_balance_msg))
 
             message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
-            send_message_to_telegram(message, override_chat_id=GROUP_CHAT_ID)
-            send_file_to_telegram(
-                "MMA", chart_file_path, override_chat_id=GROUP_CHAT_ID
-            )
+            send_message_to_telegram(message)
+            send_file_to_telegram("MMA", chart_file_path)
             logging.info(f"Published message 🛸: {message}")
 
 
