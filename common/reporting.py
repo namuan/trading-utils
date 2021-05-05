@@ -54,15 +54,15 @@ def convert_to_html(output_file: Path, open_page=True):
 sites = {
     "FinViz": "https://www.finviz.com/quote.ashx?t={}",
     "MarketChameleon": "https://marketchameleon.com/Overview/{}/",
-    "BarChart[Price]": "https://www.barchart.com/stocks/quotes/{}/overview",
-    "BarChart[Options]": "https://www.barchart.com/stocks/quotes/{}/options",
+    "BarChart (Price)": "https://www.barchart.com/stocks/quotes/{}/overview",
+    "BarChart (Options)": "https://www.barchart.com/stocks/quotes/{}/options",
     "StockInvest": "https://stockinvest.us/technical-analysis/{}",
     "TradingView": "https://www.tradingview.com/chart/?symbol={}",
     "SwingTradeBot": "https://swingtradebot.com/equities/{}",
-    "StockTwits[Sentiments]": "https://stocktwits.com/symbol/{}",
+    "StockTwits (Sentiments)": "https://stocktwits.com/symbol/{}",
     "Y Finance": "https://finance.yahoo.com/quote/{}/holders?p=ZZZ",
     "OAI Earnings": "https://tools.optionsai.com/earnings/{}",
-    "OptionStrat[Long Call]": "https://optionstrat.com/build/long-call/{}?referrer=stockriderbot",
+    "OptionStrat (Long Call)": "https://optionstrat.com/build/long-call/{}?referrer=stockriderbot",
 }
 
 
