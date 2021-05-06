@@ -113,6 +113,7 @@ class LoadDataInDataFrame(object):
             columns=["datetime", "open", "high", "low", "close", "volume"],
         )
         df["Date"] = pd.to_datetime(df.datetime, unit="ms")
+        del df["datetime"]
         df.set_index("Date", inplace=True)
         context["df"] = StockDataFrame.retype(df)
 
@@ -244,7 +245,7 @@ class CalculateBuySellAmountBasedOnAllocatedPot:
         currency_balance = context["CURRENCY_BALANCE"]
 
         allocated_currency = (
-            buying_budget * 90 / 100
+            (buying_budget * 90 / 100)
             if currency_balance >= buying_budget
             else currency_balance
         )
@@ -254,7 +255,7 @@ class CalculateBuySellAmountBasedOnAllocatedPot:
         coin_account_balance = context["COIN_BALANCE"]
         context["sell_trade_amount"] = coin_account_balance
         logging.info(
-            f"Trade amount calculation: Buying {coin_amount_to_buy} {args.stable_coin}, Selling {coin_account_balance} {args.coin}"
+            f"Trade calculation: Budget {buying_budget}, Currency Balance {currency_balance} - Buy {coin_amount_to_buy} {args.coin} based on {allocated_currency} {args.stable_coin}, Sell {coin_account_balance} {args.coin}"
         )
 
 
