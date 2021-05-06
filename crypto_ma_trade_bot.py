@@ -207,7 +207,7 @@ class CheckIfIsANewSignal:
         )
 
     def run(self, context):
-        current_signal = context["signal"]
+        current_signal = context["signal"].name
         last_signal = context.get("last_signal", "NA")
         last_transaction_signal = context["last_transaction_signal"]
 
@@ -215,9 +215,11 @@ class CheckIfIsANewSignal:
                 current_signal, last_signal, last_transaction_signal
         ):
             logging.info(
-                f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
+                f"Repeat signal {current_signal} -> Last signal {last_signal} or Last transaction signal {last_transaction_signal}"
             )
             context["signal"] = TradeSignal.NO_SIGNAL
+        else:
+            logging.info(f"New signal {current_signal} -> Last signal {last_signal} or Last transaction signal {last_transaction_signal}")
 
 
 class FetchAccountInfoFromExchange(object):
