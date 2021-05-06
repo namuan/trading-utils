@@ -66,10 +66,10 @@ ssh: ## SSH into the target VM
 	ssh ${PROJECTNAME}
 
 syncoptionspricedata: ## Sync options price tracker database
-	rsync -avzr ${PROJECTNAME}:./options_tracker.db ~/options_tracker.db
+	rm ~/options_tracker.db; rsync -avzr ${PROJECTNAME}:./options_tracker.db ~/options_tracker.db
 
 synccryptobotdiary: ## Sync crypto bot diary
-	rsync -avzr ${PROJECTNAME}:./crypto_trade_diary.db ~/crypto_trade_diary.db
+	rm ~/crypto_trade_diary.db; rsync -avzr ${PROJECTNAME}:./crypto_trade_diary.db ~/crypto_trade_diary.db
 
 .PHONY: help
 .DEFAULT_GOAL := help
