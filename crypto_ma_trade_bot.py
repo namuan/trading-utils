@@ -25,7 +25,7 @@ from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
 
 load_dotenv()
 
-CANDLE_TIME_FRAME = "1h"
+CANDLE_TIME_FRAME = "5m"
 
 
 def parse_args():
