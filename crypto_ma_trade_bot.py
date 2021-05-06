@@ -5,6 +5,7 @@ import functools
 import logging
 from argparse import ArgumentParser
 from datetime import datetime
+from enum import Enum, auto
 from operator import add
 
 import mplfinance as mpf
@@ -67,6 +68,22 @@ def parse_args():
     return parser.parse_args()
 
 
+class TradeSignal(Enum):
+    BUY = auto()
+    SELL = auto()
+    NO_SIGNAL = auto()
+
+
+def get_trade_amount(context):
+    signal = context["signal"]
+    if signal == "BUY":
+        return context.get("buy_trade_amount")
+    elif signal == "SELL":
+        return context.get("sell_trade_amount")
+    else:
+        return "N/A"
+
+
 class ReadConfiguration(object):
     def run(self, context):
         args = context["args"]
@@ -81,13 +98,7 @@ class FetchDataFromExchange(object):
         exchange_id = context["exchange"]
         candle_tf = context["candle_tf"]
         market = context["market"]
-        logging.info(
-            "Exchange {}, Market {}, TimeFrame {}".format(
-                exchange_id,
-                market,
-                candle_tf,
-            )
-        )
+        logging.info(f"Exchange {exchange_id}, Market {market}, TimeFrame {candle_tf}")
         exchange = exchange_factory(exchange_id)
         candle_data = exchange.fetch_ohlcv(market, candle_tf, limit=300)
         context["candle_data"] = candle_data
@@ -108,7 +119,7 @@ class LoadDataInDataFrame(object):
 class CalculateIndicators(object):
     def _gmma(self, ohlcv_df, ma_range):
         try:
-            values = [ohlcv_df["close_{}_ema".format(a)].iloc[-1] for a in ma_range]
+            values = [ohlcv_df[f"close_{a}_ema"].iloc[-1] for a in ma_range]
             return functools.reduce(add, values)
         except:
             return "N/A"
@@ -126,7 +137,7 @@ class CalculateIndicators(object):
         indicators["adx"] = df["dx_14_ema"].iloc[-1]
 
         context["indicators"] = indicators
-        logging.info(f"Indicators => {indicators}")
+        logging.info(f"Close {context['close']} -> Indicators => {indicators}")
 
 
 class GenerateChart:
@@ -140,7 +151,7 @@ class GenerateChart:
         for ma in ma_range:
             additional_plots.append(
                 make_addplot(
-                    df["close_{}_ema".format(ma)],
+                    df[f"close_{ma}_ema"],
                     type="line",
                     width=0.3,
                 )
@@ -189,10 +200,10 @@ class LoadLastTransactionFromDatabase(object):
 
 class CheckIfIsANewSignal:
     def _same_as_previous_signal(
-        self, current_signal, last_signal, last_transaction_signal
+            self, current_signal, last_signal, last_transaction_signal
     ):
         return (
-            last_signal == current_signal or last_transaction_signal == current_signal
+                last_signal == current_signal or last_transaction_signal == current_signal
         )
 
     def run(self, context):
@@ -201,7 +212,7 @@ class CheckIfIsANewSignal:
         last_transaction_signal = context["last_transaction_signal"]
 
         if self._same_as_previous_signal(
-            current_signal, last_signal, last_transaction_signal
+                current_signal, last_signal, last_transaction_signal
         ):
             logging.info(
                 f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
@@ -319,9 +330,7 @@ class RecordTransactionInDatabase(object):
             signal = context["signal"]
             market = context["market"]
             close_price = context["close"]
-            trade_amount = context.get(
-                "buy_trade_amount", context.get("sell_trade_amount", "N/A")
-            )
+            trade_amount = get_trade_amount(context)
             entry_row = {
                 "trade_dt": current_dt,
                 "signal": signal,
@@ -342,13 +351,14 @@ class PublishTransactionOnTelegram(object):
             close_price = context["close"]
             account_balance = context["account_balance"]
             chart_file_path = context["chart_file_path"]
+            trade_amount = get_trade_amount(context)
 
             account_balance_msg = ["Balance before trade"]
             for k, v in account_balance.items():
                 account_balance_msg.append(f"*{k}* => {v}")
             send_message_to_telegram(", ".join(account_balance_msg))
 
-            message = f"""🔔 {signal} ({context.get("trade_amount", "N/A")}) {market} at {close_price}"""
+            message = f"""🔔 {signal} ({trade_amount}) {market} at {close_price}"""
             send_message_to_telegram(message)
             send_file_to_telegram("MMA", chart_file_path)
             logging.info(f"Published message 🛸: {message}")

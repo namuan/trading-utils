@@ -14,7 +14,7 @@ schedule
 python-dotenv
 pytz
 yahoo_earnings_calendar
-ccxt
+ccxt==1.47.38
 dataset
 tweepy
 peewee
