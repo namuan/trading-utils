@@ -69,16 +69,16 @@ def parse_args():
 
 
 class TradeSignal(Enum):
-    BUY = auto()
-    SELL = auto()
-    NO_SIGNAL = auto()
+    BUY = "BUY"
+    SELL = "SELL"
+    NO_SIGNAL = "NO_SIGNAL"
 
 
 def get_trade_amount(context):
     signal = context["signal"]
-    if signal == "BUY":
+    if signal == TradeSignal.BUY:
         return context.get("buy_trade_amount")
-    elif signal == "SELL":
+    elif signal == TradeSignal.SELL:
         return context.get("sell_trade_amount")
     else:
         return "N/A"
@@ -178,11 +178,11 @@ class IdentifyBuySellSignal(object):
         slow_ema = indicators["slow_ema"]
         adx = indicators["adx"]
         if fast_ema > slow_ema and adx > 35:
-            context["signal"] = "BUY"
+            context["signal"] = TradeSignal.BUY
         elif fast_ema < slow_ema:
-            context["signal"] = "SELL"
+            context["signal"] = TradeSignal.SELL
         else:
-            context["signal"] = "NO_SIGNAL"
+            context["signal"] = TradeSignal.NO_SIGNAL
         logging.info(f"Identified signal => {context.get('signal')}")
 
 
@@ -195,7 +195,7 @@ class LoadLastTransactionFromDatabase(object):
             context["last_transaction_market"] = last_transaction["market"]
             context["last_transaction_close_price"] = last_transaction["close_price"]
         else:
-            context["last_transaction_signal"] = "SELL"
+            context["last_transaction_signal"] = TradeSignal.SELL
 
 
 class CheckIfIsANewSignal:
@@ -217,7 +217,7 @@ class CheckIfIsANewSignal:
             logging.info(
                 f"Current signal {current_signal} same as previous signal {last_signal} or last transaction signal {last_transaction_signal}"
             )
-            context["signal"] = "NO_SIGNAL"
+            context["signal"] = TradeSignal.NO_SIGNAL
 
 
 class FetchAccountInfoFromExchange(object):
@@ -263,7 +263,7 @@ class ExecuteBuyTradeIfSignaled:
         market = context["market"]
 
         try:
-            if current_signal != "BUY":
+            if current_signal != TradeSignal.BUY:
                 logging.info(f"😞 Current signal ({current_signal}) is not BUY")
                 return
 
@@ -298,7 +298,7 @@ class ExecuteSellTradeIfSignaled:
         close_price = context["close"]
         context["last_signal"] = current_signal
         try:
-            if current_signal != "SELL":
+            if current_signal != TradeSignal.SELL:
                 logging.info(f"😞 Current signal ({current_signal}) is not SELL")
                 return
 
@@ -333,7 +333,7 @@ class RecordTransactionInDatabase(object):
             trade_amount = get_trade_amount(context)
             entry_row = {
                 "trade_dt": current_dt,
-                "signal": signal,
+                "signal": signal.name,
                 "market": market,
                 "close_price": close_price,
                 "trade_amount": trade_amount,
