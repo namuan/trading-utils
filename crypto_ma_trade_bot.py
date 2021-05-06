@@ -5,7 +5,7 @@ import functools
 import logging
 from argparse import ArgumentParser
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum
 from operator import add
 
 import mplfinance as mpf
@@ -25,14 +25,15 @@ from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
 
 load_dotenv()
 
-CANDLE_TIME_FRAME = "5m"
-
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("-c", "--coin", type=str, help="Coin", required=True)
     parser.add_argument(
         "-m", "--stable-coin", type=str, help="Stable coin", required=True
+    )
+    parser.add_argument(
+        "-t", "--time-frame", type=str, help="Candle time frame", required=True
     )
     parser.add_argument(
         "-f",
@@ -89,7 +90,7 @@ class ReadConfiguration(object):
         args = context["args"]
         market = f"{args.coin}/{args.stable_coin}"
         context["exchange"] = EXCHANGE
-        context["candle_tf"] = CANDLE_TIME_FRAME
+        context["candle_tf"] = args.time_frame
         context["market"] = market
 
 
@@ -144,7 +145,7 @@ class GenerateChart:
     def run(self, context):
         df = context["df"]
         args = context["args"]
-        chart_title = f"_{args.coin}_{args.stable_coin}_{CANDLE_TIME_FRAME}"
+        chart_title = f"_{args.coin}_{args.stable_coin}_{args.time_frame}"
         context["chart_name"] = chart_title
         ma_range = context["ma_range"]
         additional_plots = []
@@ -219,7 +220,8 @@ class CheckIfIsANewSignal:
             )
             context["signal"] = TradeSignal.NO_SIGNAL
         else:
-            logging.info(f"New signal {current_signal} -> Last signal {last_signal} or Last transaction signal {last_transaction_signal}")
+            logging.info(
+                f"New signal {current_signal} -> Last signal {last_signal} or Last transaction signal {last_transaction_signal}")
 
 
 class FetchAccountInfoFromExchange(object):
