@@ -5,15 +5,17 @@ import logging
 from argparse import ArgumentParser
 from enum import Enum
 
+import mplfinance as mpf
 from dotenv import load_dotenv
 from stockstats import StockDataFrame
 
 from common.logger import init_logging
+from common.plotting import open_file
 from common.steps import SetupDatabase, ReadConfiguration, FetchDataFromExchange, LoadDataInDataFrame, \
     LoadLastTransactionFromDatabase, CheckIfIsANewSignal, FetchAccountInfoFromExchange, \
-    CalculateBuySellAmountBasedOnAllocatedPot, ExecuteBuyTradeIfSignaled, ExecuteSellTradeIfSignaled, \
-    RecordTransactionInDatabase, PublishTransactionOnTelegram
+    CalculateBuySellAmountBasedOnAllocatedPot, RecordTransactionInDatabase, PublishTransactionOnTelegram
 from common.steps_runner import run
+from common.tele_notifier import send_file_to_telegram
 
 load_dotenv()
 
@@ -143,13 +145,12 @@ class CalculateIndicators(object):
         context["close"] = df["close"].iloc[-1]
 
         indicators = {}
-        strat_5m, strat_candle_5m = self.calculate_strat(context["df"])
-        print(strat_5m, strat_candle_5m)
         strat_15m, strat_candle_15m = self.calculate_strat(context["fifteen_min_df"])
-        print(strat_15m, strat_candle_15m)
         strat_60m, strat_candle_60m = self.calculate_strat(context["hourly_df"])
-        print(strat_60m, strat_candle_60m)
-
+        indicators["strat_15m"] = strat_15m
+        indicators["strat_candle_15m_direction"] = strat_candle_15m
+        indicators["strat_60m"] = strat_60m
+        indicators["strat_candle_60m_direction"] = strat_candle_60m
         context["indicators"] = indicators
         logging.info(f"Close {context['close']} -> Indicators => {indicators}")
 
@@ -157,8 +158,53 @@ class CalculateIndicators(object):
 class IdentifyBuySellSignal(object):
     def run(self, context):
         indicators = context["indicators"]
+        strat_15m: str = indicators["strat_15m"]
+        strat_candle_15m = indicators["strat_candle_15m_direction"]
+        strat_candle_60m = indicators["strat_candle_60m_direction"]
+        if strat_15m.endswith("2d-2d") and strat_candle_15m == "green":
+            context["signal"] = TradeSignal.BUY
+            context["trade_done"] = True
+
         context["signal"] = TradeSignal.NO_SIGNAL
         logging.info(f"Identified signal => {context.get('signal')}")
+
+
+class GenerateChart:
+    def run(self, context):
+        df_15m = context["fifteen_min_df"]
+        df_60m = context["hourly_df"]
+        args = context["args"]
+        chart_title = f"_{args.coin}_{args.stable_coin}_15m"
+        context["chart_name"] = chart_title
+        context[
+            "chart_file_path"
+        ] = chart_file_path = f"output/{chart_title.lower()}-strat.png"
+        save = dict(fname=chart_file_path)
+        fig = mpf.figure(style="yahoo", figsize=(20, 10))
+        ax1 = fig.add_subplot(1, 2, 1)
+        ax2 = fig.add_subplot(1, 2, 2)
+        mpf.plot(
+            df_15m[-80:],
+            ax=ax1,
+            type="candle",
+        )
+        mpf.plot(
+            df_60m[-20:],
+            ax=ax2,
+            type="candle",
+        )
+        ax1.set_title('15m')
+        ax2.set_title('60m')
+        fig.savefig(save["fname"])
+
+
+class PublishStrategyChartOnTelegram:
+    def run(self, context):
+        trade_done = context.get("trade_done", False)
+        if trade_done:
+            chart_file_path = context["chart_file_path"]
+            send_file_to_telegram("Strat", chart_file_path)
+            # open_file(chart_file_path)
 
 
 def main(args):
@@ -171,15 +217,17 @@ def main(args):
         LoadDataInDataFrame(),
         ReSampleData(),
         CalculateIndicators(),
+        GenerateChart(),
         IdentifyBuySellSignal(),
-        LoadLastTransactionFromDatabase(),
-        CheckIfIsANewSignal(),
-        FetchAccountInfoFromExchange(),
-        CalculateBuySellAmountBasedOnAllocatedPot(),
-        ExecuteBuyTradeIfSignaled(),
-        ExecuteSellTradeIfSignaled(),
-        RecordTransactionInDatabase(),
-        PublishTransactionOnTelegram(),
+        # LoadLastTransactionFromDatabase(),
+        # CheckIfIsANewSignal(),
+        # FetchAccountInfoFromExchange(),
+        # CalculateBuySellAmountBasedOnAllocatedPot(),
+        # ExecuteBuyTradeIfSignaled(),
+        # ExecuteSellTradeIfSignaled(),
+        # RecordTransactionInDatabase(),
+        # PublishTransactionOnTelegram(),
+        PublishStrategyChartOnTelegram()
     ]
     run(procedure, args)
 
