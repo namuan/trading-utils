@@ -30,7 +30,8 @@ def load_ticker_df(ticker):
     )
 
 
-def resample_candles(daily_candles, time_frame):
+def resample_candles(shorter_tf_candles, longer_tf):
+    # https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#offset-aliases
     mapping = {
         "open": "first",
         "high": "max",
@@ -38,7 +39,7 @@ def resample_candles(daily_candles, time_frame):
         "close": "last",
         "volume": "sum",
     }
-    return StockDataFrame.retype(daily_candles.resample(time_frame).apply(mapping))
+    return StockDataFrame.retype(shorter_tf_candles.resample(longer_tf).apply(mapping))
 
 
 def last_close(close_data, days=-1):
@@ -190,7 +191,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -200,7 +201,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
 
     # Close change delta
