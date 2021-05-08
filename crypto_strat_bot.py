@@ -186,7 +186,7 @@ class GenerateChart:
 
 class PublishStrategyChartOnTelegram:
     def run(self, context):
-        trade_done = context.get("trade_done", True)
+        trade_done = context.get("trade_done", False)
         if trade_done:
             chart_file_path = context["chart_file_path"]
             send_file_to_telegram("Strat", chart_file_path)

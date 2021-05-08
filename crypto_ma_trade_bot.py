@@ -9,6 +9,7 @@ from operator import add
 import mplfinance as mpf
 from mplfinance.plotting import make_addplot
 
+from common.analyst import resample_candles
 from common.logger import init_logging
 from common.steps import SetupDatabase, FetchAccountInfoFromExchange, ReadConfiguration, FetchDataFromExchange, \
     LoadDataInDataFrame, TradeSignal, LoadLastTransactionFromDatabase, CheckIfIsANewSignal, \
@@ -61,6 +62,12 @@ def parse_args():
     return parser.parse_args()
 
 
+class ReSampleData:
+    def run(self, context):
+        df = context["df"]
+        context["hourly_df"] = resample_candles(df, "1H")
+
+
 class CalculateIndicators(object):
     def _gmma(self, ohlcv_df, ma_range):
         try:
@@ -70,7 +77,7 @@ class CalculateIndicators(object):
             return "N/A"
 
     def run(self, context):
-        df = context["df"]
+        df = context["hourly_df"]
         context["close"] = df["close"].iloc[-1]
 
         indicators = {}
@@ -87,9 +94,9 @@ class CalculateIndicators(object):
 
 class GenerateChart:
     def run(self, context):
-        df = context["df"]
+        df = context["hourly_df"]
         args = context["args"]
-        chart_title = f"_{args.coin}_{args.stable_coin}_{args.time_frame}"
+        chart_title = f"{args.coin}_{args.stable_coin}_60m"
         context["chart_name"] = chart_title
         ma_range = context["ma_range"]
         additional_plots = []
@@ -147,6 +154,7 @@ def main(args):
         ReadConfiguration(),
         FetchDataFromExchange(),
         LoadDataInDataFrame(),
+        ReSampleData(),
         CalculateIndicators(),
         GenerateChart(),
         IdentifyBuySellSignal(),
