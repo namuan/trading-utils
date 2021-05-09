@@ -10,7 +10,12 @@ from dotenv import load_dotenv
 
 from common.analyst import resample_candles
 from common.logger import init_logging
-from common.steps import SetupDatabase, ReadConfiguration, FetchDataFromExchange, LoadDataInDataFrame
+from common.steps import (
+    SetupDatabase,
+    ReadConfiguration,
+    FetchDataFromExchange,
+    LoadDataInDataFrame,
+)
 from common.steps_runner import run
 from common.tele_notifier import send_file_to_telegram
 
@@ -87,16 +92,28 @@ class CalculateIndicators(object):
     @staticmethod
     def calc_strat_n(first_candle, second_candle):
         strat_n = "0"
-        if first_candle.high > second_candle.high and first_candle.low > second_candle.low:
+        if (
+            first_candle.high > second_candle.high
+            and first_candle.low > second_candle.low
+        ):
             strat_n = "2u"
 
-        if first_candle.low < second_candle.low and first_candle.high < second_candle.high:
+        if (
+            first_candle.low < second_candle.low
+            and first_candle.high < second_candle.high
+        ):
             strat_n = "2d"
 
-        if first_candle.high > second_candle.high and first_candle.low < second_candle.low:
+        if (
+            first_candle.high > second_candle.high
+            and first_candle.low < second_candle.low
+        ):
             strat_n = "3"
 
-        if first_candle.high < second_candle.high and first_candle.low > second_candle.low:
+        if (
+            first_candle.high < second_candle.high
+            and first_candle.low > second_candle.low
+        ):
             strat_n = "1"
 
         return strat_n
@@ -178,8 +195,8 @@ class GenerateChart:
             ax=ax2,
             type="candle",
         )
-        ax1.set_title('60m')
-        ax2.set_title('4h')
+        ax1.set_title("60m")
+        ax2.set_title("4h")
         fig.suptitle(chart_title, fontsize=12)
         fig.savefig(save["fname"])
 
@@ -213,7 +230,7 @@ def main(args):
         # ExecuteSellTradeIfSignaled(),
         # RecordTransactionInDatabase(),
         # PublishTransactionOnTelegram(),
-        PublishStrategyChartOnTelegram()
+        PublishStrategyChartOnTelegram(),
     ]
     run(procedure, args)
 

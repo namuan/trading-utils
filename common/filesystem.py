@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 
@@ -16,3 +17,7 @@ def output_dir():
 def earnings_file_path():
     output_file = "earnings.json"
     return Path(output_dir()).joinpath(output_file)
+
+
+def file_as_json(file_path):
+    return json.load(open(file_path))

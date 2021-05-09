@@ -4,6 +4,6 @@ bash ./scripts/stop_screen.sh tele-links
 bash ./scripts/stop_screen.sh options-price-tracker
 bash ./scripts/stop_screen.sh tele-stock-rider-bot
 bash ./scripts/stop_screen.sh tele-theta-gang-bot
-bash ./scripts/stop_screen.sh doge-usd-trade-bot
-bash ./scripts/stop_screen.sh xlm-usdt-trade-bot
+bash ./scripts/stop_screen.sh 1-usdt-trade-bot
+bash ./scripts/stop_screen.sh 2-usdt-trade-bot
 bash ./scripts/stop_screen.sh strat-xlm-usdt

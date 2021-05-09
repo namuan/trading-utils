@@ -100,32 +100,33 @@ class LoadLastTransactionFromDatabase(object):
             context["last_transaction_market"] = last_transaction["market"]
             context["last_transaction_close_price"] = last_transaction["close_price"]
         else:
-            context["last_transaction_signal"] = TradeSignal.SELL
+            context["last_transaction_signal"] = TradeSignal.SELL.name
 
 
 class CheckIfIsANewSignal:
     def _same_as_previous_signal(
-            self, current_signal, last_signal, last_transaction_signal
+        self, current_signal, last_transaction_signal
     ):
+        logging.info(f"Comparing current signal - {current_signal} with last transaction signal {last_transaction_signal}")
         return (
-                last_signal == current_signal or last_transaction_signal == current_signal
+            last_transaction_signal == current_signal
         )
 
     def run(self, context):
         current_signal = context["signal"].name
-        last_signal = context.get("last_signal", "NA")
         last_transaction_signal = context["last_transaction_signal"]
 
         if self._same_as_previous_signal(
-                current_signal, last_signal, last_transaction_signal
+            current_signal, last_transaction_signal
         ):
             logging.info(
-                f"Repeat signal {current_signal} -> Last signal {last_signal} or Last transaction signal {last_transaction_signal}"
+                f"Repeat signal {current_signal} -> Last transaction signal {last_transaction_signal}"
             )
             context["signal"] = TradeSignal.NO_SIGNAL
         else:
             logging.info(
-                f"New signal {current_signal} -> Last signal {last_signal} or Last transaction signal {last_transaction_signal}")
+                f"New signal {current_signal} -> Last transaction signal {last_transaction_signal}"
+            )
 
 
 class CalculateBuySellAmountBasedOnAllocatedPot:
@@ -193,7 +194,6 @@ class ExecuteSellTradeIfSignaled:
         args = context["args"]
         market = context["market"]
         close_price = context["close"]
-        context["last_signal"] = current_signal
         try:
             if current_signal != TradeSignal.SELL:
                 logging.info(f"😞 Current signal ({current_signal}) is not SELL")
