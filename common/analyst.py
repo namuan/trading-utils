@@ -79,7 +79,12 @@ def calc_strat_n(first_candle, second_candle):
     if first_candle.high < second_candle.high and first_candle.low > second_candle.low:
         strat_n = "1"
 
-    return strat_n
+    if first_candle.close >= first_candle.open:
+        last_candle_direction = "green"
+    else:
+        last_candle_direction = "red"
+
+    return strat_n, last_candle_direction
 
 
 def calculate_strat(ticker_df):
@@ -89,18 +94,13 @@ def calculate_strat(ticker_df):
         candle_3 = ticker_df.iloc[-3]
         candle_4 = ticker_df.iloc[-4]
 
-        first_level_strat_n = calc_strat_n(last_candle, candle_2)
-        second_level_strat_n = calc_strat_n(candle_2, candle_3)
-        third_level_strat_n = calc_strat_n(candle_3, candle_4)
-
-        if last_candle.close > last_candle.open:
-            last_candle_direction = "green"
-        else:
-            last_candle_direction = "red"
+        first_level_strat_n, first_candle_direction = calc_strat_n(last_candle, candle_2)
+        second_level_strat_n, second_candle_direction = calc_strat_n(candle_2, candle_3)
+        third_level_strat_n, third_candle_direction = calc_strat_n(candle_3, candle_4)
 
         return (
             f"{third_level_strat_n}-{second_level_strat_n}-{first_level_strat_n}",
-            last_candle_direction,
+            f"{third_candle_direction}-{second_candle_direction}-{first_candle_direction}",
         )
     except Exception:
         logging.warning(f"Unable to calculate strat: {ticker_df}")
