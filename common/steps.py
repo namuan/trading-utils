@@ -101,8 +101,12 @@ class LoadLastTransactionFromDatabase(object):
             context["last_transaction_signal"] = last_transaction["signal"]
             context["last_transaction_market"] = last_transaction["market"]
             context["last_transaction_close_price"] = last_transaction["close_price"]
+            context["last_transaction_order_details_price"] = last_transaction.get(
+                "order_details_price", -1
+            )
         else:
             context["last_transaction_signal"] = TradeSignal.SELL.name
+            context["last_transaction_order_details_price"] = -1
 
 
 class CheckIfIsANewSignal:
@@ -231,7 +235,7 @@ class CollectInformationAboutOrder:
             error_message = f"🚨 Unable to get order details for id {order_id}"
             logging.exception(error_message)
             send_message_to_telegram(error_message)
-            return {'status': 'unknown'}
+            return {"status": "unknown"}
 
     def run(self, context):
         trade_done = context.get("trade_done", False)

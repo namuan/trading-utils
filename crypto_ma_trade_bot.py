@@ -22,7 +22,8 @@ from common.steps import (
     ExecuteBuyTradeIfSignaled,
     ExecuteSellTradeIfSignaled,
     RecordTransactionInDatabase,
-    PublishTransactionOnTelegram, CollectInformationAboutOrder,
+    PublishTransactionOnTelegram,
+    CollectInformationAboutOrder,
 )
 from common.steps_runner import run
 from common.tele_notifier import send_file_to_telegram
@@ -36,6 +37,9 @@ def parse_args():
     )
     parser.add_argument(
         "-t", "--time-frame", type=str, help="Candle time frame", required=True
+    )
+    parser.add_argument(
+        "-p", "--target-pct", type=int, help="Target percent", required=False, default=1
     )
     parser.add_argument(
         "-f",
@@ -124,20 +128,34 @@ class GenerateChart:
 
 
 class IdentifyBuySellSignal(object):
+    def _if_hit_target(self, actual_order_price, close_price, target_pct):
+        pct_change = (close_price - actual_order_price) / actual_order_price * 100
+        sl_hit = "🔴" if pct_change < -1 * target_pct else "🤞"
+        pt_hit = "✅" if pct_change > target_pct else "🤞"
+        logging.info(
+            f"Pct Change: {pct_change}, Target Percent: {target_pct}, SL Hit {sl_hit}, PT Hit {pt_hit}"
+        )
+        return sl_hit or pt_hit
+
     def run(self, context):
         indicators = context["indicators"]
+        args = context["args"]
+        target_pct = args.target_pct
+        last_transaction_order_details_price = context[
+            "last_transaction_order_details_price"
+        ]
         close = context["close"]
         fast_ema = indicators["close_3_ema"]
         slow_ema = indicators["close_25_ema"]
         adx = indicators["adx"]
-        if close > fast_ema > slow_ema and adx > 35:
-            context["signal"] = TradeSignal.BUY
-        elif close < slow_ema:
+
+        if self._if_hit_target(last_transaction_order_details_price, close, target_pct):
             context["signal"] = TradeSignal.SELL
+        elif close > fast_ema > slow_ema and adx > 35:
+            context["signal"] = TradeSignal.BUY
         else:
             context["signal"] = TradeSignal.NO_SIGNAL
 
-        context["signal"] = TradeSignal.SELL
         logging.info(f"Identified signal => {context.get('signal')}")
 
 
