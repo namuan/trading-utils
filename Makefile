@@ -47,6 +47,7 @@ deploy: clean ## Copies any changed file to the server
 		common \
 		scripts \
 		crypto_ma_trade_bot.py \
+		crypto_rsi_trade_bot.py \
 		crypto_strat_bot.py \
 		tele_links.py \
 		tele_twitter.py \
