@@ -104,21 +104,17 @@ class LoadLastTransactionFromDatabase(object):
 
 
 class CheckIfIsANewSignal:
-    def _same_as_previous_signal(
-        self, current_signal, last_transaction_signal
-    ):
-        logging.info(f"Comparing current signal - {current_signal} with last transaction signal {last_transaction_signal}")
-        return (
-            last_transaction_signal == current_signal
+    def _same_as_previous_signal(self, current_signal, last_transaction_signal):
+        logging.info(
+            f"Comparing current signal - {current_signal} with last transaction signal {last_transaction_signal}"
         )
+        return last_transaction_signal == current_signal
 
     def run(self, context):
         current_signal = context["signal"].name
         last_transaction_signal = context["last_transaction_signal"]
 
-        if self._same_as_previous_signal(
-            current_signal, last_transaction_signal
-        ):
+        if self._same_as_previous_signal(current_signal, last_transaction_signal):
             logging.info(
                 f"Repeat signal {current_signal} -> Last transaction signal {last_transaction_signal}"
             )

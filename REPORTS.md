@@ -23,7 +23,7 @@ py report_by_query.py -t "SP500 Monthly Movers" -q "(is_large_cap == True)" -o "
 #### EMA Bounce
 
 ```shell
-py report_by_query.py -t "EMA Bounce" -q "(ema_60 < ema_50 < ema_45 < ema_40 < ema_35 < last_close < ema_30) and (adx_14 > 35)" -o "smooth_30" -v
+py report_by_query.py -t "EMA Bounce" -q "(ema_60 < ema_50 < ema_45 < ema_40 < ema_35 < last_close < ema_30) and (adx_14 > 35) and (daily_strat.str.contains('.*-2d-2d')) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "smooth_30" -v
 ```
 
 #### Strat
@@ -36,3 +36,7 @@ py report_by_query.py -t "Strat Daily 3-2dn(green)" -q "(daily_strat.str.contain
 # 2dn(red)-2dn (green)
 py report_by_query.py -t "Strat Daily 2dn(red)-2dn(green)" -q "(last_close > 10) and (last_close < 20) and (daily_strat.str.contains('.*-2d-2d')) and (daily_strat_candle.str.contains('.*-red-green$')) and (last_volume > 100000)" -o "smooth_30" -v
 ```
+
+#### Momentum
+
+py report_by_query.py -t "Trending" -q "last_close > ema_3 > ema_5 > ema_7 > ema_9 > ema_11 > ema_13 > ema_30 > ema_35 > ema_40 > ema_45 > ema_50 > ema_55 > ema_60" -o "smooth_30" -v
