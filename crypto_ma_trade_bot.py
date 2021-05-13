@@ -1,10 +1,8 @@
 """
 Crypto Bot running based on a given strategy
 """
-import functools
 import logging
 from argparse import ArgumentParser
-from operator import add
 
 import mplfinance as mpf
 from mplfinance.plotting import make_addplot
@@ -80,25 +78,16 @@ class ReSampleData:
 
 
 class CalculateIndicators(object):
-    def _gmma(self, ohlcv_df, ma_range):
-        try:
-            values = [ohlcv_df[f"close_{a}_ema"].iloc[-1] for a in ma_range]
-            return functools.reduce(add, values)
-        except:
-            return "N/A"
-
     def run(self, context):
         df = context["hourly_df"]
         context["close"] = df["close"].iloc[-1]
 
         indicators = {}
-        fast_ma = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]
-        slow_ma = [25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
-        context["ma_range"] = fast_ma + slow_ma
-        indicators["fast_ema"] = self._gmma(df, fast_ma)
-        indicators["slow_ema"] = self._gmma(df, slow_ma)
-        indicators["adx"] = df["dx_14_ema"].iloc[-1]
+        context["ma_range"] = [3, 25]
+        for ma in context["ma_range"]:
+            indicators[f"close_{ma}_ema"] = df[f"close_{ma}_ema"].iloc[-1]
 
+        indicators["adx"] = df["dx_14_ema"].iloc[-1]
         context["indicators"] = indicators
         logging.info(f"Close {context['close']} -> Indicators => {indicators}")
 
@@ -116,7 +105,7 @@ class GenerateChart:
                 make_addplot(
                     df[f"close_{ma}_ema"],
                     type="line",
-                    width=0.3,
+                    width=0.5,
                 )
             )
 
@@ -137,12 +126,13 @@ class GenerateChart:
 class IdentifyBuySellSignal(object):
     def run(self, context):
         indicators = context["indicators"]
-        fast_ema = indicators["fast_ema"]
-        slow_ema = indicators["slow_ema"]
+        close = context["close"]
+        fast_ema = indicators["close_3_ema"]
+        slow_ema = indicators["close_25_ema"]
         adx = indicators["adx"]
-        if fast_ema > slow_ema and adx > 35:
+        if close > fast_ema > slow_ema and adx > 35:
             context["signal"] = TradeSignal.BUY
-        elif fast_ema < slow_ema:
+        elif close < slow_ema:
             context["signal"] = TradeSignal.SELL
         else:
             context["signal"] = TradeSignal.NO_SIGNAL
@@ -154,7 +144,7 @@ class PublishStrategyChartOnTelegram:
         trade_done = context.get("trade_done", False)
         if trade_done:
             chart_file_path = context["chart_file_path"]
-            send_file_to_telegram("MMA", chart_file_path)
+            send_file_to_telegram("MA", chart_file_path)
 
 
 def main(args):
