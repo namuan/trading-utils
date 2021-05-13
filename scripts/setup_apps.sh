@@ -7,5 +7,5 @@ bash ./scripts/start_screen.sh tele-stock-rider-bot 'python3 tele_stock_rider_bo
 bash ./scripts/start_screen.sh tele-theta-gang-bot 'python3 tele_theta_gang_bot.py'
 bash ./scripts/start_screen.sh 1-usdt-trade-bot 'python3 crypto_ma_trade_bot.py --buying-budget 100 --coin ADA --stable-coin USDT -t 5m'
 bash ./scripts/start_screen.sh 2-usdt-trade-bot 'python3 crypto_ma_trade_bot.py --buying-budget 100 --coin XLM --stable-coin USDT -t 5m'
-#bash ./scripts/start_screen.sh 3-usdt-trade-bot 'python3 crypto_ma_trade_bot.py --buying-budget 100 --coin DOGE --stable-coin USDT -t 5m'
+bash ./scripts/start_screen.sh 3-usdt-trade-bot 'python3 crypto_ma_trade_bot.py --buying-budget 100 --coin MATIC --stable-coin USDT -t 5m'
 bash ./scripts/start_screen.sh strat-xlm-usdt 'python3 crypto_strat_bot.py --buying-budget 10 --coin XLM --stable-coin USDT -t 5m'

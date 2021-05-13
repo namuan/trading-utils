@@ -22,7 +22,7 @@ from common.steps import (
     ExecuteBuyTradeIfSignaled,
     ExecuteSellTradeIfSignaled,
     RecordTransactionInDatabase,
-    PublishTransactionOnTelegram,
+    PublishTransactionOnTelegram, CollectInformationAboutOrder,
 )
 from common.steps_runner import run
 from common.tele_notifier import send_file_to_telegram
@@ -136,6 +136,8 @@ class IdentifyBuySellSignal(object):
             context["signal"] = TradeSignal.SELL
         else:
             context["signal"] = TradeSignal.NO_SIGNAL
+
+        context["signal"] = TradeSignal.SELL
         logging.info(f"Identified signal => {context.get('signal')}")
 
 
@@ -156,15 +158,16 @@ def main(args):
         FetchDataFromExchange(),
         LoadDataInDataFrame(),
         ReSampleData(),
+        FetchAccountInfoFromExchange(),
+        LoadLastTransactionFromDatabase(),
         CalculateIndicators(),
         GenerateChart(),
         IdentifyBuySellSignal(),
-        LoadLastTransactionFromDatabase(),
         CheckIfIsANewSignal(),
-        FetchAccountInfoFromExchange(),
         CalculateBuySellAmountBasedOnAllocatedPot(),
         ExecuteBuyTradeIfSignaled(),
         ExecuteSellTradeIfSignaled(),
+        CollectInformationAboutOrder(),
         RecordTransactionInDatabase(),
         PublishTransactionOnTelegram(),
         PublishStrategyChartOnTelegram(),

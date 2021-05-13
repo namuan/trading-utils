@@ -1,12 +1,14 @@
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from enum import Enum
 
 import dataset
 import pandas as pd
 from dataset import Table
+from flatten_dict import flatten
 from stockstats import StockDataFrame
 
 from common.environment import EXCHANGE
@@ -21,7 +23,7 @@ def get_trade_amount(context):
     elif signal == TradeSignal.SELL:
         return context.get("sell_trade_amount")
     else:
-        return "N/A"
+        return -1
 
 
 class TradeSignal(Enum):
@@ -163,7 +165,10 @@ class ExecuteBuyTradeIfSignaled:
 
             trade_amount = context["buy_trade_amount"]
             if not args.dry_run:
-                exchange.create_market_buy_order(market, trade_amount)
+                buy_order_response = exchange.create_market_buy_order(
+                    market, trade_amount
+                )
+                context["order_response"] = buy_order_response
             else:
                 logging.info(
                     f"Dry Run: {current_signal} => Trade amount: {trade_amount}"
@@ -197,7 +202,10 @@ class ExecuteSellTradeIfSignaled:
 
             trade_amount = context["sell_trade_amount"]
             if not args.dry_run:
-                exchange.create_market_sell_order(market, trade_amount)
+                sell_order_response = exchange.create_market_sell_order(
+                    market, trade_amount
+                )
+                context["order_response"] = sell_order_response
             else:
                 logging.info(
                     f"Dry Run: {current_signal} =>, Trade amount: {trade_amount}"
@@ -214,6 +222,33 @@ class ExecuteSellTradeIfSignaled:
             send_message_to_telegram(error_message)
 
 
+class CollectInformationAboutOrder:
+    def _fetch_order_details(self, exchange_id, order_id):
+        try:
+            exchange = exchange_factory(exchange_id)
+            return exchange.fetch_order(order_id)
+        except Exception:
+            error_message = f"🚨 Unable to get order details for id {order_id}"
+            logging.exception(error_message)
+            send_message_to_telegram(error_message)
+            return {'status': 'unknown'}
+
+    def run(self, context):
+        trade_done = context.get("trade_done", False)
+        if trade_done:
+            exchange_id = context["exchange"]
+            order_id = context["order_response"].get("id")
+            while True:
+                order_details = self._fetch_order_details(exchange_id, order_id)
+                order_status = order_details.get("status")
+                if order_status != "closed":
+                    time.sleep(1)
+                    continue
+                else:
+                    context["order_details"] = order_details
+                    break
+
+
 class RecordTransactionInDatabase(object):
     def run(self, context):
         trade_done = context.get("trade_done", False)
@@ -224,15 +259,21 @@ class RecordTransactionInDatabase(object):
             market = context["market"]
             close_price = context["close"]
             trade_amount = get_trade_amount(context)
+            order_details = context["order_details"]
+            # remove un-necessary columns from order_details
+            del order_details["fees"]
+
             entry_row = {
                 "trade_dt": current_dt,
                 "signal": signal.name,
                 "market": market,
                 "close_price": close_price,
                 "trade_amount": trade_amount,
+                "order_details": order_details,
             }
-            db_table.insert(entry_row)
-            logging.info(f"Updated database: {entry_row}")
+            flatten_entry_row = flatten(entry_row, "underscore")
+            db_table.insert(flatten_entry_row)
+            logging.info(f"Updated database: {flatten_entry_row}")
 
 
 class PublishTransactionOnTelegram(object):
