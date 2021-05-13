@@ -129,11 +129,14 @@ class GenerateChart:
 
 class IdentifyBuySellSignal(object):
     def _if_hit_target(self, actual_order_price, close_price, target_pct):
+        if actual_order_price < 0:
+            return False
+
         pct_change = (close_price - actual_order_price) / actual_order_price * 100
         sl_hit = "🔴" if pct_change < -1 * target_pct else "🤞"
         pt_hit = "✅" if pct_change > target_pct else "🤞"
         logging.info(
-            f"Pct Change: {pct_change}, Target Percent: {target_pct}, SL Hit {sl_hit}, PT Hit {pt_hit}"
+            f"Pct Change: {pct_change:.2f}%, Target Percent: (+/-){target_pct}%, SL Hit {sl_hit}, PT Hit {pt_hit}"
         )
         return sl_hit or pt_hit
 
