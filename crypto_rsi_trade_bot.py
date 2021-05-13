@@ -1,10 +1,8 @@
 """
 Crypto Bot running based on a given strategy
 """
-import functools
 import logging
 from argparse import ArgumentParser
-from operator import add
 
 import mplfinance as mpf
 from mplfinance.plotting import make_addplot
@@ -25,6 +23,7 @@ from common.steps import (
     ExecuteSellTradeIfSignaled,
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
+    CollectInformationAboutOrder,
     parse_args,
 )
 from common.steps_runner import run
@@ -38,24 +37,15 @@ class ReSampleData:
 
 
 class CalculateIndicators(object):
-    def _gmma(self, ohlcv_df, ma_range):
-        try:
-            values = [ohlcv_df[f"close_{a}_ema"].iloc[-1] for a in ma_range]
-            return functools.reduce(add, values)
-        except:
-            return "N/A"
-
     def run(self, context):
         df = context["hourly_df"]
         context["close"] = df["close"].iloc[-1]
 
         indicators = {}
-        fast_ma = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]
-        slow_ma = [25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 55]
-        context["ma_range"] = fast_ma + slow_ma
-        indicators["fast_ema"] = self._gmma(df, fast_ma)
-        indicators["slow_ema"] = self._gmma(df, slow_ma)
-        indicators["adx"] = df["dx_14_ema"].iloc[-1]
+        # RSI
+        context["rsi_range"] = [4]
+        for rsi in context["rsi_range"]:
+            indicators[f"rsi_{rsi}"] = df[f"rsi_{rsi}"][-1]
 
         context["indicators"] = indicators
         logging.info(f"Close {context['close']} -> Indicators => {indicators}")
@@ -67,25 +57,13 @@ class GenerateChart:
         args = context["args"]
         chart_title = f"{args.coin}_{args.stable_coin}_60m"
         context["chart_name"] = chart_title
-        ma_range = context["ma_range"]
-        additional_plots = []
-        for ma in ma_range:
-            additional_plots.append(
-                make_addplot(
-                    df[f"close_{ma}_ema"],
-                    type="line",
-                    width=0.3,
-                )
-            )
-
         context[
             "chart_file_path"
-        ] = chart_file_path = f"output/{chart_title.lower()}-mma.png"
+        ] = chart_file_path = f"output/{chart_title.lower()}-rsi.png"
         save = dict(fname=chart_file_path)
         fig, axes = mpf.plot(
             df,
             type="line",
-            addplot=additional_plots,
             savefig=save,
             returnfig=True,
         )
@@ -93,17 +71,36 @@ class GenerateChart:
 
 
 class IdentifyBuySellSignal(object):
+    def _if_hit_stop_loss(self, actual_order_price, close_price, target_pct):
+        if actual_order_price < 0:
+            return False
+
+        pct_change = (close_price - actual_order_price) / actual_order_price * 100
+        sl_hit = "🔴" if pct_change < -1 * target_pct else "🤞"
+        logging.info(
+            f"Pct Change: {pct_change:.2f}%, Target Percent: (+/-){target_pct}%, SL Hit {sl_hit}"
+        )
+        return sl_hit
+
     def run(self, context):
         indicators = context["indicators"]
-        fast_ema = indicators["fast_ema"]
-        slow_ema = indicators["slow_ema"]
-        adx = indicators["adx"]
-        if fast_ema > slow_ema and adx > 35:
-            context["signal"] = TradeSignal.BUY
-        elif fast_ema < slow_ema:
+        args = context["args"]
+        target_pct = args.target_pct
+        last_transaction_order_details_price = context[
+            "last_transaction_order_details_price"
+        ]
+        close = context["close"]
+        rsi_4 = indicators["rsi_4"]
+
+        if rsi_4 > 60 or self._if_hit_stop_loss(
+            last_transaction_order_details_price, close, target_pct
+        ):
             context["signal"] = TradeSignal.SELL
+        elif rsi_4 < 20:
+            context["signal"] = TradeSignal.BUY
         else:
             context["signal"] = TradeSignal.NO_SIGNAL
+
         logging.info(f"Identified signal => {context.get('signal')}")
 
 
@@ -112,7 +109,7 @@ class PublishStrategyChartOnTelegram:
         trade_done = context.get("trade_done", False)
         if trade_done:
             chart_file_path = context["chart_file_path"]
-            send_file_to_telegram("MMA", chart_file_path)
+            send_file_to_telegram("RSI", chart_file_path)
 
 
 def main(args):
@@ -124,15 +121,16 @@ def main(args):
         FetchDataFromExchange(),
         LoadDataInDataFrame(),
         ReSampleData(),
+        FetchAccountInfoFromExchange(),
+        LoadLastTransactionFromDatabase(),
         CalculateIndicators(),
         GenerateChart(),
         IdentifyBuySellSignal(),
-        LoadLastTransactionFromDatabase(),
         CheckIfIsANewSignal(),
-        FetchAccountInfoFromExchange(),
         CalculateBuySellAmountBasedOnAllocatedPot(),
         ExecuteBuyTradeIfSignaled(),
         ExecuteSellTradeIfSignaled(),
+        CollectInformationAboutOrder(),
         RecordTransactionInDatabase(),
         PublishTransactionOnTelegram(),
         PublishStrategyChartOnTelegram(),

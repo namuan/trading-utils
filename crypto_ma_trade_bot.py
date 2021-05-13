@@ -24,55 +24,10 @@ from common.steps import (
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
     CollectInformationAboutOrder,
+    parse_args,
 )
 from common.steps_runner import run
 from common.tele_notifier import send_file_to_telegram
-
-
-def parse_args():
-    parser = ArgumentParser(description=__doc__)
-    parser.add_argument("-c", "--coin", type=str, help="Coin", required=True)
-    parser.add_argument(
-        "-m", "--stable-coin", type=str, help="Stable coin", required=True
-    )
-    parser.add_argument(
-        "-t", "--time-frame", type=str, help="Candle time frame", required=True
-    )
-    parser.add_argument(
-        "-p", "--target-pct", type=int, help="Target percent", required=False, default=1
-    )
-    parser.add_argument(
-        "-f",
-        "--db-file",
-        type=str,
-        help="Database file name",
-        default="crypto_trade_diary.db",
-    )
-    parser.add_argument(
-        "-b",
-        "--buying-budget",
-        type=int,
-        help="Buying allocation budget in currency amount",
-        default=50,
-    )
-    parser.add_argument(
-        "-w",
-        "--wait-in-minutes",
-        type=int,
-        help="Wait between running in minutes",
-        default=5,
-    )
-    parser.add_argument(
-        "-r", "--run-once", action="store_true", default=False, help="Run once"
-    )
-    parser.add_argument(
-        "-d",
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="Dry run so won't trigger any transaction",
-    )
-    return parser.parse_args()
 
 
 class ReSampleData:
@@ -197,5 +152,5 @@ def main(args):
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = parse_args(__doc__)
     main(args)

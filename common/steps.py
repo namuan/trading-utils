@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+from argparse import ArgumentParser
 from datetime import datetime
 from enum import Enum
 
@@ -14,6 +15,57 @@ from stockstats import StockDataFrame
 from common.environment import EXCHANGE
 from common.exchange import exchange_factory
 from common.tele_notifier import send_message_to_telegram
+
+
+def parse_args(doc):
+    parser = ArgumentParser(description=doc)
+    parser.add_argument(
+        "-s", "--strategy", type=str, help="Strategy title", required=True
+    )
+    parser.add_argument(
+        "-c", "--coins", type=str, help="Comma separated list of coins", required=True
+    )
+    parser.add_argument(
+        "-m", "--stable-coin", type=str, help="Stable coin", required=True
+    )
+    parser.add_argument(
+        "-t", "--time-frame", type=str, help="Candle time frame", required=True
+    )
+    parser.add_argument(
+        "-p", "--target-pct", type=int, help="Target percent", required=False, default=1
+    )
+    parser.add_argument(
+        "-f",
+        "--db-file",
+        type=str,
+        help="Database file name",
+        default="crypto_trade_diary.db",
+    )
+    parser.add_argument(
+        "-b",
+        "--buying-budget",
+        type=int,
+        help="Buying allocation budget in currency amount",
+        default=50,
+    )
+    parser.add_argument(
+        "-w",
+        "--wait-in-minutes",
+        type=int,
+        help="Wait between running in minutes",
+        default=5,
+    )
+    parser.add_argument(
+        "-r", "--run-once", action="store_true", default=False, help="Run once"
+    )
+    parser.add_argument(
+        "-d",
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Dry run so won't trigger any transaction",
+    )
+    return parser.parse_args()
 
 
 def get_trade_amount(context):
@@ -37,8 +89,11 @@ class SetupDatabase(object):
         home_dir = os.getenv("HOME")
         args = context["args"]
         coin = args.coin
+        strategy = args.strategy.lower()
         stable_currency = args.stable_coin
-        table_name = "{}_{}_trades".format(coin.lower(), stable_currency.lower())
+        table_name = "{}_{}_{}_trades".format(
+            coin.lower(), stable_currency.lower(), strategy
+        )
         db_file = context["args"].db_file
         db_connection_string = f"sqlite:///{home_dir}/{db_file}"
         db = dataset.connect(db_connection_string)
@@ -97,6 +152,7 @@ class LoadLastTransactionFromDatabase(object):
     def run(self, context):
         db_table: Table = context["db_table"]
         last_transaction = db_table.find_one(_limit=1, order_by="-trade_dt")
+        logging.info(f"Found last transaction in database: {last_transaction}")
         if last_transaction:
             context["last_transaction_signal"] = last_transaction["signal"]
             context["last_transaction_market"] = last_transaction["market"]

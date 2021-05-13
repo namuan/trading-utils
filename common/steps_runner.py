@@ -14,12 +14,16 @@ def run(procedure, args):
 
 
 def run_procedure(procedure, args):
-    context = {"args": args}
-    for step in procedure:
-        step_name = step.__class__.__name__
-        try:
-            logging.info(f"==> Running step: {step_name}")
-            logging.debug(context)
-            step.run(context)
-        except Exception:
-            logging.exception(f"Failure in step {step_name}")
+    coins = args.coins.split(",")
+
+    for coin in coins:
+        context = {"args": args}
+        setattr(args, "coin", coin)
+        for step in procedure:
+            step_name = step.__class__.__name__
+            try:
+                logging.info(f"==> Running step: {step_name}")
+                logging.debug(context)
+                step.run(context)
+            except Exception:
+                logging.exception(f"Failure in step {step_name}")
