@@ -14,7 +14,7 @@ from stockstats import StockDataFrame
 
 from common.environment import EXCHANGE
 from common.exchange import exchange_factory
-from common.tele_notifier import send_message_to_telegram
+from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
 
 
 def parse_args(doc):
@@ -354,6 +354,15 @@ class PublishTransactionOnTelegram(object):
             message = f"""🔔 {signal} ({trade_amount}) {market} at {close_price}"""
             send_message_to_telegram(message)
             logging.info(f"Published message 🛸: {message}")
+
+
+class PublishStrategyChartOnTelegram:
+    def run(self, context):
+        trade_done = context.get("trade_done", False)
+        strategy = context["args"].strategy
+        if trade_done:
+            chart_file_path = context["chart_file_path"]
+            send_file_to_telegram(strategy, chart_file_path)
 
 
 class PrintContext(object):

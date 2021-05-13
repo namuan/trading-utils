@@ -3,7 +3,6 @@ Crypto Bot running based on a given strategy
 """
 import functools
 import logging
-from argparse import ArgumentParser
 from operator import add
 
 import mplfinance as mpf
@@ -25,10 +24,9 @@ from common.steps import (
     ExecuteSellTradeIfSignaled,
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
-    parse_args,
+    parse_args, PublishStrategyChartOnTelegram,
 )
 from common.steps_runner import run
-from common.tele_notifier import send_file_to_telegram
 
 
 class ReSampleData:
@@ -105,14 +103,6 @@ class IdentifyBuySellSignal(object):
         else:
             context["signal"] = TradeSignal.NO_SIGNAL
         logging.info(f"Identified signal => {context.get('signal')}")
-
-
-class PublishStrategyChartOnTelegram:
-    def run(self, context):
-        trade_done = context.get("trade_done", False)
-        if trade_done:
-            chart_file_path = context["chart_file_path"]
-            send_file_to_telegram("MMA", chart_file_path)
 
 
 def main(args):

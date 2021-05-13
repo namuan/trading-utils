@@ -24,7 +24,7 @@ from common.steps import (
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
     CollectInformationAboutOrder,
-    parse_args,
+    parse_args, PublishStrategyChartOnTelegram,
 )
 from common.steps_runner import run
 from common.tele_notifier import send_file_to_telegram
@@ -115,14 +115,6 @@ class IdentifyBuySellSignal(object):
             context["signal"] = TradeSignal.NO_SIGNAL
 
         logging.info(f"Identified signal => {context.get('signal')}")
-
-
-class PublishStrategyChartOnTelegram:
-    def run(self, context):
-        trade_done = context.get("trade_done", False)
-        if trade_done:
-            chart_file_path = context["chart_file_path"]
-            send_file_to_telegram("MA", chart_file_path)
 
 
 def main(args):

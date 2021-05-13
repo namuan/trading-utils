@@ -2,10 +2,8 @@
 Crypto Bot running based on a given strategy
 """
 import logging
-from argparse import ArgumentParser
 
 import mplfinance as mpf
-from mplfinance.plotting import make_addplot
 
 from common.analyst import resample_candles
 from common.logger import init_logging
@@ -24,10 +22,9 @@ from common.steps import (
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
     CollectInformationAboutOrder,
-    parse_args,
+    parse_args, PublishStrategyChartOnTelegram,
 )
 from common.steps_runner import run
-from common.tele_notifier import send_file_to_telegram
 
 
 class ReSampleData:
@@ -93,7 +90,7 @@ class IdentifyBuySellSignal(object):
         rsi_4 = indicators["rsi_4"]
 
         if rsi_4 > 60 or self._if_hit_stop_loss(
-            last_transaction_order_details_price, close, target_pct
+                last_transaction_order_details_price, close, target_pct
         ):
             context["signal"] = TradeSignal.SELL
         elif rsi_4 < 20:
@@ -102,14 +99,6 @@ class IdentifyBuySellSignal(object):
             context["signal"] = TradeSignal.NO_SIGNAL
 
         logging.info(f"Identified signal => {context.get('signal')}")
-
-
-class PublishStrategyChartOnTelegram:
-    def run(self, context):
-        trade_done = context.get("trade_done", False)
-        if trade_done:
-            chart_file_path = context["chart_file_path"]
-            send_file_to_telegram("RSI", chart_file_path)
 
 
 def main(args):
