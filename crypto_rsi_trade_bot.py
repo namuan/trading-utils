@@ -22,7 +22,8 @@ from common.steps import (
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
     CollectInformationAboutOrder,
-    parse_args, PublishStrategyChartOnTelegram,
+    parse_args,
+    PublishStrategyChartOnTelegram,
 )
 from common.steps_runner import run
 
@@ -90,7 +91,7 @@ class IdentifyBuySellSignal(object):
         rsi_4 = indicators["rsi_4"]
 
         if rsi_4 > 60 or self._if_hit_stop_loss(
-                last_transaction_order_details_price, close, target_pct
+            last_transaction_order_details_price, close, target_pct
         ):
             context["signal"] = TradeSignal.SELL
         elif rsi_4 < 20:

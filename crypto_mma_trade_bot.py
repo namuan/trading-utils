@@ -24,7 +24,8 @@ from common.steps import (
     ExecuteSellTradeIfSignaled,
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
-    parse_args, PublishStrategyChartOnTelegram,
+    parse_args,
+    PublishStrategyChartOnTelegram,
 )
 from common.steps_runner import run
 

@@ -345,7 +345,9 @@ class PublishTransactionOnTelegram(object):
             market = context["market"]
             close_price = context["close"]
             order_details = context["order_details"]
-            last_transaction_order_details_price = context["last_transaction_order_details_price"]
+            last_transaction_order_details_price = context[
+                "last_transaction_order_details_price"
+            ]
             account_balance = context["account_balance"]
             trade_amount = get_trade_amount(context)
 

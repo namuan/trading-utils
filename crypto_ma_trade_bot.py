@@ -24,7 +24,8 @@ from common.steps import (
     RecordTransactionInDatabase,
     PublishTransactionOnTelegram,
     CollectInformationAboutOrder,
-    parse_args, PublishStrategyChartOnTelegram,
+    parse_args,
+    PublishStrategyChartOnTelegram,
 )
 from common.steps_runner import run
 from common.tele_notifier import send_file_to_telegram

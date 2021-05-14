@@ -2,11 +2,8 @@
 Crypto Bot running based on a given strategy
 """
 import logging
-from argparse import ArgumentParser
-from enum import Enum
 
 import mplfinance as mpf
-from dotenv import load_dotenv
 
 from common.analyst import resample_candles
 from common.logger import init_logging
@@ -15,70 +12,11 @@ from common.steps import (
     ReadConfiguration,
     FetchDataFromExchange,
     LoadDataInDataFrame,
+    TradeSignal,
+    parse_args,
+    PublishStrategyChartOnTelegram,
 )
 from common.steps_runner import run
-from common.tele_notifier import send_file_to_telegram
-
-load_dotenv()
-
-
-def parse_args():
-    parser = ArgumentParser(description=__doc__)
-    parser.add_argument("-c", "--coin", type=str, help="Coin", required=True)
-    parser.add_argument(
-        "-m", "--stable-coin", type=str, help="Stable coin", required=True
-    )
-    parser.add_argument(
-        "-t", "--time-frame", type=str, help="Candle time frame", required=True
-    )
-    parser.add_argument(
-        "-f",
-        "--db-file",
-        type=str,
-        help="Database file name",
-        default="crypto_trade_diary.db",
-    )
-    parser.add_argument(
-        "-b",
-        "--buying-budget",
-        type=int,
-        help="Buying allocation budget in currency amount",
-        default=50,
-    )
-    parser.add_argument(
-        "-w",
-        "--wait-in-minutes",
-        type=int,
-        help="Wait between running in minutes",
-        default=5,
-    )
-    parser.add_argument(
-        "-r", "--run-once", action="store_true", default=False, help="Run once"
-    )
-    parser.add_argument(
-        "-d",
-        "--dry-run",
-        action="store_true",
-        default=False,
-        help="Dry run so won't trigger any transaction",
-    )
-    return parser.parse_args()
-
-
-class TradeSignal(Enum):
-    BUY = "BUY"
-    SELL = "SELL"
-    NO_SIGNAL = "NO_SIGNAL"
-
-
-def get_trade_amount(context):
-    signal = context["signal"]
-    if signal == TradeSignal.BUY:
-        return context.get("buy_trade_amount")
-    elif signal == TradeSignal.SELL:
-        return context.get("sell_trade_amount")
-    else:
-        return "N/A"
 
 
 class ReSampleData:
@@ -201,15 +139,6 @@ class GenerateChart:
         fig.savefig(save["fname"])
 
 
-class PublishStrategyChartOnTelegram:
-    def run(self, context):
-        trade_done = context.get("trade_done", False)
-        if trade_done:
-            chart_file_path = context["chart_file_path"]
-            send_file_to_telegram("Strat", chart_file_path)
-            # open_file(chart_file_path)
-
-
 def main(args):
     init_logging()
 
@@ -222,19 +151,11 @@ def main(args):
         CalculateIndicators(),
         GenerateChart(),
         IdentifyBuySellSignal(),
-        # LoadLastTransactionFromDatabase(),
-        # CheckIfIsANewSignal(),
-        # FetchAccountInfoFromExchange(),
-        # CalculateBuySellAmountBasedOnAllocatedPot(),
-        # ExecuteBuyTradeIfSignaled(),
-        # ExecuteSellTradeIfSignaled(),
-        # RecordTransactionInDatabase(),
-        # PublishTransactionOnTelegram(),
         PublishStrategyChartOnTelegram(),
     ]
     run(procedure, args)
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = parse_args(__doc__)
     main(args)
