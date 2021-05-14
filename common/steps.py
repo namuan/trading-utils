@@ -340,9 +340,12 @@ class PublishTransactionOnTelegram(object):
     def run(self, context):
         trade_done = context.get("trade_done", False)
         if trade_done:
+            strategy = context["args"].strategy
             signal = context["signal"]
             market = context["market"]
             close_price = context["close"]
+            order_details = context["order_details"]
+            last_transaction_order_details_price = context["last_transaction_order_details_price"]
             account_balance = context["account_balance"]
             trade_amount = get_trade_amount(context)
 
@@ -351,9 +354,14 @@ class PublishTransactionOnTelegram(object):
                 account_balance_msg.append(f"*{k}* => {v}")
             send_message_to_telegram(", ".join(account_balance_msg))
 
-            message = f"""🔔 {signal} ({trade_amount}) {market} at {close_price}"""
-            send_message_to_telegram(message)
-            logging.info(f"Published message 🛸: {message}")
+            message = f"""🔔 Using {strategy} strategy {signal} ({trade_amount}) {market} at {close_price}"""
+            additional_message = ""
+            if signal == TradeSignal.SELL:
+                sold_price = order_details.price
+                profit_loss = sold_price - last_transaction_order_details_price
+                additional_message = f"""Made {profit_loss}. Buy at {last_transaction_order_details_price}, Sold at {sold_price}"""
+            send_message_to_telegram(message + " " + additional_message)
+            logging.info(f"Published message 🛸: {message} {additional_message}")
 
 
 class PublishStrategyChartOnTelegram:
