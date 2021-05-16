@@ -19,6 +19,7 @@ def run_procedure(procedure, args):
     for coin in coins:
         context = {"args": args}
         setattr(args, "coin", coin)
+        logging.info("{} {} {}".format("*" * 50, coin, "*" * 50))
         for step in procedure:
             step_name = step.__class__.__name__
             try:
