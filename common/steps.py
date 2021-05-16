@@ -405,4 +405,6 @@ def procedure(given_trade_procedure):
         PublishTransactionOnTelegram(),
         PublishStrategyChartOnTelegram(),
     ]
-    return flatten_list(data_collection_procedure + given_trade_procedure + process_trade_procedure)
+    return flatten_list(
+        data_collection_procedure + given_trade_procedure + process_trade_procedure
+    )
