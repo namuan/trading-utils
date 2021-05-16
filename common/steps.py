@@ -12,6 +12,7 @@ from dataset import Table
 from flatten_dict import flatten
 from stockstats import StockDataFrame
 
+from common import flatten_list
 from common.environment import EXCHANGE
 from common.exchange import exchange_factory
 from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
@@ -383,3 +384,25 @@ class PrintContext(object):
             del context["data"]
         logging.info(context)
         logging.info(json.dumps(data, indent=4))
+
+
+def procedure(given_trade_procedure):
+    data_collection_procedure = [
+        SetupDatabase(),
+        ReadConfiguration(),
+        FetchDataFromExchange(),
+        LoadDataInDataFrame(),
+        FetchAccountInfoFromExchange(),
+        LoadLastTransactionFromDatabase(),
+    ]
+    process_trade_procedure = [
+        CheckIfIsANewSignal(),
+        CalculateBuySellAmountBasedOnAllocatedPot(),
+        ExecuteBuyTradeIfSignaled(),
+        ExecuteSellTradeIfSignaled(),
+        CollectInformationAboutOrder(),
+        RecordTransactionInDatabase(),
+        PublishTransactionOnTelegram(),
+        PublishStrategyChartOnTelegram(),
+    ]
+    return flatten_list(data_collection_procedure + given_trade_procedure + process_trade_procedure)

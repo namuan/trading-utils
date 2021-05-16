@@ -3,6 +3,10 @@ from time import sleep
 
 
 def run(procedure, args):
+    run_forever_with(procedure, args)
+
+
+def run_forever_with(procedure, args):
     wait_period = args.wait_in_minutes
     run_once = args.run_once
     while True:
