@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 import mplfinance as mpf
 from mplfinance.plotting import make_addplot
 
+from common import flatten_list
 from common.analyst import resample_candles
 from common.logger import init_logging
 from common.steps import (
@@ -121,17 +122,21 @@ class IdentifyBuySellSignal(object):
 def main(args):
     init_logging()
 
-    procedure = [
+    data_collection_procedure = [
         SetupDatabase(),
         ReadConfiguration(),
         FetchDataFromExchange(),
         LoadDataInDataFrame(),
-        ReSampleData(),
         FetchAccountInfoFromExchange(),
         LoadLastTransactionFromDatabase(),
+    ]
+    identify_trade_procedure = [
+        ReSampleData(),
         CalculateIndicators(),
         GenerateChart(),
         IdentifyBuySellSignal(),
+    ]
+    process_trade_procedure = [
         CheckIfIsANewSignal(),
         CalculateBuySellAmountBasedOnAllocatedPot(),
         ExecuteBuyTradeIfSignaled(),
@@ -141,6 +146,7 @@ def main(args):
         PublishTransactionOnTelegram(),
         PublishStrategyChartOnTelegram(),
     ]
+    procedure = flatten_list(data_collection_procedure + identify_trade_procedure + process_trade_procedure)
     run(procedure, args)
 
 
