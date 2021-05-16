@@ -16,7 +16,7 @@ from common.steps import (
     parse_args,
     PublishStrategyChartOnTelegram,
 )
-from common.steps_runner import run
+from common.steps_runner import run_forever_with
 
 
 class ReSampleData:
@@ -153,7 +153,7 @@ def main(args):
         IdentifyBuySellSignal(),
         PublishStrategyChartOnTelegram(),
     ]
-    run(procedure, args)
+    run_forever_with(procedure, args)
 
 
 if __name__ == "__main__":

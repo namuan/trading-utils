@@ -6,13 +6,9 @@ import operator
 from argparse import ArgumentParser
 
 import requests
-from dotenv import load_dotenv
 
-from common.filesystem import file_as_json, output_dir
 from common.logger import init_logging
 from common.steps_runner import run_procedure
-
-load_dotenv()
 
 
 def parse_args():
