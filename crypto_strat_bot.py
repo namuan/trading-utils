@@ -22,8 +22,14 @@ from common.steps_runner import run_forever_with
 class ReSampleData:
     def run(self, context):
         df = context["df"]
-        context["hourly_df"] = resample_candles(df, "1H")
-        context["four_hourly_df"] = resample_candles(df, "4H")
+        context["resample_map"] = {
+            "fifteen_df": "15T",
+            "hourly_df": "1H",
+            "two_hourly_df": "2H",
+            "four_hourly_df": "4H",
+        }
+        for rk, rv in context["resample_map"].items():
+            context[rk] = resample_candles(df, rv)
 
 
 class CalculateIndicators(object):
@@ -85,12 +91,11 @@ class CalculateIndicators(object):
         context["close"] = df["close"].iloc[-1]
 
         indicators = {}
-        strat_60m, strat_candle_60m = self.calculate_strat(context["hourly_df"])
-        strat_4h, strat_candle_4h = self.calculate_strat(context["four_hourly_df"])
-        indicators["strat_60m"] = strat_60m
-        indicators["strat_candle_60m_direction"] = strat_candle_60m
-        indicators["strat_4h"] = strat_4h
-        indicators["strat_candle_4h_direction"] = strat_candle_4h
+        for rk, rv in context["resample_map"].items():
+            strat, strat_candle = self.calculate_strat(context[rk])
+            indicators[f"strat_{rv}"] = strat
+            indicators[f"strat_candle_{rv}_direction"] = strat_candle
+
         context["indicators"] = indicators
         logging.info(f"Close {context['close']} -> Indicators => {indicators}")
 
@@ -98,9 +103,8 @@ class CalculateIndicators(object):
 class IdentifyBuySellSignal(object):
     def run(self, context):
         indicators = context["indicators"]
-        strat_60m: str = indicators["strat_60m"]
-        strat_candle_60m = indicators["strat_candle_60m_direction"]
-        strat_candle_4h = indicators["strat_candle_4h_direction"]
+        strat_60m: str = indicators["strat_1H"]
+        strat_candle_60m = indicators["strat_candle_1H_direction"]
         strat_conditions = strat_60m.endswith("2d-2d") or strat_60m.endswith("2u-2u")
         if strat_conditions and strat_candle_60m == "green":
             context["signal"] = TradeSignal.BUY
@@ -111,8 +115,10 @@ class IdentifyBuySellSignal(object):
 
 class GenerateChart:
     def run(self, context):
-        df_60m = context["hourly_df"]
-        df_4h = context["four_hourly_df"]
+        df_1 = context["fifteen_df"]
+        df_2 = context["hourly_df"]
+        df_3 = context["two_hourly_df"]
+        df_4 = context["four_hourly_df"]
         args = context["args"]
         chart_title = f"{args.coin}_{args.stable_coin}_60m"
         context["chart_name"] = chart_title
@@ -121,20 +127,34 @@ class GenerateChart:
         ] = chart_file_path = f"output/{chart_title.lower()}-strat.png"
         save = dict(fname=chart_file_path)
         fig = mpf.figure(style="yahoo", figsize=(20, 10))
-        ax1 = fig.add_subplot(1, 2, 1)
-        ax2 = fig.add_subplot(1, 2, 2)
+        ax1 = fig.add_subplot(3, 2, 1)
+        ax2 = fig.add_subplot(3, 2, 2)
+        ax3 = fig.add_subplot(3, 2, 5)
+        ax4 = fig.add_subplot(3, 2, 6)
         mpf.plot(
-            df_60m[-40:],
+            df_1[-160:],
             ax=ax1,
             type="candle",
         )
         mpf.plot(
-            df_4h[-10:],
+            df_2[-40:],
             ax=ax2,
             type="candle",
         )
-        ax1.set_title("60m")
-        ax2.set_title("4h")
+        mpf.plot(
+            df_3[-20:],
+            ax=ax3,
+            type="candle",
+        )
+        mpf.plot(
+            df_4[-10:],
+            ax=ax4,
+            type="candle",
+        )
+        ax1.set_title("15T")
+        ax2.set_title("1H")
+        ax3.set_title("2H")
+        ax4.set_title("4H")
         fig.suptitle(chart_title, fontsize=12)
         fig.savefig(save["fname"])
 

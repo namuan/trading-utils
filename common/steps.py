@@ -121,7 +121,7 @@ class FetchDataFromExchange(object):
         market = context["market"]
         logging.info(f"Exchange {exchange_id}, Market {market}, TimeFrame {candle_tf}")
         exchange = exchange_factory(exchange_id)
-        candle_data = exchange.fetch_ohlcv(market, candle_tf, limit=300)
+        candle_data = exchange.fetch_ohlcv(market, candle_tf)
         context["candle_data"] = candle_data
 
 
