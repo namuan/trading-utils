@@ -52,6 +52,8 @@ class CalculateIndicators(object):
 class GenerateChart:
     def run(self, context):
         df = context["hourly_df"]
+        df["rsi_ub"] = 60
+        df["rsi_lb"] = 20
         args = context["args"]
         chart_title = f"{args.coin}_{args.stable_coin}_60m"
         context["chart_name"] = chart_title
@@ -59,10 +61,17 @@ class GenerateChart:
             "chart_file_path"
         ] = chart_file_path = f"output/{chart_title.lower()}-rsi.png"
         save = dict(fname=chart_file_path)
+        rsi_plot = [
+            mpf.make_addplot(df["rsi_4"], width=0.5, color='red', ylabel="rsi(14)", panel=1),
+            mpf.make_addplot(df["rsi_lb"], width=0.5, color='blue', panel=1),
+            mpf.make_addplot(df["rsi_ub"], width=0.5, color='blue', panel=1)
+        ]
         fig, axes = mpf.plot(
             df,
-            type="line",
+            type="candle",
             savefig=save,
+            addplot=rsi_plot,
+            style="yahoo",
             returnfig=True,
         )
         fig.savefig(save["fname"])
@@ -91,7 +100,7 @@ class IdentifyBuySellSignal(object):
         rsi_4 = indicators["rsi_4"]
 
         if rsi_4 > 60 or self._if_hit_stop_loss(
-            last_transaction_order_details_price, close, target_pct
+                last_transaction_order_details_price, close, target_pct
         ):
             context["signal"] = TradeSignal.SELL
         elif rsi_4 < 20:
