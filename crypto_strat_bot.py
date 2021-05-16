@@ -101,11 +101,11 @@ class IdentifyBuySellSignal(object):
         strat_60m: str = indicators["strat_60m"]
         strat_candle_60m = indicators["strat_candle_60m_direction"]
         strat_candle_4h = indicators["strat_candle_4h_direction"]
-        if strat_60m.endswith("2d-2d") and strat_candle_60m == "green":
+        strat_conditions = strat_60m.endswith("2d-2d") or strat_60m.endswith("2u-2u")
+        if strat_conditions and strat_candle_60m == "green":
             context["signal"] = TradeSignal.BUY
             context["trade_done"] = True
 
-        context["signal"] = TradeSignal.NO_SIGNAL
         logging.info(f"Identified signal => {context.get('signal')}")
 
 
