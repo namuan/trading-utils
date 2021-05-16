@@ -15,6 +15,7 @@ from stockstats import StockDataFrame
 from common import flatten_list
 from common.environment import EXCHANGE
 from common.exchange import exchange_factory
+from common.plotting import open_file
 from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
 
 
@@ -370,10 +371,13 @@ class PublishTransactionOnTelegram(object):
 class PublishStrategyChartOnTelegram:
     def run(self, context):
         trade_done = context.get("trade_done", False)
+        run_once = context["args"].run_once
         strategy = context["args"].strategy
-        if trade_done:
-            chart_file_path = context["chart_file_path"]
+        chart_file_path = context["chart_file_path"]
+        if not run_once and trade_done:
             send_file_to_telegram(strategy, chart_file_path)
+        elif run_once:
+            open_file(chart_file_path)
 
 
 class PrintContext(object):
