@@ -8,24 +8,11 @@ import mplfinance as mpf
 from common.analyst import resample_candles
 from common.logger import init_logging
 from common.steps import (
-    SetupDatabase,
-    FetchAccountInfoFromExchange,
-    ReadConfiguration,
-    FetchDataFromExchange,
-    LoadDataInDataFrame,
     TradeSignal,
-    LoadLastTransactionFromDatabase,
-    CheckIfIsANewSignal,
-    CalculateBuySellAmountBasedOnAllocatedPot,
-    ExecuteBuyTradeIfSignaled,
-    ExecuteSellTradeIfSignaled,
-    RecordTransactionInDatabase,
-    PublishTransactionOnTelegram,
-    CollectInformationAboutOrder,
     parse_args,
-    PublishStrategyChartOnTelegram,
+    procedure,
 )
-from common.steps_runner import run
+from common.steps_runner import run_forever_with
 
 
 class ReSampleData:
@@ -62,9 +49,11 @@ class GenerateChart:
         ] = chart_file_path = f"output/{chart_title.lower()}-rsi.png"
         save = dict(fname=chart_file_path)
         rsi_plot = [
-            mpf.make_addplot(df["rsi_4"], width=0.5, color='red', ylabel="rsi(14)", panel=1),
-            mpf.make_addplot(df["rsi_lb"], width=0.5, color='blue', panel=1),
-            mpf.make_addplot(df["rsi_ub"], width=0.5, color='blue', panel=1)
+            mpf.make_addplot(
+                df["rsi_4"], width=0.5, color="red", ylabel="rsi(14)", panel=1
+            ),
+            mpf.make_addplot(df["rsi_lb"], width=0.5, color="blue", panel=1),
+            mpf.make_addplot(df["rsi_ub"], width=0.5, color="blue", panel=1),
         ]
         fig, axes = mpf.plot(
             df,
@@ -100,7 +89,7 @@ class IdentifyBuySellSignal(object):
         rsi_4 = indicators["rsi_4"]
 
         if rsi_4 > 60 or self._if_hit_stop_loss(
-                last_transaction_order_details_price, close, target_pct
+            last_transaction_order_details_price, close, target_pct
         ):
             context["signal"] = TradeSignal.SELL
         elif rsi_4 < 20:
@@ -114,27 +103,14 @@ class IdentifyBuySellSignal(object):
 def main(args):
     init_logging()
 
-    procedure = [
-        SetupDatabase(),
-        ReadConfiguration(),
-        FetchDataFromExchange(),
-        LoadDataInDataFrame(),
+    identify_trade_procedure = [
         ReSampleData(),
-        FetchAccountInfoFromExchange(),
-        LoadLastTransactionFromDatabase(),
         CalculateIndicators(),
         GenerateChart(),
         IdentifyBuySellSignal(),
-        CheckIfIsANewSignal(),
-        CalculateBuySellAmountBasedOnAllocatedPot(),
-        ExecuteBuyTradeIfSignaled(),
-        ExecuteSellTradeIfSignaled(),
-        CollectInformationAboutOrder(),
-        RecordTransactionInDatabase(),
-        PublishTransactionOnTelegram(),
-        PublishStrategyChartOnTelegram(),
     ]
-    run(procedure, args)
+
+    run_forever_with(procedure(identify_trade_procedure), args)
 
 
 if __name__ == "__main__":

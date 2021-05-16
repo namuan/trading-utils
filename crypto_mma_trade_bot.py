@@ -11,23 +11,11 @@ from mplfinance.plotting import make_addplot
 from common.analyst import resample_candles
 from common.logger import init_logging
 from common.steps import (
-    SetupDatabase,
-    FetchAccountInfoFromExchange,
-    ReadConfiguration,
-    FetchDataFromExchange,
-    LoadDataInDataFrame,
     TradeSignal,
-    LoadLastTransactionFromDatabase,
-    CheckIfIsANewSignal,
-    CalculateBuySellAmountBasedOnAllocatedPot,
-    ExecuteBuyTradeIfSignaled,
-    ExecuteSellTradeIfSignaled,
-    RecordTransactionInDatabase,
-    PublishTransactionOnTelegram,
     parse_args,
-    PublishStrategyChartOnTelegram,
+    procedure,
 )
-from common.steps_runner import run
+from common.steps_runner import run_forever_with
 
 
 class ReSampleData:
@@ -109,26 +97,14 @@ class IdentifyBuySellSignal(object):
 def main(args):
     init_logging()
 
-    procedure = [
-        SetupDatabase(),
-        ReadConfiguration(),
-        FetchDataFromExchange(),
-        LoadDataInDataFrame(),
+    identify_trade_procedure = [
         ReSampleData(),
         CalculateIndicators(),
         GenerateChart(),
         IdentifyBuySellSignal(),
-        LoadLastTransactionFromDatabase(),
-        CheckIfIsANewSignal(),
-        FetchAccountInfoFromExchange(),
-        CalculateBuySellAmountBasedOnAllocatedPot(),
-        ExecuteBuyTradeIfSignaled(),
-        ExecuteSellTradeIfSignaled(),
-        RecordTransactionInDatabase(),
-        PublishTransactionOnTelegram(),
-        PublishStrategyChartOnTelegram(),
     ]
-    run(procedure, args)
+
+    run_forever_with(procedure(identify_trade_procedure), args)
 
 
 if __name__ == "__main__":
