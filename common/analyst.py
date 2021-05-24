@@ -267,16 +267,22 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     data_row["weekly_strat_candle"] = weekly_strat_candle
 
     # Monthly timeframe calculations
-    monthly_ticker_candles = resample_candles(ticker_df, "M")
+    for month in [1, 2, 3]:
+        monthly_ticker_candles = resample_candles(ticker_df, f"{month}M")
+        data_row[f"month_{month}_high"] = monthly_ticker_candles.iloc[-1]["high"]
+        data_row[f"month_{month}_low"] = monthly_ticker_candles.iloc[-1]["low"]
+        data_row[f"month_{month}_open"] = monthly_ticker_candles.iloc[-1]["open"]
+        data_row[f"month_{month}_close"] = monthly_ticker_candles.iloc[-1]["close"]
+        data_row[f"month_{month}_volume"] = monthly_ticker_candles.iloc[-1]["volume"]
 
-    # Monthly Close change delta
-    for ccr in [1, 3, 7]:
-        data_row["monthly_close_change_delta_{}".format(ccr)] = monthly_ticker_candles[
-            "close_-{}_d".format(ccr)
-        ].iloc[-1]
+        # Monthly Close change delta
+        for ccr in [1, 3, 7]:
+            data_row[
+                f"month_{month}_close_change_delta_{ccr}"
+            ] = monthly_ticker_candles["close_-{}_d".format(ccr)].iloc[-1]
 
-    monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
-    data_row["monthly_strat"] = monthly_strat
-    data_row["monthly_strat_candle"] = monthly_strat_candle
+        monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
+        data_row[f"month_{month}_strat"] = monthly_strat
+        data_row[f"month_{month}_strat_candle"] = monthly_strat_candle
 
     return data_row
