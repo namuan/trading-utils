@@ -145,6 +145,21 @@ def fetch_data_from_cache(ticker, is_etf):
     return enrich_data(ticker, ticker_df, earnings_date=earnings_date, is_etf=is_etf)
 
 
+def compare_range_with_prev_days(ticker_df, last_trading_day, prev_days):
+    try:
+        prev_days_for_calc = -1 * prev_days - 1
+        prev_days_max = max(
+            abs(
+                ticker_df[prev_days_for_calc:-1]["high"]
+                - ticker_df[prev_days_for_calc:-1]["low"]
+            )
+        )
+        last_range = abs(last_trading_day["high"] - last_trading_day["low"])
+        return bool(last_range > prev_days_max)
+    except:
+        return "N/A"
+
+
 def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     last_close_date = ticker_df.index[-1]
     last_trading_day = ticker_df.iloc[-1]
@@ -221,6 +236,12 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         data_row["hv_{}".format(vol_calc)] = historical_vol(ticker_df, vol_calc).iloc[
             -1
         ]
+
+    # Check if todays range is better than prev n days
+    for prev_days in [9, 13]:
+        data_row[
+            f"range_better_than_{prev_days}_prev_days"
+        ] = compare_range_with_prev_days(ticker_df, last_trading_day, prev_days)
 
     # Trend smoothness
     for mo in [30, 60, 90, 180]:
