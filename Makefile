@@ -60,10 +60,10 @@ deploy: clean ## Copies any changed file to the server
 		${PROJECTNAME}:./${PROJECTNAME}
 
 start: deploy ## Sets up a screen session on the server and start the app
-	ssh ${PROJECTNAME} -C 'bash -l -c "./${PROJECTNAME}/scripts/setup_apps.sh"'
+	ssh ${PROJECTNAME} -C 'bash -l -c "./${PROJECTNAME}/scripts/setup_apps.sh ${PROJECTNAME}"'
 
 stop: deploy ## Stop any running screen session on the server
-	ssh ${PROJECTNAME} -C 'bash -l -c "./${PROJECTNAME}/scripts/stop_apps.sh"'
+	ssh ${PROJECTNAME} -C 'bash -l -c "./${PROJECTNAME}/scripts/stop_apps.sh ${PROJECTNAME}"'
 
 ssh: ## SSH into the target VM
 	ssh ${PROJECTNAME}

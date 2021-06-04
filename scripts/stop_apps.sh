@@ -1,4 +1,4 @@
-cd trading-utils || exit
+cd $1 || exit
 bash ./scripts/stop_screen.sh tele-links
 #bash ./scripts/stop_screen.sh tele-twitter
 bash ./scripts/stop_screen.sh options-price-tracker
