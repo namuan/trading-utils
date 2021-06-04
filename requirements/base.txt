@@ -1,6 +1,6 @@
 yfinance
 pandas
-numpy
+numpy>=1.16.5
 tqdm
 yahoo-finance
 requests
@@ -22,3 +22,4 @@ dotmap
 flatten-dict
 python-telegram-bot
 justpy
+finta
