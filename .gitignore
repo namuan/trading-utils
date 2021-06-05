@@ -6,5 +6,6 @@ output/
 cache.sqlite
 __pycache__/
 webpages.txt
+twitter_furus_accounts.txt
 .env
 fireprofile

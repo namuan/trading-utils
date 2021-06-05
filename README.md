@@ -143,6 +143,20 @@ Forward tweets from your followers to a telegram channel.
 py tele_twitter.py
 ```
 
+#### Twitter Furus -> Telegram
+
+Get tweets from your favourite twitter furus in your own telegram channel 🚀.
+The notification includes the original tweet along with a chart 📈 and links to several websites 🌎.
+It also keeps the tweets in a database to hold them accountable 👺.
+
+![](docs/images/twitter-pumps-sample.png)
+
+It requires setting up a file `twitter_furus_accounts.txt` with a list of individual twitter handles on each line (See `twitter_furus_accounts.txt.example`).
+
+```shell
+py twitter_furus.py
+```
+
 ## Crypto Bots
 
 Make sure you define a few variables before starting up these bots
