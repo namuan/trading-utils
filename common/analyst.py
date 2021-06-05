@@ -115,7 +115,15 @@ def calculate_position_size(account_value, risk_factor, recent_volatility):
     return math.floor(account_value * (risk_factor / recent_volatility))
 
 
-def fetch_data_on_demand(ticker, is_etf=False):
+def max_dd_based_position_sizing(buy_price, account_size, risk_factor, max_dd):
+    stop_loss = buy_price - (buy_price * max_dd)
+    trail_stop_loss = buy_price - stop_loss
+    account_size_risk = account_size * risk_factor
+    stocks_to_purchase = account_size_risk / trail_stop_loss
+    return buy_price, math.floor(stocks_to_purchase), stop_loss, trail_stop_loss
+
+
+def fetch_data_on_demand(ticker):
     end = datetime.now()
     start = datetime(end.year - 2, end.month, end.day)
     ticker_df = StockDataFrame.retype(download_ticker_data(ticker, start, end))
@@ -208,7 +216,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -218,7 +226,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
         )
 
     # Close change delta

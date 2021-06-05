@@ -10,9 +10,9 @@ from telegram.ext import (
     CallbackContext,
 )
 
-from common.analyst import fetch_data_on_demand
+from common.analyst import fetch_data_on_demand, max_dd_based_position_sizing
 from common.bot_wrapper import start, help_command
-from common.environment import TELEGRAM_STOCK_RIDER_BOT
+from common.environment import TELEGRAM_STOCK_RIDER_BOT, TRADING_ACCOUNT_VALUE, TRADING_RISK_FACTOR, TRADING_MAX_DD
 from common.external_charts import ChartProvider, build_chart_link
 from common.logger import init_logging
 from common.reporting import build_links_in_markdown
@@ -20,14 +20,20 @@ from common.reporting import build_links_in_markdown
 
 def populate_additional_info(ticker):
     d, _ = fetch_data_on_demand(ticker)
+    buy_price, stocks_to_purchase, stop_loss, trail_stop_loss = max_dd_based_position_sizing(
+        d["last_close"],
+        TRADING_ACCOUNT_VALUE,
+        TRADING_RISK_FACTOR,
+        TRADING_MAX_DD
+    )
     return """
 *Close* {:.2f} | *📈(1M)* {:.2f} | *Position* {} | *Trailing SL* {:.2f} | *SL* {:.2f}
     """.format(
-        d["last_close"],
+        buy_price,
         d["monthly_gains_1"],
-        int(d["position_size"]),
-        d["trailing_stop_loss"],
-        d["stop_loss"],
+        int(stocks_to_purchase),
+        trail_stop_loss,
+        stop_loss,
     )
 
 
