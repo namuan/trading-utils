@@ -30,7 +30,7 @@ py report_by_query.py -t "EMA Bounce" -q "(ema_60 < ema_50 < ema_45 < ema_40 < e
 
 ```shell
 # 3-2dn
-py report_by_query.py -t "Strat Daily 3-2dn(green)" -q "(daily_strat.str.contains('.*-3-2d')) and (daily_strat_candle == 'green') and (weekly_strat_candle == 'green') and (monthly_strat_candle == 'green')" -o "smooth_30" -v
+py report_by_query.py -t "Strat Daily 3-2dn(green)" -q "(daily_strat.str.contains('.*-3-2d')) and (daily_strat_candle.str.contains('.*-green$')) and (weekly_strat_candle.str.contains('.*-green$'))" -o "smooth_30" -v
 
 ```shell
 # 2dn(red)-2dn (green)
@@ -39,4 +39,25 @@ py report_by_query.py -t "Strat Daily 2dn(red)-2dn(green)" -q "(last_close > 10)
 
 #### Momentum
 
+```shell
 py report_by_query.py -t "Trending" -q "last_close > ema_3 > ema_5 > ema_7 > ema_9 > ema_11 > ema_13 > ema_30 > ema_35 > ema_40 > ema_45 > ema_50 > ema_55 > ema_60" -o "smooth_30" -v
+```
+
+### Misc
+
+```shell
+py report_by_query.py -t "Power of 3" -q "(power_of_3 == True)"
+```
+
+```shell
+./rbq "(daily_strat.str.contains('.*-2u$')) and (daily_strat_candle.str.contains('.*-green$')) and (weekly_strat.str.contains('.*-1$')) and (weekly_strat_candle.str.contains('.*-green$'))"
+```
+
+```shell
+py report_by_query.py -t "Boomer" -q "(adx_14 > 35) and (pdi_14 > mdi_14) and (daily_strat.str.contains('.*-1-1$')) and (daily_strat_candle.str.contains('.*-green-green$'))"
+```
+
+```shell
+py report_by_query.py -t "123 Pullbacks" -q "(adx_14 > 35) and (pdi_14 > mdi_14) and (daily_strat.str.contains('2d-2d-2d$'))" -v
+py report_by_query.py -t "123 Pullbacks" -q "(adx_14 > 35) and (pdi_14 > mdi_14) and (daily_strat.str.contains('2d-2d-1$'))" -v
+```
