@@ -20,12 +20,12 @@ from common.reporting import build_links_in_markdown
 
 
 def select_strikes_for(
-    options_df,
-    selected_expiry,
-    option_type,
-    additional_filters,
-    sort_criteria,
-    fetch_limit,
+        options_df,
+        selected_expiry,
+        option_type,
+        additional_filters,
+        sort_criteria,
+        fetch_limit,
 ):
     option_query = f"(expiration_date == '{selected_expiry}') and (option_type == '{option_type}') and {additional_filters}"
     return (
@@ -135,6 +135,10 @@ def generate_report(ticker, update: Update, context: CallbackContext):
 
 def handle_cmd(update: Update, context: CallbackContext) -> None:
     maybe_symbol: str = update.message.text
+    if len(maybe_symbol.split(" ")) > 1:
+        print(f"More information provided so it could be for a different bot: {maybe_symbol}")
+        return
+
     if maybe_symbol.startswith("$"):
         ticker = maybe_symbol[1:]
         generate_report(ticker, update, context)
