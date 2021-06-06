@@ -55,6 +55,7 @@ deploy: clean ## Copies any changed file to the server
 		options_price_tracker.py \
 		tele_stock_rider_bot.py \
 		tele_theta_gang_bot.py \
+		tele_stock_alerts_bot.py \
 		webpages.txt \
 		twitter_furus.py \
 		twitter_furus_accounts.txt \
