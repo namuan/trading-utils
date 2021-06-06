@@ -55,11 +55,6 @@ def gains(close_data):
     return ((close - open) / open) * 100
 
 
-def historical_vol(ticker_candles, vol_calc):
-    rets = ticker_candles["close_-1_r"]
-    return rets.rolling(window=vol_calc).std() * np.sqrt(252)
-
-
 def smooth_trend(df):
     pos_neg = np.where(df > df.shift(periods=1), 1, -1)
     return pos_neg.sum()
@@ -121,6 +116,34 @@ def max_dd_based_position_sizing(buy_price, account_size, risk_factor, max_dd):
     account_size_risk = account_size * risk_factor
     stocks_to_purchase = account_size_risk / trail_stop_loss
     return buy_price, math.floor(stocks_to_purchase), stop_loss, trail_stop_loss
+
+
+def green_candle(ticker_candle):
+    return ticker_candle["close"] > ticker_candle["open"]
+
+
+def power_of_3(ticker_candles):
+    """Return True if we see 3 daily increasing price and volume"""
+    try:
+        price_increase = (
+            ticker_candles["close"].iloc[-1]
+            > ticker_candles["close"].iloc[-2]
+            > ticker_candles["close"].iloc[-3]
+        )
+        volume_increase = (
+            ticker_candles["volume"].iloc[-1]
+            > ticker_candles["volume"].iloc[-2]
+            > ticker_candles["volume"].iloc[-3]
+        )
+        return (
+            green_candle(ticker_candles.iloc[-1])
+            and green_candle(ticker_candles.iloc[-2])
+            and green_candle(ticker_candles.iloc[-3])
+            and price_increase
+            and volume_increase
+        )
+    except:
+        return "N/A"
 
 
 def fetch_data_on_demand(ticker):
@@ -216,7 +239,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for atr in [10, 20, 30, 60]:
         data_row[f"atr_{atr}"] = ticker_df[f"atr_{atr}"].iloc[-1]
         data_row[f"natr_{atr}"] = (
-                (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
+            (ticker_df[f"atr_{atr}"] / ticker_df["close"]) * 100
         ).iloc[-1]
 
     # RSI
@@ -226,7 +249,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
-            ticker_df["close"][mg * DAYS_IN_MONTH * -1:]
+            ticker_df["close"][mg * DAYS_IN_MONTH * -1 :]
         )
 
     # Close change delta
@@ -237,13 +260,16 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # ADX
     for adx_period in [9, 14, 21]:
+        data_row[f"pdi_{adx_period}"] = ticker_df[f"pdi_{adx_period}"].iloc[-1]
+        data_row[f"mdi_{adx_period}"] = ticker_df[f"mdi_{adx_period}"].iloc[-1]
+        data_row[f"dx_{adx_period}"] = ticker_df[f"dx_{adx_period}"].iloc[-1]
         data_row[f"adx_{adx_period}"] = ticker_df[f"dx_{adx_period}_ema"].iloc[-1]
 
-    # Historical Volatility
-    for vol_calc in [9, 14, 21, 50]:
-        data_row["hv_{}".format(vol_calc)] = historical_vol(ticker_df, vol_calc).iloc[
-            -1
-        ]
+    # Daily Volume EMA
+    fast_ma = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]
+    for vema in fast_ma:
+        data_row[f"vol_ma_{vema}"] = ticker_df[f"volume_{vema}_sma"].iloc[-1]
+        data_row[f"vol_ema_{vema}"] = ticker_df[f"volume_{vema}_ema"].iloc[-1]
 
     # Check if todays range is better than prev n days
     for prev_days in [9, 13]:
@@ -313,5 +339,8 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
         data_row[f"month_{month}_strat"] = monthly_strat
         data_row[f"month_{month}_strat_candle"] = monthly_strat_candle
+
+    # Strategies
+    data_row["power_of_3"] = power_of_3(ticker_df)
 
     return data_row
