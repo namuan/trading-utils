@@ -9,7 +9,7 @@ from common.analyst import fetch_data_on_demand
 from common.external_charts import build_chart_link
 from common.plotting import plot_intraday
 from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
-from common.trading_hours import outside_trading_hours
+from common.trading_hours import after_hour_during_trading_day
 
 
 def parse_args():
@@ -59,10 +59,8 @@ def run_analysis(telegram=True, output_dir="output"):
 
 
 def run_bot():
-    if outside_trading_hours():
-        return
-
-    run_analysis()
+    if after_hour_during_trading_day(3):
+        run_analysis()
 
 
 def check_if_run(schedule_in_hours):

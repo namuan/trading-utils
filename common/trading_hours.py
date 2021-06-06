@@ -9,21 +9,19 @@ def eastern_datetime(dt):
 
 
 def outside_trading_hours():
+    return not inside_trading_hours()
+
+
+def after_hour_during_trading_day(given_hr):
+    if outside_trading_hours():
+        return False
+
     now = datetime.now()
-    is_weekday = now.weekday() < 5
-    selected_hr = 15
     eastern = eastern_datetime(now)
     eastern_hour = eastern.time().hour
-    before_time = eastern_hour == selected_hr
-    print(
-        "Checking {} - Hour: {} - Before Time - {}".format(
-            now, eastern_hour, before_time
-        )
-    )
-    if is_weekday and before_time:
-        print(
-            "{} - Is Weekday: {}, Before Time: {}".format(now, is_weekday, before_time)
-        )
+    about_time = eastern_hour == given_hr
+    if about_time:
+        print(f"=> After given hour {given_hr}")
         return True
     else:
         return False
