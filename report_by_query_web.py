@@ -59,7 +59,7 @@ def home_page():
     jp.Br(a=wp)
     user_label = jp.Label(text="Enter query ", classes="font-bold m-2", a=wp)
     in1 = jp.Input(
-        a=wp, classes="form-input", value="(is_large_cap == True)", no_events=True
+        a=wp, classes="form-input w-10/12", value="(is_large_cap == True)", no_events=True
     )
     user_label.for_component = in1
     jp.Br(a=wp)
