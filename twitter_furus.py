@@ -139,9 +139,7 @@ def main(twitter_accounts, poll_freq_in_secs):
         try:
             chart_link, _, message = build_response_message(symbol)
             header = f"""🚀 #*{symbol}* 👀 posted by [{mention_acct}](https://twitter.com/{mention_acct}/status/{mention_tweet_id}) at {formatted_posted_dt}"""
-            send_message_to_telegram(
-                header, disable_web_preview=False
-            )
+            send_message_to_telegram(header, disable_web_preview=False)
             send_message_to_telegram(
                 chart_link,
                 format="HTML",
