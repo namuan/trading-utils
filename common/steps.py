@@ -13,7 +13,7 @@ from flatten_dict import flatten
 from stockstats import StockDataFrame
 
 from common import flatten_list
-from common.environment import EXCHANGE
+from common.environment import EXCHANGE, GROUP_CHAT_ID
 from common.exchange import exchange_factory
 from common.plotting import open_file
 from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
@@ -375,7 +375,7 @@ class PublishStrategyChartOnTelegram:
         strategy = context["args"].strategy
         chart_file_path = context["chart_file_path"]
         if not run_once and trade_done:
-            send_file_to_telegram(strategy, chart_file_path)
+            send_file_to_telegram(strategy, chart_file_path, override_chat_id=GROUP_CHAT_ID)
         elif run_once:
             open_file(chart_file_path)
 
