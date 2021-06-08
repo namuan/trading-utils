@@ -11,4 +11,4 @@ bash ./scripts/start_screen.sh tele-theta-gang-bot 'venv/bin/python3 tele_theta_
 bash ./scripts/start_screen.sh tele-stock-alerts-bot 'venv/bin/python3 tele_stock_alerts_bot.py'
 bash ./scripts/start_screen.sh strat-usdt 'venv/bin/python3 crypto_strat_bot.py --strategy strat --buying-budget 10 --coins ADA,XLM,MATIC,DOGE --stable-coin USDT --time-frame 5m --wait-in-minutes 15'
 #bash ./scripts/start_screen.sh 1-usdt-trade-bot 'venv/bin/python3 crypto_ma_trade_bot.py --strategy ma --buying-budget 50 --coins ADA,XLM,MATIC --target-pct 2 --stable-coin USDT --time-frame 5m --wait-in-minutes 1'
-bash ./scripts/start_screen.sh 2-usdt-trade-bot 'venv/bin/python3 crypto_rsi_trade_bot.py --strategy rsi --buying-budget 100 --coins ADA,XLM,DOGE,XRP --target-pct 2 --stable-coin USDT --time-frame 5m --wait-in-minutes 1'
+#bash ./scripts/start_screen.sh 2-usdt-trade-bot 'venv/bin/python3 crypto_rsi_trade_bot.py --strategy rsi --buying-budget 100 --coins ADA,XLM,DOGE,XRP --target-pct 2 --stable-coin USDT --time-frame 5m --wait-in-minutes 1'
