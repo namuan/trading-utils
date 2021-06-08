@@ -134,12 +134,11 @@ def generate_report(ticker, update: Update, context: CallbackContext):
 
 
 def handle_cmd(update: Update, context: CallbackContext) -> None:
-    maybe_symbol: str = update.message.text
-    if len(maybe_symbol.split(" ")) > 1:
-        print(f"More information provided so it could be for a different bot: {maybe_symbol}")
-        return
+    message_text: str = update.message.text
+    print(message_text)
 
-    if maybe_symbol.startswith("$"):
+    if message_text.startswith("$") and message_text.endswith("options"):
+        maybe_symbol, _ = message_text.split(" ")
         ticker = maybe_symbol[1:]
         generate_report(ticker, update, context)
 
