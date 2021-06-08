@@ -58,7 +58,7 @@ def build_response_message(ticker):
     )
     sites_urls = build_links_in_markdown(ticker)
     additional_info = populate_additional_info(ticker)
-    disclaimer = "_ Disclaimer: Position size calculated for ~1% risk using given SL. Not financial advice _"
+    disclaimer = "_ Disclaimer: Position size calculated for ~1% account size risk using given SL. Not financial advice _"
     return (
         daily_chart_link,
         weekly_chart_link,
@@ -85,6 +85,7 @@ def generate_report(ticker, update: Update, context: CallbackContext):
 
 
 def handle_cmd(update: Update, context: CallbackContext) -> None:
+    print(f"Incoming update: {update}")
     maybe_symbol: str = update.message.text
     if len(maybe_symbol.split(" ")) > 1:
         print(f"More information provided so it could be for a different bot: {maybe_symbol}")
