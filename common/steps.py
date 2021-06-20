@@ -375,7 +375,9 @@ class PublishStrategyChartOnTelegram:
         strategy = context["args"].strategy
         chart_file_path = context["chart_file_path"]
         if not run_once and trade_done:
-            send_file_to_telegram(strategy, chart_file_path, override_chat_id=GROUP_CHAT_ID)
+            send_file_to_telegram(
+                strategy, chart_file_path, override_chat_id=GROUP_CHAT_ID
+            )
         elif run_once:
             open_file(chart_file_path)
 

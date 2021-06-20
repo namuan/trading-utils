@@ -19,13 +19,17 @@ from common.logger import init_logging
 def handle_cmd(update: Update, context: CallbackContext) -> None:
     message_text: str = update.message.text
     if len(message_text.split(" ")) < 3:
-        print(f"More information provided so it could be for a different bot: {message_text}")
+        print(
+            f"More information provided so it could be for a different bot: {message_text}"
+        )
         return
 
     maybe_symbol, criteria, threshold = message_text.split(" ")
     if maybe_symbol.startswith("$"):
         ticker = maybe_symbol[1:]
-        update.message.reply_text(f"Set up alert when #{ticker} {criteria} {threshold}", quote=True)
+        update.message.reply_text(
+            f"Set up alert when #{ticker} {criteria} {threshold}", quote=True
+        )
 
 
 def main():

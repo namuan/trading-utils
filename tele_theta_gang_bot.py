@@ -20,12 +20,12 @@ from common.reporting import build_links_in_markdown
 
 
 def select_strikes_for(
-        options_df,
-        selected_expiry,
-        option_type,
-        additional_filters,
-        sort_criteria,
-        fetch_limit,
+    options_df,
+    selected_expiry,
+    option_type,
+    additional_filters,
+    sort_criteria,
+    fetch_limit,
 ):
     option_query = f"(expiration_date == '{selected_expiry}') and (option_type == '{option_type}') and {additional_filters}"
     return (
