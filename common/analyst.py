@@ -246,6 +246,33 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for rsi in [2, 4, 9, 14]:
         data_row[f"rsi_{rsi}"] = ticker_df[f"rsi_{rsi}"][-1]
 
+    # Extended BollingerBands
+    extended_bb_period = 50
+    extended_bb_std = 3
+    extended_bbands = TA.BBANDS(
+        ticker_df, period=extended_bb_period, std_multiplier=extended_bb_std
+    )
+    data_row[f"boll_{extended_bb_period}_{extended_bb_std}"] = extended_bbands[
+        "BB_MIDDLE"
+    ].iloc[-1]
+    data_row[f"boll_{extended_bb_period}_{extended_bb_std}_ub"] = extended_bbands[
+        "BB_UPPER"
+    ].iloc[-1]
+    data_row[f"boll_{extended_bb_period}_{extended_bb_std}_lb"] = extended_bbands[
+        "BB_LOWER"
+    ].iloc[-1]
+
+    # Keltner Channel
+    kc_bands = TA.KC(ticker_df, kc_mult=1)
+    data_row[f"kc_ub"] = kc_bands["KC_UPPER"].iloc[-1]
+    data_row[f"kc_lb"] = kc_bands["KC_LOWER"].iloc[-1]
+
+    # Donchian Channel
+    dc_bands = TA.DO(ticker_df)
+    data_row[f"dc_middle"] = dc_bands["MIDDLE"].iloc[-1]
+    data_row[f"dc_ub"] = dc_bands["UPPER"].iloc[-1]
+    data_row[f"dc_lb"] = dc_bands["LOWER"].iloc[-1]
+
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
         data_row["monthly_gains_{}".format(mg)] = gains(
@@ -290,6 +317,11 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # Weekly timeframe calculations
     weekly_ticker_candles = resample_candles(ticker_df, "W")
+    data_row[f"weekly_high"] = weekly_ticker_candles.iloc[-1]["high"]
+    data_row[f"weekly_low"] = weekly_ticker_candles.iloc[-1]["low"]
+    data_row[f"weekly_open"] = weekly_ticker_candles.iloc[-1]["open"]
+    data_row[f"weekly_close"] = weekly_ticker_candles.iloc[-1]["close"]
+    data_row[f"weekly_volume"] = weekly_ticker_candles.iloc[-1]["volume"]
 
     # Weekly Close change delta
     for ccr in [1, 3, 7, 22]:
