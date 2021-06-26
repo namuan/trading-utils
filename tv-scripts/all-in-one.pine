@@ -1,0 +1,65 @@
+study(title="AllInOne", overlay=true)
+length = input(20, minval=1, title="Length")
+src = input(close, title="Source")
+breakhigh_source = input(high, title="High Break Source")
+breaklow_source = input(low, title="Low Break Source")
+bb_use_ema = input(false, title="Use EMA Basis?")
+
+BB_Basis = bb_use_ema ? ema(src, length) : sma(src, length)
+//2SD BB
+
+B2mult = input(2.0, minval=0.001, maxval=50, title="Band 1 StDev")
+B2dev = B2mult * stdev(src, length)
+B2upper = BB_Basis + B2dev
+B2lower = BB_Basis - B2dev
+
+//3SD BB
+
+B3mult = input(3.0, minval=0.001, maxval=50, title="Band 2 StDev")
+B3dev = B3mult * stdev(src, length)
+B3upper = BB_Basis + B3dev
+B3lower = BB_Basis - B3dev
+
+p_bb2_upper = plot(B2upper, color=#E8E8E8, style=line, linewidth=0, title="Band 2SD upper")
+p_bb2_lower = plot(B2lower, color=#E8E8E8, style=line, linewidth=0, title="Band 2SD lower")
+p_bb3_upper = plot(B3upper, color=#E8E8E8, style=line, linewidth=0, title="Band 3SD upper")
+p_bb3_lower = plot(B3lower, color=#E8E8E8, style=line, linewidth=0, title="Band 3SD lower")
+fill(p_bb2_upper, p_bb3_upper, color=red)
+fill(p_bb2_lower, p_bb3_lower, color=green)
+
+// Keltner Channel
+useTrueRange = input(true)
+
+Kmult = input(1.5, title="Keltner Range")
+Kma = bb_use_ema ? ema(src, length) : sma(src, length)
+Krange = useTrueRange ? tr : high - low
+Krangema = bb_use_ema ? ema(Krange, length) : sma(Krange, length)
+Kupper = Kma + Krangema * Kmult
+Klower = Kma - Krangema * Kmult
+
+p5 = plot(Kupper, color=#E8E8E8, linewidth=1, title="Keltner upper")
+p6 = plot(Klower, color=#E8E8E8, linewidth=1, title="Keltner lower")
+fill(p5, p6, color=black)
+
+
+// ----
+
+connectRanges=input(false, title="Connect Ranges")
+showMidLine=input(false, title="Show MidLine")
+showEMA=input(true, title="Show EMA")
+hc=input(true, title="Highlight Consolidation")
+e=bb_use_ema ? ema(src, length) : sma(src, length)
+up = close<nz(up[1]) and close>down[1] ? nz(up[1]) : high
+down = close<nz(up[1]) and close>down[1] ? nz(down[1]) : low
+mid = avg(up,down)
+ul=plot(connectRanges?up:up==nz(up[1])?up:na, color=black, linewidth=2, style=linebr, title="Up")
+ll=plot(connectRanges?down:down==nz(down[1])?down:na, color=black, linewidth=2, style=linebr, title="Down")
+dummy=plot(hc?close>e?down:up:na, color=gray, style=circles, linewidth=0, title="Dummy")
+fill(ul,dummy, color=lime)
+fill(dummy,ll, color=red)
+plot(showMidLine?mid:na, color=black, linewidth=1, title="Mid")
+plot(showEMA?e:na, title="EMA", color=black, style=circles, linewidth=1)
+
+// plot breakouts
+plotshape(breakhigh_source >= B3upper, title="High Breakout", style=shape.triangledown, location=location.abovebar, size=size.tiny, color=red, transp=0)
+plotshape(breaklow_source <= B3lower, title="Low Breakout", style=shape.triangleup, location=location.belowbar, size=size.tiny, color=green, transp=0)
