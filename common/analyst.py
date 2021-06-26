@@ -7,7 +7,6 @@ import pandas as pd
 from finta import TA
 from stockstats import StockDataFrame
 
-from common import with_ignoring_errors
 from common.candle_pattern import identify_candle_pattern
 from common.environment import TRADING_RISK_FACTOR, TRADING_ACCOUNT_VALUE
 from common.filesystem import output_dir, earnings_file_path
@@ -247,20 +246,20 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         data_row[f"rsi_{rsi}"] = ticker_df[f"rsi_{rsi}"][-1]
 
     # Extended BollingerBands
-    extended_bb_period = 50
     extended_bb_std = 3
-    extended_bbands = TA.BBANDS(
-        ticker_df, period=extended_bb_period, std_multiplier=extended_bb_std
-    )
-    data_row[f"boll_{extended_bb_period}_{extended_bb_std}"] = extended_bbands[
-        "BB_MIDDLE"
-    ].iloc[-1]
-    data_row[f"boll_{extended_bb_period}_{extended_bb_std}_ub"] = extended_bbands[
-        "BB_UPPER"
-    ].iloc[-1]
-    data_row[f"boll_{extended_bb_period}_{extended_bb_std}_lb"] = extended_bbands[
-        "BB_LOWER"
-    ].iloc[-1]
+    for ext_bb_period in [21, 50]:
+        extended_bbands = TA.BBANDS(
+            ticker_df, period=ext_bb_period, std_multiplier=extended_bb_std
+        )
+        data_row[f"boll_{ext_bb_period}_{extended_bb_std}"] = extended_bbands[
+            "BB_MIDDLE"
+        ].iloc[-1]
+        data_row[f"boll_{ext_bb_period}_{extended_bb_std}_ub"] = extended_bbands[
+            "BB_UPPER"
+        ].iloc[-1]
+        data_row[f"boll_{ext_bb_period}_{extended_bb_std}_lb"] = extended_bbands[
+            "BB_LOWER"
+        ].iloc[-1]
 
     # Keltner Channel
     kc_bands = TA.KC(ticker_df, kc_mult=1)
@@ -316,42 +315,43 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     data_row["candle_type"] = identify_candle_pattern(ticker_df)
 
     # Weekly timeframe calculations
-    weekly_ticker_candles = resample_candles(ticker_df, "W")
-    data_row[f"weekly_high"] = weekly_ticker_candles.iloc[-1]["high"]
-    data_row[f"weekly_low"] = weekly_ticker_candles.iloc[-1]["low"]
-    data_row[f"weekly_open"] = weekly_ticker_candles.iloc[-1]["open"]
-    data_row[f"weekly_close"] = weekly_ticker_candles.iloc[-1]["close"]
-    data_row[f"weekly_volume"] = weekly_ticker_candles.iloc[-1]["volume"]
+    for week in [1, 2, 3]:
+        try:
+            weekly_ticker_candles = resample_candles(ticker_df, f"{week}W")
+            data_row[f"week_{week}_high"] = weekly_ticker_candles.iloc[-1]["high"]
+            data_row[f"week_{week}_low"] = weekly_ticker_candles.iloc[-1]["low"]
+            data_row[f"week_{week}_open"] = weekly_ticker_candles.iloc[-1]["open"]
+            data_row[f"week_{week}_close"] = weekly_ticker_candles.iloc[-1]["close"]
+            data_row[f"week_{week}_volume"] = weekly_ticker_candles.iloc[-1]["volume"]
 
-    # Weekly Close change delta
-    for ccr in [1, 3, 7, 22]:
-        data_row["weekly_close_change_delta_{}".format(ccr)] = weekly_ticker_candles[
-            "close_-{}_d".format(ccr)
-        ].iloc[-1]
+            # Weekly Close change delta
+            for ccr in [1, 3, 7, 22]:
+                data_row[
+                    f"week_{week}_close_change_delta_{ccr}"
+                ] = weekly_ticker_candles["close_-{}_d".format(ccr)].iloc[-1]
 
-    def weekly_sma():
-        for ma in ma_range:
-            data_row[f"weekly_ma_{ma}"] = TA.SMA(weekly_ticker_candles, period=ma).iloc[
-                -1
-            ]
+            weekly_strat, weekly_strat_candle = calculate_strat(weekly_ticker_candles)
+            data_row[f"week_{week}_strat"] = weekly_strat
+            data_row[f"week_{week}_strat_candle"] = weekly_strat_candle
 
-    with_ignoring_errors(
-        weekly_sma, f"Unable to calculate weekly ma for {ticker_symbol}"
-    )
+            # Weekly SMA
+            for ma in ma_range:
+                data_row[f"week_{week}_ma_{ma}"] = TA.SMA(
+                    weekly_ticker_candles, period=ma
+                ).iloc[-1]
 
-    def weekly_ema():
-        for ema in ma_range:
-            data_row[f"weekly_ema_{ema}"] = TA.EMA(
-                weekly_ticker_candles, period=ema
-            ).iloc[-1]
+            for ema in ma_range:
+                data_row[f"week_{week}_ema_{ema}"] = TA.EMA(
+                    weekly_ticker_candles, period=ema
+                ).iloc[-1]
 
-    with_ignoring_errors(
-        weekly_ema, f"Unable to calculate weekly ema for {ticker_symbol}"
-    )
-
-    weekly_strat, weekly_strat_candle = calculate_strat(weekly_ticker_candles)
-    data_row["weekly_strat"] = weekly_strat
-    data_row["weekly_strat_candle"] = weekly_strat_candle
+            data_row[f"power_of_3_week_{week}"] = power_of_3(weekly_ticker_candles)
+        except Exception as e:
+            print(
+                "{} - {}".format(
+                    f"Unable to calculate week ({week}) for {ticker_symbol}", e
+                )
+            )
 
     # Monthly timeframe calculations
     for month in [1, 2, 3]:
@@ -371,8 +371,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
         data_row[f"month_{month}_strat"] = monthly_strat
         data_row[f"month_{month}_strat_candle"] = monthly_strat_candle
+        data_row[f"power_of_3_month_{month}"] = power_of_3(monthly_ticker_candles)
 
     # Strategies
-    data_row["power_of_3"] = power_of_3(ticker_df)
+    data_row["power_of_3_daily"] = power_of_3(ticker_df)
 
     return data_row
