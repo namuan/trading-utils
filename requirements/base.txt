@@ -23,3 +23,4 @@ flatten-dict
 python-telegram-bot
 justpy
 finta
+slug

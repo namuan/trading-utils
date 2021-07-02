@@ -1,9 +1,9 @@
 import subprocess
-
 from datetime import datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
+from slug import slug
 
 from common.external_charts import build_chart_link
 
@@ -28,7 +28,7 @@ def generate_report(report_title, report_data, report_file_name):
     rendered = template.render(dict(title=report_title, stocks=report_data))
 
     output_file = Path("output").joinpath(
-        "{}-{}".format(datetime.now().strftime("%Y-%m-%d"), report_file_name)
+        "{}-{}".format(datetime.now().strftime("%Y-%m-%d"), f"{slug(report_title)}-{report_file_name}")
     )
     if output_file.exists():
         output_file.unlink()

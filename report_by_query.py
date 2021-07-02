@@ -37,7 +37,7 @@ if __name__ == "__main__":
     select_top = args.count
     sort_by = args.sort_by.split(",")
     query = args.query
-    heading = args.title
+    report_title = args.title
     view_in_browser = args.view_in_browser
     input_file = args.input_file
 
@@ -58,7 +58,6 @@ if __name__ == "__main__":
         )
     )
     template_data = {"sort_by": sort_by, "query": query, "report_data": report_data}
-    report_title = f"Stocks Report: {heading}"
     print("Generating report for: {}".format(report_title))
     output_file = generate_report(
         report_title, template_data, report_file_name="stocks-report.md"
