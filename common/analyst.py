@@ -228,7 +228,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Simple and Exponential Moving Average
     fast_ma = [3, 5, 7, 9, 11, 13, 15]
     slow_ma = [30, 35, 40, 45, 50, 55, 60]
-    other_ma = [10, 20, 100, 200]
+    other_ma = [8, 10, 20, 21, 100, 200]
     ma_range = fast_ma + slow_ma + other_ma
     for ma in ma_range:
         data_row[f"ma_{ma}"] = ticker_df[f"close_{ma}_sma"].iloc[-1]
