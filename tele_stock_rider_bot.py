@@ -10,13 +10,19 @@ from telegram.ext import (
     CallbackContext,
 )
 
-from common.analyst import fetch_data_on_demand, max_dd_based_position_sizing
+from common.analyst import (
+    fetch_data_on_demand,
+    max_dd_based_position_sizing,
+    pct_based_position_sizing,
+)
 from common.bot_wrapper import start, help_command
 from common.environment import (
     TELEGRAM_STOCK_RIDER_BOT,
     TRADING_ACCOUNT_VALUE,
     TRADING_RISK_FACTOR,
     TRADING_MAX_DD,
+    PROFIT_TARGET_PCT,
+    STOP_LOSS_PCT,
 )
 from common.external_charts import ChartProvider, build_chart_link
 from common.logger import init_logging
@@ -28,23 +34,51 @@ def populate_additional_info(ticker):
     (
         buy_price,
         stocks_to_purchase,
+        profit_target,
         stop_loss,
         trail_stop_loss,
     ) = max_dd_based_position_sizing(
         d["last_close"], TRADING_ACCOUNT_VALUE, TRADING_RISK_FACTOR, TRADING_MAX_DD
     )
+
     total_cost = buy_price * stocks_to_purchase
     potential_loss = total_cost - (stop_loss * stocks_to_purchase)
-    return """
-*Close* {:.2f} | *📈(1M)* {:.2f} | *Position* {} | *Cost* {:.2f} | *Potential Loss* {:.2f} | *Trailing SL* {:.2f} | *SL* {:.2f}
-    """.format(
-        buy_price,
-        d["monthly_gains_1"],
+    max_dd_model = "=== *MaxDD Model* | *Position* {} | *Cost* {:.2f} | *Potential Loss* {:.2f} | *Trailing SL* {:.2f} | *PT* {:.2f} | *SL* {:.2f}".format(
         int(stocks_to_purchase),
         total_cost,
         potential_loss,
         trail_stop_loss,
+        profit_target,
         stop_loss,
+    )
+
+    (
+        buy_price,
+        stocks_to_purchase,
+        profit_target,
+        stop_loss,
+        trail_stop_loss,
+    ) = pct_based_position_sizing(
+        d["last_close"],
+        TRADING_ACCOUNT_VALUE,
+        TRADING_RISK_FACTOR,
+        PROFIT_TARGET_PCT,
+        STOP_LOSS_PCT,
+    )
+    total_cost = buy_price * stocks_to_purchase
+    potential_loss = total_cost - (stop_loss * stocks_to_purchase)
+    pct_model = "=== *Fixed PT/SL Pct Model* | *Position* {} | *Cost* {:.2f} | *Potential Loss* {:.2f} | *Trailing SL* {:.2f} | *PT* {:.2f} | *SL* {:.2f}".format(
+        int(stocks_to_purchase),
+        total_cost,
+        potential_loss,
+        trail_stop_loss,
+        profit_target,
+        stop_loss,
+    )
+    return """
+*Close* {:.2f} | *📈(1M)* {:.2f} | {} | {}
+    """.format(
+        buy_price, d["monthly_gains_1"], max_dd_model, pct_model
     )
 
 

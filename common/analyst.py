@@ -112,9 +112,31 @@ def calculate_position_size(account_value, risk_factor, recent_volatility):
 def max_dd_based_position_sizing(buy_price, account_size, risk_factor, max_dd):
     stop_loss = buy_price - (buy_price * max_dd)
     trail_stop_loss = buy_price - stop_loss
+    profit_target = buy_price + (trail_stop_loss * 2)
     account_size_risk = account_size * risk_factor
     stocks_to_purchase = account_size_risk / trail_stop_loss
-    return buy_price, math.floor(stocks_to_purchase), stop_loss, trail_stop_loss
+    return (
+        buy_price,
+        math.floor(stocks_to_purchase),
+        profit_target,
+        stop_loss,
+        trail_stop_loss,
+    )
+
+
+def pct_based_position_sizing(buy_price, account_size, risk_factor, pt_pct, sl_pct):
+    profit_target = buy_price + (buy_price * pt_pct)
+    stop_loss = buy_price - (buy_price * sl_pct)
+    trail_stop_loss = buy_price - stop_loss
+    account_size_risk = account_size / 2 * risk_factor
+    stocks_to_purchase = account_size_risk / trail_stop_loss
+    return (
+        buy_price,
+        math.floor(stocks_to_purchase),
+        profit_target,
+        stop_loss,
+        trail_stop_loss,
+    )
 
 
 def green_candle(ticker_candle):
