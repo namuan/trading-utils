@@ -13,6 +13,7 @@ from common.filesystem import output_dir, earnings_file_path
 from common.market import download_ticker_data, large_cap_companies
 
 DAYS_IN_MONTH = 22
+MINIMUM_DAYS_DATA_REQUIRED = 200
 
 
 def load_earnings_tickers():
@@ -46,6 +47,13 @@ def last_close(close_data, days=-1):
         return close_data.iloc[days]
     except:
         return "N/A"
+
+
+def candle_for(ticker_data, loc=-1):
+    try:
+        return ticker_data.iloc[loc]
+    except:
+        return {}
 
 
 def gains(close_data):
@@ -171,8 +179,8 @@ def fetch_data_on_demand(ticker):
     end = datetime.now()
     start = datetime(end.year - 2, end.month, end.day)
     ticker_df = StockDataFrame.retype(download_ticker_data(ticker, start, end))
-    if ticker_df.empty:
-        raise NameError("️⚠️ Unable to lookup {}".format(ticker))
+    if ticker_df.empty or len(ticker_df) < MINIMUM_DAYS_DATA_REQUIRED:
+        raise NameError("️⚠️ Not enough data for {}".format(ticker))
     return enrich_data(ticker, ticker_df), ticker_df
 
 
@@ -182,7 +190,7 @@ def fetch_data_from_cache(ticker, is_etf):
     except FileNotFoundError:
         return {}
 
-    if ticker_df.empty:
+    if ticker_df.empty or len(ticker_df) < MINIMUM_DAYS_DATA_REQUIRED:
         return {}
 
     earnings_df = load_earnings_tickers()
@@ -213,9 +221,10 @@ def compare_range_with_prev_days(ticker_df, last_trading_day, prev_days):
 
 
 def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
+    print(f"Processing ticker: {ticker_symbol} - len({len(ticker_df)})")
     last_close_date = ticker_df.index[-1]
-    last_trading_day = ticker_df.iloc[-1]
-    last_close_price = last_trading_day["close"]
+    last_trading_day = candle_for(ticker_df, loc=-1)
+    last_close_price = last_trading_day.get("close", "N/A")
     stock_data_52_weeks = ticker_df["close"][-256:]
     high_52_weeks = stock_data_52_weeks.max()
     low_52_weeks = stock_data_52_weeks.min()
@@ -228,9 +237,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         "last_close_date": last_close_date,
         "high_52_weeks": high_52_weeks,
         "low_52_weeks": low_52_weeks,
-        "last_volume": last_trading_day["volume"],
-        "last_high": last_trading_day["high"],
-        "last_low": last_trading_day["low"],
+        "last_volume": last_trading_day.get("volume", "N/A"),
+        "last_high": last_trading_day.get("high", "N/A"),
+        "last_low": last_trading_day.get("low", "N/A"),
         "boll": ticker_df["boll"].iloc[-1],
         "boll_ub": ticker_df["boll_ub"].iloc[-1],
         "boll_lb": ticker_df["boll_lb"].iloc[-1],
@@ -238,6 +247,44 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         if earnings_date
         else "Not Available",
     }
+
+    # Last few days ohlcv
+    for prev_day in [2, 3, 4, 5, 6, 7, 8, 9, 10]:
+        day_before_last_candle = candle_for(ticker_df, loc=-1 * prev_day)
+        data_row[f"day_{prev_day}_before_last_open"] = day_before_last_candle.get(
+            "open", "N/A"
+        )
+        data_row[f"day_{prev_day}_before_last_high"] = day_before_last_candle.get(
+            "high", "N/A"
+        )
+        data_row[f"day_{prev_day}_before_last_low"] = day_before_last_candle.get(
+            "low", "N/A"
+        )
+        data_row[f"day_{prev_day}_before_last_close"] = day_before_last_candle.get(
+            "close", "N/A"
+        )
+        data_row[f"day_{prev_day}_before_last_volume"] = day_before_last_candle.get(
+            "volume", "N/A"
+        )
+
+    # Calculate BB for last few days
+    for prev_day in [1, 2, 3, 4, 5]:
+        for bb_std in [2, 3]:
+            for ext_bb_period in [21, 50]:
+                additional_bbands = TA.BBANDS(
+                    ticker_df[: -1 * prev_day],
+                    period=ext_bb_period,
+                    std_multiplier=bb_std,
+                )
+                data_row[
+                    f"boll_{prev_day}_day_before_last_{ext_bb_period}_{bb_std}"
+                ] = additional_bbands["BB_MIDDLE"].iloc[-1]
+                data_row[
+                    f"boll_{prev_day}_day_before_last_{ext_bb_period}_{bb_std}_ub"
+                ] = additional_bbands["BB_UPPER"].iloc[-1]
+                data_row[
+                    f"boll_{prev_day}_day_before_last_{ext_bb_period}_{bb_std}_lb"
+                ] = additional_bbands["BB_LOWER"].iloc[-1]
 
     # Position Sizing with Risk Management
     recent_volatility = ticker_df["atr_20"].iloc[-1]
