@@ -4,6 +4,7 @@ study(title="[TVT] Multiple Moving Averages", shorttitle="TVT-MMA", overlay=true
 // === INPUTS ===
 src = input(close)
 use_ema = input(true, title="Use EMA over SMA?")
+bb_mult = input(2.0, minval=0.001, maxval=50, title="BB Oversold/Overbought deviation")
 
 // Short Moving Averages
 ma1   = input(3,title='Short MA-1')
@@ -13,7 +14,8 @@ ma4   = input(9,title='Short MA-4')
 ma5   = input(11,title='Short MA-5')
 ma6   = input(13,title='Short MA-6')
 ma7   = input(15,title='Short MA-7')
-ma8   = 21
+ma8   = 8
+ma21  = 21
 
 lma5   = 50
 
@@ -27,6 +29,7 @@ ma_series5 = use_ema ? sma(src, ma5) : ema(src, ma5)
 ma_series6 = use_ema ? sma(src, ma6) : ema(src, ma6)
 ma_series7 = use_ema ? sma(src, ma7) : ema(src, ma7)
 ma_series8 = use_ema ? sma(src, ma8) : ema(src, ma8)
+ma_series21 = use_ema ? sma(src, ma21) : ema(src, ma21)
 
 lma_series5 = use_ema ? sma(src, lma5) : ema(src, lma5)
 
@@ -38,7 +41,8 @@ p_ma4 = plot(ma_series4,title='MA-4',color=blend_color, linewidth=0)
 p_ma5 = plot(ma_series5,title='MA-5',color=blend_color, linewidth=0)
 p_ma6 = plot(ma_series6,title='MA-6',color=blend_color, linewidth=0)
 p_ma7 = plot(ma_series7,title='MA-7',color=blend_color, linewidth=0)
-p_ma8 = plot(ma_series8,title='MA-8',color=color.black, linewidth=2)
+p_ma8 = plot(ma_series8,title='MA-8',color=color.gray, linewidth=1)
+p_ma21 = plot(ma_series21,title='MA-21',color=color.black, linewidth=2)
 
 p_lma5 = plot(lma_series5,title='Long MA-5',color=color.orange, linewidth=2)
 
@@ -51,4 +55,13 @@ fill(p_ma3, p_ma4, color=ma_series3 > ma_series4 ? color.new(up_color, transp=60
 fill(p_ma4, p_ma5, color=ma_series4 > ma_series5 ? color.new(up_color, transp=55) : color.new(down_color, transp=55))
 fill(p_ma5, p_ma6, color=ma_series5 > ma_series6 ? color.new(up_color, transp=50) : color.new(down_color, transp=50))
 fill(p_ma6, p_ma7, color=ma_series6 > ma_series7 ? color.new(up_color, transp=45) : color.new(down_color, transp=45))
-fill(p_ma7, p_ma8, color=ma_series7 > ma_series8 ? color.new(up_color, transp=40) : color.new(down_color, transp=40))
+fill(p_ma7, p_ma21, color=ma_series7 > ma_series21 ? color.new(up_color, transp=40) : color.new(down_color, transp=40))
+
+// BB Expansion
+bb_stdev = bb_mult * stdev(src, ma21)
+bb_upper = ma_series21 + bb_stdev
+bb_lower = ma_series21 - bb_stdev
+
+bgcolor((close > bb_upper) ? color.new(color.orange, 90) : na, title="Overbought")
+bgcolor((close < bb_lower) ? color.new(color.orange, 90) : na, title="Oversold")
+
