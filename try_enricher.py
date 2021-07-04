@@ -17,8 +17,9 @@ ticker = "AAPL"
 # print(has_options('AAPL'))
 # data, ticker_df = fetch_data_on_demand(ticker)
 data = fetch_data_from_cache(ticker, is_etf=False)
-key_values = list([(k, data[k]) for k in data.keys() if "strat" in k])
-print(json.dumps(key_values, indent=2))
+key_values = list([(k, data[k]) for k in data.keys() if "month_" in k])
+for kv in key_values:
+    print(kv)
 
 # weekly_ticker_candles = convert_to_weekly(df)
 #
