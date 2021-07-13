@@ -46,15 +46,19 @@ def load_all_tickers(market_type="all"):
 
 
 def download_ticker_data(ticker, start, end):
-    expire_after = timedelta(hours=1)
-    session = requests_cache.CachedSession(
-        cache_name="cache", backend="sqlite", expire_after=expire_after
-    )
-    ticker_df = pdr.DataReader(
-        ticker, data_source="yahoo", start=start, end=end, session=session
-    )
-    ticker_df.to_csv(f"{output_dir()}/{ticker}.csv")
-    return ticker_df
+    try:
+        expire_after = timedelta(hours=1)
+        session = requests_cache.CachedSession(
+            cache_name="cache", backend="sqlite", expire_after=expire_after
+        )
+        ticker_df = pdr.DataReader(
+            ticker, data_source="yahoo", start=start, end=end, session=session
+        )
+        ticker_df.to_csv(f"{output_dir()}/{ticker}.csv")
+        return ticker_df
+    except:
+        print(f"Unable to fetch data for ticker: {ticker}")
+        return pd.DataFrame()
 
 
 def download_tickers_data(tickers, start, end):
