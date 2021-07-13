@@ -6,6 +6,7 @@ from jinja2 import Environment, FileSystemLoader
 from slug import slug
 
 from common.external_charts import build_chart_link
+from common.subprocess_runner import open_in_browser
 
 TEMPLATE_DIR = Path().joinpath("templates").as_posix()
 jinja_env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), trim_blocks=True)
@@ -48,9 +49,7 @@ def convert_to_html(output_file: Path, open_page=True):
         shell=True,
     )
     if open_page:
-        subprocess.call(
-            'open -a "Firefox.app" {}'.format(target_file + ".html"), shell=True
-        )
+        open_in_browser(target_file + ".html")
     return target_file
 
 

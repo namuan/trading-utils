@@ -1,10 +1,9 @@
-import subprocess
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 from common.market import download_with_yf
+from common.subprocess_runner import open_file
 
 
 def plot_intraday(ticker, period="1d", interval="1m"):
@@ -36,7 +35,3 @@ def save_and_open_plt_fig(plt_fig, file_path, dpi=1200, close_fig=True):
     if close_fig:
         plt_fig.close()
     open_file(file_path)
-
-
-def open_file(file_path):
-    subprocess.call("open {}".format(file_path), shell=True)

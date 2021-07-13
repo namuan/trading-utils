@@ -3,7 +3,6 @@ Enrich Stocks and ETF data with different indicators and generates a CSV file fo
 """
 
 import argparse
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +11,7 @@ import pandas as pd
 from common.analyst import fetch_data_from_cache
 from common.filesystem import output_dir
 from common.market import load_all_tickers
+from common.subprocess_runner import run_cmd
 from common.symbols import macro_etfs
 
 
@@ -55,6 +55,6 @@ if __name__ == "__main__":
         f"{dtale_path.as_posix()} --open-browser --csv-path {file_path}"
     )
     if view_in_browser:
-        subprocess.call(view_in_browser_cmd, shell=True)
+        run_cmd(view_in_browser_cmd)
     else:
         print(view_in_browser_cmd)
