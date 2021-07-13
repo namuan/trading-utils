@@ -62,7 +62,12 @@ def parse_args():
         "-m",
         "--market-type",
         help="Select Market for analysis. Choose between all(All tickers), large-cap(S&P500)",
-        default="all",
+        default="large-cap",
+    )
+    parser.add_argument(
+        "-s",
+        "--stocks",
+        help="Comma separated list of stocks to compare with base ticker.",
     )
     return parser.parse_args()
 
@@ -77,7 +82,7 @@ def sort_stocks(k):
 def generate_charts(title: str, selected_stocks, stocks_rs_data):
     dt_now = datetime.now()
     fig = plt.figure(figsize=(15, 10))
-    fig.suptitle(f"S&P 500 {title} ({dt_now.strftime('%d %B %Y')}) ")
+    fig.suptitle(f"{title} ({dt_now.strftime('%d %B %Y')}) ")
     print("Plotting {} -> {}".format(title, selected_stocks))
     for num, stock in enumerate(selected_stocks):
         plt_charts(fig, num, stocks_rs_data[stock][-1 * DAYS_IN_MONTH :], stock)
@@ -92,8 +97,12 @@ def main():
     args = parse_args()
     base_ticker = args.base_ticker
     market_type = args.market_type
+    stocks: str = args.stocks
+    print(args)
     left_df = load_ticker_df(base_ticker)
     all_tickers = load_all_tickers(market_type=market_type)
+    if stocks:
+        all_tickers = [s.strip() for s in stocks.split(",")]
     stocks_rs_data = {}
     for num, ticker in enumerate(all_tickers):
         try:
