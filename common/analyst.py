@@ -220,6 +220,10 @@ def compare_range_with_prev_days(ticker_df, last_trading_day, prev_days):
         return "N/A"
 
 
+def trim_recent_data(df: StockDataFrame, cut_off: int) -> StockDataFrame:
+    return df if cut_off == 0 else df[: -1 * cut_off]
+
+
 def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     print(f"Processing ticker: {ticker_symbol} - len({len(ticker_df)})")
     last_close_date = ticker_df.index[-1]
@@ -240,9 +244,6 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         "last_volume": last_trading_day.get("volume", "N/A"),
         "last_high": last_trading_day.get("high", "N/A"),
         "last_low": last_trading_day.get("low", "N/A"),
-        "boll": ticker_df["boll"].iloc[-1],
-        "boll_ub": ticker_df["boll_ub"].iloc[-1],
-        "boll_lb": ticker_df["boll_lb"].iloc[-1],
         "earnings_date": datetime.strftime(earnings_date, "%Y-%m-%d")
         if earnings_date
         else "Not Available",
@@ -268,22 +269,22 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         )
 
     # Calculate BB for last few days
-    for prev_day in [1, 2, 3, 4, 5]:
+    for prev_day in [0, 1, 2, 3, 4, 5]:
         for bb_std in [2, 3]:
-            for ext_bb_period in [21, 50]:
+            for bb_period in [21, 50]:
                 additional_bbands = TA.BBANDS(
-                    ticker_df[: -1 * prev_day],
-                    period=ext_bb_period,
+                    trim_recent_data(ticker_df, prev_day),
+                    period=bb_period,
                     std_multiplier=bb_std,
                 )
                 data_row[
-                    f"boll_{prev_day}_day_before_last_{ext_bb_period}_{bb_std}"
+                    f"boll_{prev_day}_day_before_last_{bb_period}_{bb_std}"
                 ] = additional_bbands["BB_MIDDLE"].iloc[-1]
                 data_row[
-                    f"boll_{prev_day}_day_before_last_{ext_bb_period}_{bb_std}_ub"
+                    f"boll_{prev_day}_day_before_last_{bb_period}_{bb_std}_ub"
                 ] = additional_bbands["BB_UPPER"].iloc[-1]
                 data_row[
-                    f"boll_{prev_day}_day_before_last_{ext_bb_period}_{bb_std}_lb"
+                    f"boll_{prev_day}_day_before_last_{bb_period}_{bb_std}_lb"
                 ] = additional_bbands["BB_LOWER"].iloc[-1]
 
     # Position Sizing with Risk Management
@@ -314,22 +315,6 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     for rsi in [2, 4, 9, 14]:
         data_row[f"rsi_{rsi}"] = ticker_df[f"rsi_{rsi}"][-1]
 
-    # Extended BollingerBands
-    extended_bb_std = 3
-    for ext_bb_period in [21, 50]:
-        extended_bbands = TA.BBANDS(
-            ticker_df, period=ext_bb_period, std_multiplier=extended_bb_std
-        )
-        data_row[f"boll_{ext_bb_period}_{extended_bb_std}"] = extended_bbands[
-            "BB_MIDDLE"
-        ].iloc[-1]
-        data_row[f"boll_{ext_bb_period}_{extended_bb_std}_ub"] = extended_bbands[
-            "BB_UPPER"
-        ].iloc[-1]
-        data_row[f"boll_{ext_bb_period}_{extended_bb_std}_lb"] = extended_bbands[
-            "BB_LOWER"
-        ].iloc[-1]
-
     # Keltner Channel
     kc_bands = TA.KC(ticker_df, kc_mult=1)
     data_row[f"kc_ub"] = kc_bands["KC_UPPER"].iloc[-1]
@@ -350,7 +335,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Close change delta
     for ccr in [1, 3, 7, 22, 55]:
         data_row["daily_close_change_delta_{}".format(ccr)] = ticker_df[
-            "close_-{}_d".format(ccr)
+            "close_-{}_r".format(ccr)
         ].iloc[-1]
 
     # ADX
@@ -384,9 +369,10 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     data_row["candle_type"] = identify_candle_pattern(ticker_df)
 
     # Weekly timeframe calculations
-    for week in [1, 2, 3]:
+    for week in [0, 1, 2, 3, 4]:
         try:
-            weekly_ticker_candles = resample_candles(ticker_df, f"{week}W")
+            weekly_resampled_candles = resample_candles(ticker_df, "W")
+            weekly_ticker_candles = trim_recent_data(weekly_resampled_candles, week)
             data_row[f"week_{week}_high"] = weekly_ticker_candles.iloc[-1]["high"]
             data_row[f"week_{week}_low"] = weekly_ticker_candles.iloc[-1]["low"]
             data_row[f"week_{week}_open"] = weekly_ticker_candles.iloc[-1]["open"]
@@ -397,7 +383,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
             for ccr in [1, 3, 7, 22]:
                 data_row[
                     f"week_{week}_close_change_delta_{ccr}"
-                ] = weekly_ticker_candles["close_-{}_d".format(ccr)].iloc[-1]
+                ] = weekly_ticker_candles["close_-{}_r".format(ccr)].iloc[-1]
 
             weekly_strat, weekly_strat_candle = calculate_strat(weekly_ticker_candles)
             data_row[f"week_{week}_strat"] = weekly_strat
@@ -423,8 +409,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
             )
 
     # Monthly timeframe calculations
-    for month in [1, 2, 3]:
-        monthly_ticker_candles = resample_candles(ticker_df, f"{month}M")
+    for month in [0, 1, 2, 3]:
+        monthly_resampled_candles = resample_candles(ticker_df, "M")
+        monthly_ticker_candles = trim_recent_data(monthly_resampled_candles, month)
         data_row[f"month_{month}_high"] = monthly_ticker_candles.iloc[-1]["high"]
         data_row[f"month_{month}_low"] = monthly_ticker_candles.iloc[-1]["low"]
         data_row[f"month_{month}_open"] = monthly_ticker_candles.iloc[-1]["open"]
@@ -435,7 +422,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         for ccr in [1, 3, 7]:
             data_row[
                 f"month_{month}_close_change_delta_{ccr}"
-            ] = monthly_ticker_candles["close_-{}_d".format(ccr)].iloc[-1]
+            ] = monthly_ticker_candles["close_-{}_r".format(ccr)].iloc[-1]
 
         monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
         data_row[f"month_{month}_strat"] = monthly_strat
