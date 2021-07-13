@@ -10,4 +10,4 @@ def open_file(file_path):
 
 
 def open_in_browser(target_file, browser="Firefox.app"):
-    run_cmd('open -a "{}" {}'.format(browser, target_file + ".html"))
+    run_cmd('open -a "{}" {}'.format(browser, target_file))
