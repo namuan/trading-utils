@@ -1,7 +1,9 @@
+import logging
 import subprocess
 
 
 def run_cmd(cmd, in_shell=True):
+    logging.info(f"Running command: {cmd}")
     subprocess.call(cmd, shell=in_shell)
 
 

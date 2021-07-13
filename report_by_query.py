@@ -1,9 +1,11 @@
 import argparse
 from datetime import datetime
+import logging
 
 import pandas as pd
 
 from common.filesystem import output_dir
+from common.logger import init_logging
 from common.reporting import add_reporting_data, generate_report, convert_to_html
 
 
@@ -33,6 +35,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    init_logging()
 
     select_top = args.count
     sort_by = args.sort_by.split(",")
@@ -41,10 +44,10 @@ if __name__ == "__main__":
     view_in_browser = args.view_in_browser
     input_file = args.input_file
 
-    print(f"Reading from file: {input_file}")
+    logging.info(f"Reading from file: {input_file}")
 
     enriched_stocks_df = pd.read_csv(input_file, index_col="symbol")
-    print(enriched_stocks_df.columns)
+    logging.info(enriched_stocks_df.columns)
 
     selected_stocks = (
         enriched_stocks_df.query(query)
@@ -52,17 +55,17 @@ if __name__ == "__main__":
         .head(n=select_top)
     )
     report_data = add_reporting_data(selected_stocks)
-    print(
+    logging.info(
         "Selected Stocks: {}".format(
             ", ".join([f"${d.get('symbol')}" for d in report_data])
         )
     )
     template_data = {"sort_by": sort_by, "query": query, "report_data": report_data}
-    print("Generating report for: {}".format(report_title))
+    logging.info("Generating report for: {}".format(report_title))
     output_file = generate_report(
         report_title, template_data, report_file_name="stocks-report.md"
     )
     if view_in_browser:
         convert_to_html(output_file, open_page=True)
     else:
-        print(f"Generated {output_file}")
+        logging.info(f"Generated {output_file}")
