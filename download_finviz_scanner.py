@@ -3,11 +3,10 @@ Downloads stocks from finviz selected using a scanner
 """
 
 from argparse import ArgumentParser
-from datetime import datetime
 
 from finvizfinance.screener.overview import Overview
 
-from common.filesystem import output_dir
+from common.subprocess_runner import run_cmd
 
 
 def parse_args():
@@ -34,8 +33,5 @@ if __name__ == "__main__":
     }
     overview.set_filter(filters_dict=filters_dict)
     scanner_df = overview.ScreenerView()
-    print(scanner_df["Ticker"])
-    file_path = "{}/finviz-{}-data.csv".format(
-        output_dir(), datetime.now().strftime("%Y-%m-%d")
-    )
-    scanner_df.to_csv(file_path, index=False)
+    ticker_list = ",".join([f"'{t}'" for t in scanner_df["Ticker"].tolist()])
+    run_cmd('./rbq "(symbol in ({}))"'.format(ticker_list))
