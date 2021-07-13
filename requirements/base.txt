@@ -1,4 +1,4 @@
-yfinance
+yfinance>=0.1.62
 pandas
 numpy>=1.16.5
 tqdm
@@ -24,3 +24,4 @@ python-telegram-bot
 justpy
 finta
 slug
+finvizfinance
