@@ -244,6 +244,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         "last_volume": last_trading_day.get("volume", "N/A"),
         "last_high": last_trading_day.get("high", "N/A"),
         "last_low": last_trading_day.get("low", "N/A"),
+        "last_open": last_trading_day.get("open", "N/A"),
         "earnings_date": datetime.strftime(earnings_date, "%Y-%m-%d")
         if earnings_date
         else "Not Available",
@@ -252,21 +253,11 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # Last few days ohlcv
     for prev_day in [2, 3, 4, 5, 6, 7, 8, 9, 10]:
         day_before_last_candle = candle_for(ticker_df, loc=-1 * prev_day)
-        data_row[f"day_{prev_day}_before_last_open"] = day_before_last_candle.get(
-            "open", "N/A"
-        )
-        data_row[f"day_{prev_day}_before_last_high"] = day_before_last_candle.get(
-            "high", "N/A"
-        )
-        data_row[f"day_{prev_day}_before_last_low"] = day_before_last_candle.get(
-            "low", "N/A"
-        )
-        data_row[f"day_{prev_day}_before_last_close"] = day_before_last_candle.get(
-            "close", "N/A"
-        )
-        data_row[f"day_{prev_day}_before_last_volume"] = day_before_last_candle.get(
-            "volume", "N/A"
-        )
+        data_row[f"day_{prev_day}_open"] = day_before_last_candle.get("open", "N/A")
+        data_row[f"day_{prev_day}_high"] = day_before_last_candle.get("high", "N/A")
+        data_row[f"day_{prev_day}_low"] = day_before_last_candle.get("low", "N/A")
+        data_row[f"day_{prev_day}_close"] = day_before_last_candle.get("close", "N/A")
+        data_row[f"day_{prev_day}_volume"] = day_before_last_candle.get("volume", "N/A")
 
     # Calculate BB for last few days
     for prev_day in [0, 1, 2, 3, 4, 5]:
@@ -278,13 +269,13 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
                     std_multiplier=bb_std,
                 )
                 data_row[
-                    f"boll_{prev_day}_day_before_last_{bb_period}_{bb_std}"
+                    f"day_{prev_day}_boll_{bb_period}_{bb_std}"
                 ] = additional_bbands["BB_MIDDLE"].iloc[-1]
                 data_row[
-                    f"boll_{prev_day}_day_before_last_{bb_period}_{bb_std}_ub"
+                    f"day_{prev_day}_boll_{bb_period}_{bb_std}_ub"
                 ] = additional_bbands["BB_UPPER"].iloc[-1]
                 data_row[
-                    f"boll_{prev_day}_day_before_last_{bb_period}_{bb_std}_lb"
+                    f"day_{prev_day}_boll_{bb_period}_{bb_std}_lb"
                 ] = additional_bbands["BB_LOWER"].iloc[-1]
 
     # Position Sizing with Risk Management
@@ -300,9 +291,15 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     slow_ma = [30, 35, 40, 45, 50, 55, 60]
     other_ma = [8, 10, 20, 21, 100, 200]
     ma_range = fast_ma + slow_ma + other_ma
-    for ma in ma_range:
-        data_row[f"ma_{ma}"] = ticker_df[f"close_{ma}_sma"].iloc[-1]
-        data_row[f"ema_{ma}"] = ticker_df[f"close_{ma}_ema"].iloc[-1]
+    for prev_day in [0, 1, 2, 3, 4, 5]:
+        for ma in ma_range:
+            trimmed_ticker_df = trim_recent_data(ticker_df, prev_day)
+            data_row[f"day_{prev_day}_ma_{ma}"] = trimmed_ticker_df[
+                f"close_{ma}_sma"
+            ].iloc[-1]
+            data_row[f"day_{prev_day}_ema_{ma}"] = trimmed_ticker_df[
+                f"close_{ma}_ema"
+            ].iloc[-1]
 
     # Average True Range
     for atr in [10, 20, 30, 60]:
