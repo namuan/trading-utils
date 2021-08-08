@@ -21,3 +21,7 @@ def earnings_file_path():
 
 def file_as_json(file_path):
     return json.load(open(file_path))
+
+
+def file_exists(file_path):
+    return Path(file_path).exists()

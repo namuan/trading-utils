@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 import pandas as pd
@@ -8,7 +9,7 @@ from tqdm import tqdm
 from yahoo_earnings_calendar import YahooEarningsCalendar
 
 from common import ALL_LISTED_TICKERS_FILE, LARGE_CAP_TICKERS_FILE
-from common.filesystem import output_dir
+from common.filesystem import output_dir, file_exists
 
 yf.pdr_override()
 
@@ -41,7 +42,14 @@ def download_with_yf(ticker, period, interval):
 def load_all_tickers(market_type="all"):
     file_to_load = ALL_LISTED_TICKERS_FILE
     if market_type == "large-cap":
-        file_to_load = LARGE_CAP_TICKERS_FILE
+        if file_exists(LARGE_CAP_TICKERS_FILE):
+            file_to_load = LARGE_CAP_TICKERS_FILE
+        else:
+            logging.warning(
+                f"Unable to find {LARGE_CAP_TICKERS_FILE} please see README or download it from BarChart"
+            )
+            return []
+
     return pd.read_csv(file_to_load).Symbol.tolist()
 
 
