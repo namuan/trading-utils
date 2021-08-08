@@ -56,8 +56,8 @@ if __name__ == "__main__":
     )
     report_data = add_reporting_data(selected_stocks)
     logging.info(
-        "Selected Stocks: {}".format(
-            ", ".join([f"${d.get('symbol')}" for d in report_data])
+        "({}) Selected Stocks: {}".format(
+            len(report_data), ", ".join([f"${d.get('symbol')}" for d in report_data])
         )
     )
     template_data = {"sort_by": sort_by, "query": query, "report_data": report_data}
