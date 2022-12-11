@@ -5,7 +5,8 @@ DTALE=./venv/bin/dtale
 .SILENT: ;               # no need for @
 
 setup: ## Setup Virtual Env
-	python3 -m venv venv
+	python3.10 -m venv venv
+	$(PY) -m pip install --upgrade pip
 	./venv/bin/pip3 install -r requirements/dev.txt
 
 deps: ## Install dependencies
