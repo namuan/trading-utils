@@ -6,6 +6,7 @@ from pathlib import Path
 from peewee import *
 
 from common import uuid_gen, search_rgx
+from common.environment import GROUP_CHAT_ID
 from common.tele_notifier import send_message_to_telegram
 from common.twitter_api import get_twitter_user_timeline
 from tele_stock_rider_bot import build_response_message
@@ -139,11 +140,12 @@ def main(twitter_accounts, poll_freq_in_secs):
         try:
             chart_link, _, message = build_response_message(symbol)
             header = f"""🚀 #*{symbol}* 👀 posted by [{mention_acct}](https://twitter.com/{mention_acct}/status/{mention_tweet_id}) at {formatted_posted_dt}"""
-            send_message_to_telegram(header, disable_web_preview=False)
+            send_message_to_telegram(header, disable_web_preview=False, override_chat_id=GROUP_CHAT_ID)
             send_message_to_telegram(
                 chart_link,
                 format="HTML",
                 disable_web_preview=False,
+                override_chat_id=GROUP_CHAT_ID,
             )
             send_message_to_telegram(message)
             print(f"Sent message by {mention_acct} for {symbol}")
