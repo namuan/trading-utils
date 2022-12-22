@@ -11,7 +11,7 @@ EXCHANGE = os.getenv("EXCHANGE")
 
 # Telegram
 
-PERSONAL_CHAT_ID = os.getenv("CHAT_ID")
+# PERSONAL_CHAT_ID = os.getenv("CHAT_ID")
 DEFAULT_BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 TELEGRAM_STOCK_RIDER_BOT = os.getenv("TELEGRAM_STOCK_RIDER_BOT")
