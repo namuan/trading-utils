@@ -3,7 +3,6 @@ test -d venv || python3 -m venv venv
 #venv/bin/pip3 install -r requirements/base.txt
 bash ./scripts/start_screen.sh tele-links 'venv/bin/python3 tele_links.py'
 #bash ./scripts/start_screen.sh tele-twitter 'venv/bin/python3 tele_twitter.py'
-bash ./scripts/start_screen.sh tele-furus 'venv/bin/python3 twitter_furus.py'
 bash ./scripts/start_screen.sh tele-spy-trade-bot 'venv/bin/python3 tele_spy_trade_bot.py'
 bash ./scripts/start_screen.sh options-price-tracker 'venv/bin/python3 options_price_tracker.py -t SPX,XHB,XLC,XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLR,XLK,XME,XOP,GDX,IYR,XLU'
 bash ./scripts/start_screen.sh tele-stock-rider-bot 'venv/bin/python3 tele_stock_rider_bot.py'
