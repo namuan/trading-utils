@@ -41,9 +41,13 @@ def get_stock_data(stock_symbol, year, data_folder):
     if os.path.exists(filename):
         return pd.read_csv(filename, index_col="Date")
     else:
-        stock_data = yf.download(stock_symbol, start=f"{year}-01-01", end=f"{year}-12-31")
+        stock_data = yf.download(
+            stock_symbol, start=f"{year}-01-01", end=f"{year}-12-31"
+        )
         weekly_data = stock_data.resample("W").last().dropna()
-        weekly_data["gain"] = (weekly_data["Close"] / weekly_data["Close"].iloc[0] - 1) * 100
+        weekly_data["gain"] = (
+            weekly_data["Close"] / weekly_data["Close"].iloc[0] - 1
+        ) * 100
         weekly_data.to_csv(filename, index=True)
         return weekly_data
 
@@ -53,7 +57,9 @@ def process_stocks(selected_stocks, year, data_folder):
     for stock_symbol in selected_stocks:
         try:
             get_stock_data(stock_symbol, year, data_folder)
-            weekly_data = pd.read_csv(f"{data_folder}/{stock_symbol}-{year}.csv", index_col="Date")
+            weekly_data = pd.read_csv(
+                f"{data_folder}/{stock_symbol}-{year}.csv", index_col="Date"
+            )
             stocks_gains[stock_symbol] = weekly_data["gain"].to_dict()
         except:
             pass
@@ -62,20 +68,36 @@ def process_stocks(selected_stocks, year, data_folder):
 
 def plot_gains(stock_symbol, gains_data, year, charts_folder):
     fig, ax = plt.subplots(figsize=(16, 9))
-    ax.bar(gains_data.keys(), gains_data.values(), color=["g" if g >= 0 else "r" for g in gains_data.values()])
+    ax.bar(
+        gains_data.keys(),
+        gains_data.values(),
+        color=["g" if g >= 0 else "r" for g in gains_data.values()],
+    )
     ax.set_title(f"{stock_symbol} Weekly Gains in {year}")
     ax.set_ylabel("Gain (%)")
     plt.xticks(rotation=45, ha="right")
-    plt.savefig(f"{charts_folder}/{stock_symbol}-{year}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(
+        f"{charts_folder}/{stock_symbol}-{year}.png", dpi=300, bbox_inches="tight"
+    )
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Process selected stocks for a given year.")
-    parser.add_argument("-y", "--year", type=int, default=2022, help="The year to process (default: 2022)")
-    parser.add_argument("-s", "--selected-stocks", nargs="+", help="The list of selected stocks")
+    parser = argparse.ArgumentParser(
+        description="Process selected stocks for a given year."
+    )
+    parser.add_argument(
+        "-y",
+        "--year",
+        type=int,
+        default=2022,
+        help="The year to process (default: 2022)",
+    )
+    parser.add_argument(
+        "-s", "--selected-stocks", nargs="+", help="The list of selected stocks"
+    )
     args = parser.parse_args()
 
-    working_folder = "data/gains-working"
+    working_folder = f"data/gains-working/{args.year}"
     create_folder(working_folder)
     stocks_folder = f"{working_folder}/stocks-data"
     create_folder(stocks_folder)
