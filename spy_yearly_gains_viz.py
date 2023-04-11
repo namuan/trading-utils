@@ -1,12 +1,12 @@
-import os
 import argparse
-import glob
-from datetime import datetime
+import csv
+import os
+import re
 from pathlib import Path
 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+from PIL import Image
 
 
 def create_folder(folder_path):
@@ -61,13 +61,8 @@ def create_bar_chart(df, final_close_date, output_folder):
     ax.set_title(f"({final_close_date})")
     ax.set_xlabel("S&P 500")
     ax.set_ylabel("Gains/Losses (%)")
-    ax.legend()
-
-    # Remove x-axis ticks and labels
     ax.set_xticks([])
     ax.set_xticklabels([])
-
-    # Set y-axis limits to -150 to 150
     ax.set_ylim(-100, 125)
 
     ax.legend(loc=None)
@@ -75,9 +70,6 @@ def create_bar_chart(df, final_close_date, output_folder):
     # Save the chart in the specified folder
     output_file = output_folder.joinpath(f"gains_losses_chart-{final_close_date}.png")
     plt.savefig(output_file.as_posix(), dpi=300, bbox_inches="tight")
-
-
-import csv
 
 
 def get_dates_from_csv(csv_file):
@@ -90,10 +82,6 @@ def get_dates_from_csv(csv_file):
             dates.append(date)
 
     return dates
-
-
-import os
-from PIL import Image
 
 
 def create_gif_from_png(png_files, output_file):
@@ -116,11 +104,6 @@ def create_gif_from_png(png_files, output_file):
 
     for png_file in png_files:
         os.remove(png_file)
-
-
-import re
-from datetime import datetime
-from pathlib import Path
 
 
 def get_sorted_png_files(folder_path):
