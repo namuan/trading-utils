@@ -11,5 +11,5 @@ def open_file(file_path):
     run_cmd("open {}".format(file_path))
 
 
-def open_in_browser(target_file, browser="Firefox.app"):
-    run_cmd('open -a "{}" {}'.format(browser, target_file))
+def open_in_browser(target_file):
+    run_cmd("open {}".format(target_file))
