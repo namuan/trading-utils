@@ -22,34 +22,53 @@ py report_by_query.py -t "SP500 Monthly Movers" -q "(is_large_cap == True)" -o "
 
 ### Scanners
 
+EMA Bounce
 ```shell
-py report_by_query.py -t "EMA Bounce" -q "(ema_60 < ema_50 < ema_45 < ema_40 < ema_35 < last_close < ema_30) and (adx_14 > 35) and (daily_strat.str.contains('.*-2d-2d')) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "natr_30" -v
+py report_by_query.py -t "EMA Bounce" -q "(day_0_ema_60 < day_0_ema_50 < day_0_ema_45 < day_0_ema_40 < day_0_ema_35 < last_close < day_0_ema_30) and (adx_14 > 35) and (daily_strat.str.contains('.*-2d-2d')) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "natr_30" -v
+```
 
-py report_by_query.py -t "EMA 8x21 Pullback" -q "(ema_60 < ema_50 < ema_45 < ema_40 < ema_35 < ema_21 < ema_8) and (vol_ema_3 > vol_ema_5 > vol_ema_7) and (last_low > ema_21) and (last_low < ema_8) and (adx_14 < 30) and (adx_9 > adx_14 > adx_21)" -o "natr_30" -v
+```shell
+py report_by_query.py -t "EMA 8x21 Pullback" -q "(day_0_ema_60 < day_0_ema_50 < day_0_ema_45 < day_0_ema_40 < day_0_ema_35 < day_0_ema_21 < day_0_ema_8) and (vol_ema_3 > vol_ema_5 > vol_ema_7) and (last_low > day_0_ema_21) and (last_low < day_0_ema_8) and (adx_14 < 30) and (adx_9 > adx_14 > adx_21)" -o "natr_30" -v
+```
 
+```shell
+py report_by_query.py -t "UpTrend" -q "(day_0_ema_3 > day_0_ema_5 > day_0_ema_7 > day_0_ema_9 > day_0_ema_11 > day_0_ema_13 > day_0_ema_15 > day_0_ema_21 > day_0_ema_30 > day_0_ema_35 > day_0_ema_40 > day_0_ema_45 > day_0_ema_50 > day_0_ema_60)" -o "smooth_30" -v
+```
 
-py report_by_query.py -t "UpTrend" -q "(ema_3 > ema_5 > ema_7 > ema_9 > ema_11 > ema_13 > ema_15 > ema_21 > ema_30 > ema_35 > ema_40 > ema_45 > ema_50 > ema_60)" -o "smooth_30" -v
-
+```shell
 # 21 x 50
 py report_by_query.py -t "UpTrend" -q "(ema_21 > ema_50) and (last_high > ema_8) and (last_low < ema_8)" -o "smooth_30" -v
+```
 
+```shell
 py report_by_query.py -t "Ema21 Bounce" -q "(ema_8 > ema_21) and (ema_8 > ema_21) and (last_high < ema_8) and (last_low > ema_21) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "smooth_30" -v
 ```
 
 ```shell
 py report_by_query.py -t "Power of 3 Daily" -q "(power_of_3_daily == True)" -o natr_30 -v
-py report_by_query.py -t "Power of 3 Weekly" -q "(power_of_3_week_1 == True) and (last_close < boll)" -o natr_30 -v
+```
+
+```shell
+py report_by_query.py -t "Power of 3 Weekly" -q "(power_of_3_week_1 == True) and (last_close < day_0_boll_21_2)" -o natr_30 -v
 ```
 
 ```shell
 py report_by_query.py -t "⬆ 5D Volume" -o natr_30 -v -q "(last_volume > day_2_before_last_volume > day_3_before_last_volume > day_4_before_last_volume > day_5_before_last_volume > day_6_before_last_volume > day_7_before_last_volume > day_8_before_last_volume > day_9_before_last_volume)"
+```
+
+```shell
 py report_by_query.py -t "⬆ 4D Vol/R-G-G Candles" -o natr_30 -v -q "(last_volume > day_2_before_last_volume > day_3_before_last_volume > day_4_before_last_volume) and (daily_strat_candle.str.contains('red-green-green$'))"
+```
+
+```shell
 py report_by_query.py -t "⬆ 2W Vol/GG Candles" -o natr_30 -v -q "(week_0_volume > week_1_volume > week_2_volume > week_3_volume and (week_1_strat.str.contains('2d-2d-2u$')) and (week_1_strat_candle.str.contains('.*-green-green$')))"
 ```
 
 ```shell
 py report_by_query.py -t "123 Pullbacks(Daily)" -q "(adx_14 > 35) and (pdi_14 > mdi_14) and (daily_strat.str.contains('2d-2d-2u$'))" -o natr_30 -v
+```
 
+```shell
 # Track - Buy when cross-up week high
 py report_by_query.py -t "123 Pullbacks(week_1)" -q "(adx_14 > 35) and (pdi_14 > mdi_14) and (week_1_strat.str.contains('2d-2d-2u$'))" -o natr_30 -v
 ```
@@ -57,7 +76,13 @@ py report_by_query.py -t "123 Pullbacks(week_1)" -q "(adx_14 > 35) and (pdi_14 >
 ```shell
 # Oversold and mean reversion
 py report_by_query.py -t "Mean Rev 50 LowerBB" -o natr_30 -v -q "(daily_strat_candle.str.contains('.*-red-green$')) and (last_close < boll_50_3_lb)"
+```
+
+```shell
 py report_by_query.py -t "Mean Rev LowerBB" -o natr_30 -v -q "(daily_strat_candle.str.contains('.*-green$')) and (last_close < boll_lb)"
+```
+
+```shell
 # boll_21_3_lb -> bollinger ban 21 day MA, 3 Stdev Lowerband
 py report_by_query.py -t "Mean Reversion 21 LowerBB" -o natr_30 -v -q "(last_close < boll_21_3_lb) and (daily_strat_candle.str.contains('.*-green$'))"
 ```
@@ -76,7 +101,13 @@ py report_by_query.py -t "Momentum Trending" -q "last_close > ema_3 > ema_5 > em
 
 ```shell
 py report_by_query.py -t "Boomer" -q "(daily_strat.str.contains('.*-1-1$')) and (daily_strat_candle.str.contains('.*-green-green$'))" -o natr_30 -v
+```
+
+```shell
 py report_by_query.py -t "Boomer" -q "(month_1_strat.str.contains('1-1-1$')) and (month_1_strat_candle.str.contains('.*-green-green$'))" -o natr_30 -v
+```
+
+```shell
 py report_by_query.py -t "Boomer" -q "(last_volume > 100000) and (month_3_strat.str.contains('.*-1-1$')) and (week_1_strat_candle.str.contains('red-green-green$'))" -o monthly_gains_1 -v
 ```
 
@@ -116,7 +147,7 @@ py report_by_query.py -o smooth_90 -v -t "Long Key Reversal" -q "((day_2_before_
 ```
 
 ```shell
-py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volume < day_2_before_last_volume) and (last_low < day_2_before_last_high) and (last_close > month_1_high) and (last_close > month_2_high) and (last_close > month_3_high) and (day_2_before_last_close < last_close)"
+py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volume < day_2_volume) and (last_low < day_2_high) and (last_close > month_1_high) and (last_close > month_2_high) and (last_close > month_3_high) and (day_2_volume < last_close)"
 ```
 
 ```shell
@@ -127,5 +158,8 @@ py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volu
 ```shell
 # Volume/Price divergence/convergence
 ./rbq "(vol_ma_3 > vol_ma_5 > vol_ma_7 > vol_ma_9 > vol_ma_11 > vol_ma_13 > vol_ma_15 > vol_ma_17 > vol_ma_19 > vol_ma_21) and (ma_3 < ma_5 < ma_7 < ma_9 < ma_11 < ma_13 < ma_15)"
+```
+
+```shell
 ./rbq "(day_2_before_last_volume > day_3_before_last_volume > day_4_before_last_volume > day_5_before_last_volume > day_6_before_last_volume) and (day_2_before_last_close < day_3_before_last_close < day_4_before_last_close < day_5_before_last_close < day_6_before_last_close < day_7_before_last_close)"
 ```
