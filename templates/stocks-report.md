@@ -27,19 +27,8 @@ Sort By: {{ stocks["sort_by"] }}
 | ▶️ Fixed Stop Loss | {{ '%0.2f' % (stock['last_close']|float - (2 * stock['atr_20']|float)) }} |
 | ▶️ Max Loss (Based on buy at last close) | {{ '%0.2f' % ((stock['last_close']|float - (2 * stock['atr_20']|float)) * stock['position_size']|float - (stock['position_size']|float * stock['last_close']|float)) }} |
 
-[BarChart](https://www.barchart.com/stocks/quotes/{{ stock['symbol'] }}/options)
-| [StockInvest](https://stockinvest.us/technical-analysis/{{ stock['symbol'] }})
-| [TradingView](https://www.tradingview.com/chart/?symbol={{ stock['symbol'] }})
-| [FinViz](https://www.finviz.com/quote.ashx?t={{ stock['symbol'] }})
-| [StockTwits](https://stocktwits.com/symbol/{{ stock['symbol'] }})
-| [SwingTradeBot](https://swingtradebot.com/equities/{{ stock['symbol'] }})
-| [MacroAxis](https://www.macroaxis.com/forecast/{{ stock['symbol'] }})
-| [Y Options](https://finance.yahoo.com/quote/{{ stock['symbol'] }}/options?straddle=true)
-| [Straddle](https://optionstrat.com/build/straddle/{{ stock['symbol'] }})
-| [Short Put](https://optionstrat.com/build/short-put/{{ stock['symbol'] }})
-| [Credit Spread](https://optionstrat.com/build/bull-put-spread/{{ stock['symbol'] }})
-| [OAI Earnings](https://tools.optionsai.com/earnings/{{ stock['symbol'] }})
 
+[LazyTrader](https://namuan.github.io/lazy-trader/?symbol={{ stock['symbol'] }})
 
 ___
 
