@@ -10,7 +10,7 @@ sns.set(style="whitegrid")
 
 
 def get_price_data(start_date, end_date, symbol):
-    price_data = yf.download(symbol, start=start_date, end=end_date)['Close']
+    price_data = yf.download(symbol, start=start_date, end=end_date)["Close"]
     return pd.DataFrame(price_data)
 
 
@@ -60,7 +60,7 @@ def process_data(daily_returns, price_df):
             shares_bought = False
             shares_sold = True
 
-        elif daily_return['Close'] < -5 and shares_sold:
+        elif daily_return["Close"] < -5 and shares_sold:
             buying_dates.append(date)
             last_buy_price = current_price
             shares_bought = True
@@ -73,12 +73,33 @@ def process_data(daily_returns, price_df):
     return buying_dates, selling_dates, max_drawdowns
 
 
-def plot_data(price_df, daily_returns, buying_dates, selling_dates, max_drawdowns, start_date, end_date, symbol):
+def plot_data(
+    price_df,
+    daily_returns,
+    buying_dates,
+    selling_dates,
+    max_drawdowns,
+    start_date,
+    end_date,
+    symbol,
+):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12), sharex=True)
 
-    ax1.plot(price_df.index, price_df, label='Stock Price', color='cornflowerblue')
-    ax1.scatter(buying_dates, price_df.loc[buying_dates], c='limegreen', marker='o', label='Buying')
-    ax1.scatter(selling_dates, price_df.loc[selling_dates], c='tomato', marker='o', label='Selling')
+    ax1.plot(price_df.index, price_df, label="Stock Price", color="cornflowerblue")
+    ax1.scatter(
+        buying_dates,
+        price_df.loc[buying_dates],
+        c="limegreen",
+        marker="o",
+        label="Buying",
+    )
+    ax1.scatter(
+        selling_dates,
+        price_df.loc[selling_dates],
+        c="tomato",
+        marker="o",
+        label="Selling",
+    )
 
     for i, date in enumerate(selling_dates):
         ax1.annotate(
@@ -86,33 +107,61 @@ def plot_data(price_df, daily_returns, buying_dates, selling_dates, max_drawdown
             (date, price_df.loc[date]),
             textcoords="offset points",
             xytext=(0, 10),
-            ha='center',
+            ha="center",
             fontsize=8,
-            color='mediumorchid',
+            color="mediumorchid",
         )
 
-    ax1.set_title(f'{symbol} Stock Price ({start_date.strftime("%Y-%m-%d")} - {end_date.strftime("%Y-%m-%d")})')
-    ax1.set_ylabel('Stock Price')
+    ax1.set_title(
+        f'{symbol} Stock Price ({start_date.strftime("%Y-%m-%d")} - {end_date.strftime("%Y-%m-%d")})'
+    )
+    ax1.set_ylabel("Stock Price")
     ax1.legend()
 
-    ax2.plot(daily_returns.index, daily_returns, label='Daily Returns', color='purple')
-    ax2.scatter(daily_returns[daily_returns['Close'] > 5].index, daily_returns[daily_returns['Close'] > 5],
-                c='limegreen', marker='o', label='Up > 5%')
-    ax2.scatter(daily_returns[daily_returns['Close'] < -5].index, daily_returns[daily_returns['Close'] < -5],
-                c='tomato', marker='o', label='Down < -5%')
+    ax2.plot(daily_returns.index, daily_returns, label="Daily Returns", color="purple")
+    ax2.scatter(
+        daily_returns[daily_returns["Close"] > 5].index,
+        daily_returns[daily_returns["Close"] > 5],
+        c="limegreen",
+        marker="o",
+        label="Up > 5%",
+    )
+    ax2.scatter(
+        daily_returns[daily_returns["Close"] < -5].index,
+        daily_returns[daily_returns["Close"] < -5],
+        c="tomato",
+        marker="o",
+        label="Down < -5%",
+    )
 
-    ax2.set_title(f'{symbol} Daily Returns ({start_date.strftime("%Y-%m-%d")} - {end_date.strftime("%Y-%m-%d")})')
-    ax2.set_ylabel('Daily Returns (%)')
+    ax2.set_title(
+        f'{symbol} Daily Returns ({start_date.strftime("%Y-%m-%d")} - {end_date.strftime("%Y-%m-%d")})'
+    )
+    ax2.set_ylabel("Daily Returns (%)")
     ax2.legend()
 
     plt.show()
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Analyze stock data.')
-    parser.add_argument('-s', '--symbol', type=str, required=True, help='Stock symbol, e.g., AAPL')
-    parser.add_argument('-st', '--start_date', type=str, required=True, help='Start date in YYYY-MM-DD format')
-    parser.add_argument('-et', '--end_date', type=str, required=True, help='End date in YYYY-MM-DD format')
+    parser = argparse.ArgumentParser(description="Analyze stock data.")
+    parser.add_argument(
+        "-s", "--symbol", type=str, required=True, help="Stock symbol, e.g., AAPL"
+    )
+    parser.add_argument(
+        "-st",
+        "--start_date",
+        type=str,
+        required=True,
+        help="Start date in YYYY-MM-DD format",
+    )
+    parser.add_argument(
+        "-et",
+        "--end_date",
+        type=str,
+        required=True,
+        help="End date in YYYY-MM-DD format",
+    )
 
     return parser.parse_args()
 
@@ -126,8 +175,17 @@ def main():
     price_df = get_price_data(start_date, end_date, symbol)
     daily_returns = get_daily_returns(price_df)
     buying_dates, selling_dates, max_drawdowns = process_data(daily_returns, price_df)
-    plot_data(price_df, daily_returns, buying_dates, selling_dates, max_drawdowns, start_date, end_date, symbol)
+    plot_data(
+        price_df,
+        daily_returns,
+        buying_dates,
+        selling_dates,
+        max_drawdowns,
+        start_date,
+        end_date,
+        symbol,
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
