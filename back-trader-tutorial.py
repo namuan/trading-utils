@@ -5,22 +5,27 @@ import backtrader as bt
 
 
 class TestStrategy(bt.Strategy):
-    params = (("exit_bars", 5),)
+    params = (("ma_period", 14), ("print_log", False))
 
     def __init__(self):
         self.bar_executed = None
         self.data_close = self.datas[0].close
         self.order = None
+        self.sma = bt.indicators.SimpleMovingAverage(
+            self.datas[0], period=self.params.ma_period
+        )
+        # rsi = bt.indicators.RSI(self.datas[0])
+        # bt.indicators.SmoothedMovingAverage(rsi, period=10)
 
     def next(self):
-        self.log(f"Close, {self.data_close[0]}")
+        # self.log(f"Close, {self.data_close[0]}")
         if not self.position:
-            if self.data_close[0] < self.data_close[-1] < self.data_close[-2]:
-                self.log(f"Buy Create, {self.data_close[0]}")
+            if self.data_close[0] > self.sma[0]:
+                self.log(f"Buy Create, Close {self.data_close[0]} > SMA {self.sma[0]}")
                 self.buy()
         else:
-            if len(self) >= (self.bar_executed + self.params.exit_bars):
-                self.log(f"Sell Create, {self.data_close[0]}")
+            if self.data_close[0] < self.sma[0]:
+                self.log(f"Sell Create, Close {self.data_close[0]} < SMA {self.sma[0]}")
                 self.sell()
 
     def notify_order(self, order):
@@ -48,26 +53,30 @@ class TestStrategy(bt.Strategy):
 
         self.log(f"OPERATION PROFIT, GROSS: {trade.pnl:.2f}, NET: {trade.pnlcomm:.2f}")
 
-    def log(self, txt, dt=None):
-        dt = dt or self.datas[0].datetime.date(0)
-        print(f"{dt.isoformat()}, {txt}")
+    def stop(self):
+        self.log(
+            f"(MA Period {self.params.ma_period:2d}) Ending Value {self.broker.getvalue():.2f}",
+            do_print=True,
+        )
+
+    def log(self, txt, dt=None, do_print=False):
+        if self.params.print_log or do_print:
+            dt = dt or self.datas[0].datetime.date(0)
+            print(f"{dt.isoformat()}, {txt}")
 
 
 if __name__ == "__main__":
     cerebro = bt.Cerebro()
-    cerebro.addstrategy(TestStrategy, exit_bars=5)
+    # cerebro.optstrategy(TestStrategy, ma_period=range(5, 30))
+    cerebro.addstrategy(TestStrategy, ma_period=20)
 
     # Load feed
-    data_path = (
-        Path("~/code-reference/backtrader")
-        .expanduser()
-        .joinpath("datas/orcl-1995-2014.txt")
-    )
+    data_path = Path.cwd().joinpath("output").joinpath("AAPL.csv")
 
     data = bt.feeds.YahooFinanceCSVData(
         dataname=data_path,
-        fromdate=datetime.datetime(2000, 1, 1),
-        todate=datetime.datetime(2001, 1, 3),
+        fromdate=datetime.datetime(2004, 1, 1),
+        todate=datetime.datetime(2023, 1, 3),
         reverse=False,
     )
 
@@ -76,5 +85,6 @@ if __name__ == "__main__":
     cerebro.broker.setcommission(commission=0.001)
 
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
-    cerebro.run()
+    cerebro.run(maxcpus=1)
     print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
+    # cerebro.plot()
