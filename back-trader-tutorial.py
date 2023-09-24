@@ -18,7 +18,7 @@ def parse_arguments():
     parser.add_argument(
         "-t",
         "--test",
-        action='store_true',
+        action="store_true",
         help="Run in test mode",
     )
     return parser.parse_args()
@@ -28,7 +28,7 @@ def parse_arguments():
 scale_in = {1: 0.05, 2: 0.15, 3: 0.3, 4: 0.5}
 
 
-class TestStrategy(bt.Strategy):
+class RsiStrategy(bt.Strategy):
     params = (
         ("initial_investment", 10000.0),
         ("rsi_period", 14),
@@ -136,20 +136,22 @@ class TestStrategy(bt.Strategy):
 def main(args):
     cerebro = bt.Cerebro()
     initial_investment = 10000.0
-    cerebro.optstrategy(
-        TestStrategy,
-        initial_investment=initial_investment,
-        rsi_period=4,
-        rsi_lower=range(5, 21),
-        rsi_upper=range(75, 91),
-    )
-    # cerebro.addstrategy(
-    #     TestStrategy,
-    #     initial_investment=initial_investment,
-    #     rsi_period=4,
-    #     rsi_lower=10,
-    #     rsi_upper=90,
-    # )
+    if args.test:
+        cerebro.optstrategy(
+            RsiStrategy,
+            initial_investment=initial_investment,
+            rsi_period=4,
+            rsi_lower=range(5, 21),
+            rsi_upper=range(75, 91),
+        )
+    else:
+        cerebro.addstrategy(
+            RsiStrategy,
+            initial_investment=initial_investment,
+            rsi_period=4,
+            rsi_lower=10,
+            rsi_upper=90,
+        )
 
     # Load feed
     data_path = Path.cwd().joinpath("output").joinpath(f"{args.symbol}.csv")
@@ -167,7 +169,8 @@ def main(args):
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
     cerebro.run()
     print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
-    # cerebro.plot()
+    if not args.test:
+        cerebro.plot()
 
 
 if __name__ == "__main__":
