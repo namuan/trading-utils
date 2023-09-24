@@ -93,7 +93,8 @@ class RsiStrategy(bt.Strategy):
         else:
             emoji = "❌"
 
-        self.log(f"Close, {self.data_close[0]}, RSI = {self.rsi[0]:.2f} {emoji}")
+        if emoji != "❌":
+            self.log(f"Close, {self.data_close[0]}, RSI = {self.rsi[0]:.2f} {emoji}")
 
         # Buy
         if self.scale_in_step <= len(scale_in) and self.rsi[0] < self.params.rsi_lower:
@@ -205,7 +206,17 @@ def main(args):
 def load_data(symbol: str, start_date: str, end_date: str):
     data_path = Path.cwd().joinpath("output").joinpath(f"{symbol}.csv")
     if not os.path.isfile(data_path):
-        subprocess.run(["python3", "download_stocks_ohlcv.py", "-t", symbol])
+        subprocess.run(
+            [
+                "python3",
+                "download_stocks_ohlcv.py",
+                "-t",
+                symbol,
+                "--back-period-in-years",
+                "10",
+            ]
+        )
+
     start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     data = bt.feeds.YahooFinanceCSVData(
