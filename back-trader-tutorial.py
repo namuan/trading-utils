@@ -21,6 +21,13 @@ def parse_arguments():
         action="store_true",
         help="Run in test mode",
     )
+    parser.add_argument(
+        "-i",
+        "--initial_investment",
+        type=float,
+        default=10000.0,
+        help="Initial investment amount (default: 10000.0)",
+    )
     return parser.parse_args()
 
 
@@ -135,7 +142,7 @@ class RsiStrategy(bt.Strategy):
 
 def main(args):
     cerebro = bt.Cerebro()
-    initial_investment = 10000.0
+    initial_investment = args.initial_investment
     if args.test:
         cerebro.optstrategy(
             RsiStrategy,
