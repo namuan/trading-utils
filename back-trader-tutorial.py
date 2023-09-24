@@ -63,12 +63,12 @@ scale_in = {1: 0.05, 2: 0.15, 3: 0.3, 4: 0.5}
 
 
 class RsiStrategy(bt.Strategy):
-    params = (
-        ("initial_investment", 10000.0),
-        ("rsi_period", 14),
-        ("rsi_lower", 30),
-        ("rsi_upper", 70),
-        ("print_log", True),
+    params = dict(
+        initial_investment=10000.0,
+        rsi_period=14,
+        rsi_lower=30,
+        rsi_upper=70,
+        print_log=True,
     )
 
     def __init__(self):
