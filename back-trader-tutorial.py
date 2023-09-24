@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+"""
+Backtest using RSI strategy
+
+Usage:
+To test over a range and find the best parameters:
+$ py back-trader-tutorial.py| python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
+"""
 import datetime
 import math
 from pathlib import Path
@@ -116,20 +124,20 @@ class TestStrategy(bt.Strategy):
 if __name__ == "__main__":
     cerebro = bt.Cerebro()
     initial_investment = 10000.0
-    # cerebro.optstrategy(
-    #     TestStrategy,
-    #     initial_investment=initial_investment,
-    #     rsi_period=4,
-    #     rsi_lower=range(5, 21),
-    #     rsi_upper=range(75, 91),
-    # )
-    cerebro.addstrategy(
+    cerebro.optstrategy(
         TestStrategy,
         initial_investment=initial_investment,
         rsi_period=4,
-        rsi_lower=10,
-        rsi_upper=90,
+        rsi_lower=range(5, 21),
+        rsi_upper=range(75, 91),
     )
+    # cerebro.addstrategy(
+    #     TestStrategy,
+    #     initial_investment=initial_investment,
+    #     rsi_period=4,
+    #     rsi_lower=10,
+    #     rsi_upper=90,
+    # )
 
     # Load feed
     data_path = Path.cwd().joinpath("output").joinpath("TQQQ.csv")
@@ -138,7 +146,6 @@ if __name__ == "__main__":
         dataname=data_path,
         fromdate=datetime.datetime(2019, 1, 1),
         todate=datetime.datetime(2023, 8, 1),
-        # reverse=False,
     )
 
     cerebro.adddata(data)
@@ -146,6 +153,6 @@ if __name__ == "__main__":
     cerebro.broker.setcommission(commission=0.001)
 
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
-    cerebro.run(maxcpus=1)
+    cerebro.run()
     print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
-    cerebro.plot()
+    # cerebro.plot()
