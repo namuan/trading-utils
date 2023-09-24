@@ -1,13 +1,16 @@
-import argparse
 import datetime
 import math
 from pathlib import Path
 
 import backtrader as bt
+import argparse
 
-parser = argparse.ArgumentParser(description='Backtest using RSI strategy')
-parser.add_argument('symbol', type=str, help='Stock symbol')
-args = parser.parse_args()
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Backtest using RSI strategy')
+    parser.add_argument('symbol', type=str, help='Stock symbol')
+    return parser.parse_args()
+
+args = parse_arguments()
 
 # Factor to percent of investment
 scale_in = {1: 0.05, 2: 0.15, 3: 0.3, 4: 0.5}
