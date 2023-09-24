@@ -6,6 +6,8 @@ Usage:
 To test over a range and find the best parameters:
 $ py back-trader-tutorial.py | python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
 """
+import os
+import subprocess
 import datetime
 import math
 from pathlib import Path
@@ -202,6 +204,8 @@ def main(args):
 
 def load_data(symbol: str, start_date: str, end_date: str):
     data_path = Path.cwd().joinpath("output").joinpath(f"{symbol}.csv")
+    if not os.path.isfile(data_path):
+        subprocess.run(["python3", "download_stocks_ohlcv.py", "-t", symbol])
     start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     data = bt.feeds.YahooFinanceCSVData(
