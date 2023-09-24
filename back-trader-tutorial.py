@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
-"""
-Backtest using RSI strategy
-
-Usage:
-To test over a range and find the best parameters:
-$ py back-trader-tutorial.py| python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
-"""
+import argparse
 import datetime
 import math
 from pathlib import Path
 
 import backtrader as bt
+
+parser = argparse.ArgumentParser(description='Backtest using RSI strategy')
+parser.add_argument('symbol', type=str, help='Stock symbol')
+args = parser.parse_args()
 
 # Factor to percent of investment
 scale_in = {1: 0.05, 2: 0.15, 3: 0.3, 4: 0.5}
@@ -140,7 +137,7 @@ if __name__ == "__main__":
     # )
 
     # Load feed
-    data_path = Path.cwd().joinpath("output").joinpath("TQQQ.csv")
+    data_path = Path.cwd().joinpath("output").joinpath(f"{args.symbol}.csv")
 
     data = bt.feeds.YahooFinanceCSVData(
         dataname=data_path,
