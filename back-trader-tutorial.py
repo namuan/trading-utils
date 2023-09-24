@@ -15,6 +15,12 @@ def parse_arguments():
         default="AAPL",
         help="Stock symbol (default: AAPL)",
     )
+    parser.add_argument(
+        "-t",
+        "--test",
+        action='store_true',
+        help="Run in test mode",
+    )
     return parser.parse_args()
 
 
