@@ -121,7 +121,12 @@ class TestStrategy(bt.Strategy):
             print(f"{dt.isoformat()}, {txt}", flush=True)
 
 
+def main():
+    pass
+
 if __name__ == "__main__":
+    main()
+def main():
     cerebro = bt.Cerebro()
     initial_investment = 10000.0
     cerebro.optstrategy(
