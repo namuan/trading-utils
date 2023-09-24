@@ -37,6 +37,20 @@ def parse_arguments():
         default=10000.0,
         help="Initial investment amount (default: 10000.0)",
     )
+    parser.add_argument(
+        "-sd",
+        "--start_date",
+        type=str,
+        default=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'),
+        help="Start date for backtesting (default: one year from today)",
+    )
+    parser.add_argument(
+        "-ed",
+        "--end_date",
+        type=str,
+        default=datetime.datetime.now().strftime('%Y-%m-%d'),
+        help="End date for backtesting (default: today)",
+    )
     return parser.parse_args()
 
 
@@ -171,7 +185,7 @@ def main(args):
             rsi_upper=90,
         )
 
-    data = load_data(args.symbol)
+    data = load_data(args.symbol, args.start_date, args.end_date)
 
     cerebro.adddata(data)
     cerebro.broker.setcash(initial_investment)
@@ -184,12 +198,14 @@ def main(args):
         cerebro.plot()
 
 
-def load_data(symbol: str):
+def load_data(symbol: str, start_date: str, end_date: str):
     data_path = Path.cwd().joinpath("output").joinpath(f"{symbol}.csv")
+    start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+    end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
     data = bt.feeds.YahooFinanceCSVData(
         dataname=data_path,
-        fromdate=datetime.datetime(2022, 1, 3),
-        todate=datetime.datetime(2023, 9, 1),
+        fromdate=start_date,
+        todate=end_date,
     )
     return data
 
