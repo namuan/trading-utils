@@ -39,16 +39,18 @@ def parse_arguments():
     )
     parser.add_argument(
         "-sd",
-        "--start_date",
+        "--start-date",
         type=str,
-        default=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'),
+        default=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime(
+            "%Y-%m-%d"
+        ),
         help="Start date for backtesting (default: one year from today)",
     )
     parser.add_argument(
         "-ed",
-        "--end_date",
+        "--end-date",
         type=str,
-        default=datetime.datetime.now().strftime('%Y-%m-%d'),
+        default=datetime.datetime.now().strftime("%Y-%m-%d"),
         help="End date for backtesting (default: today)",
     )
     return parser.parse_args()
@@ -200,8 +202,8 @@ def main(args):
 
 def load_data(symbol: str, start_date: str, end_date: str):
     data_path = Path.cwd().joinpath("output").joinpath(f"{symbol}.csv")
-    start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
-    end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
+    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     data = bt.feeds.YahooFinanceCSVData(
         dataname=data_path,
         fromdate=start_date,
