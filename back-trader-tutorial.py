@@ -1,9 +1,18 @@
+#!/usr/bin/env python3
+"""
+Backtest using RSI strategy
+
+Usage:
+To test over a range and find the best parameters:
+$ py back-trader-tutorial.py | python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
+"""
 import datetime
 import math
 from pathlib import Path
 
 import backtrader as bt
 import argparse
+import pandas
 
 
 def parse_arguments():
@@ -41,7 +50,7 @@ class RsiStrategy(bt.Strategy):
         ("rsi_period", 14),
         ("rsi_lower", 30),
         ("rsi_upper", 70),
-        ("print_log", False),
+        ("print_log", True),
     )
 
     def __init__(self):
@@ -50,6 +59,7 @@ class RsiStrategy(bt.Strategy):
         self.trades_holding = 0
         self.scale_in_step = 1
         self.total_stocks_purchased = 0
+        self.number_of_trades = 0
         self.rsi = bt.indicators.RSI(
             self.datas[0],
             period=self.params.rsi_period,
@@ -65,8 +75,7 @@ class RsiStrategy(bt.Strategy):
         else:
             emoji = "❌"
 
-        if emoji != "❌":
-            self.log(f"Close, {self.data_close[0]}, RSI = {self.rsi[0]:.2f} {emoji}")
+        self.log(f"Close, {self.data_close[0]}, RSI = {self.rsi[0]:.2f} {emoji}")
 
         # Buy
         if self.scale_in_step <= len(scale_in) and self.rsi[0] < self.params.rsi_lower:
@@ -117,6 +126,7 @@ class RsiStrategy(bt.Strategy):
             )
 
         self.order = None
+        self.number_of_trades += 1
 
     def notify_trade(self, trade):
         if not trade.isclosed:
@@ -130,6 +140,7 @@ class RsiStrategy(bt.Strategy):
             f"(RSI Period {self.params.rsi_period:2d})"
             f" ⚫ (Upper {self.params.rsi_upper} : Lower {self.params.rsi_lower})"
             f" ⚫ Ending Value {self.broker.getvalue():.2f}"
+            f" ⚫ Number of Trades {self.number_of_trades}"
             f" ⚫ Percent Gain {percent_gain:.2%}",
             do_print=True,
         )
@@ -147,7 +158,7 @@ def main(args):
         cerebro.optstrategy(
             RsiStrategy,
             initial_investment=initial_investment,
-            rsi_period=4,
+            rsi_period=range(4, 21),
             rsi_lower=range(5, 21),
             rsi_upper=range(75, 91),
         )
@@ -155,19 +166,12 @@ def main(args):
         cerebro.addstrategy(
             RsiStrategy,
             initial_investment=initial_investment,
-            rsi_period=4,
-            rsi_lower=10,
+            rsi_period=10,
+            rsi_lower=20,
             rsi_upper=90,
         )
 
-    # Load feed
-    data_path = Path.cwd().joinpath("output").joinpath(f"{args.symbol}.csv")
-
-    data = bt.feeds.YahooFinanceCSVData(
-        dataname=data_path,
-        fromdate=datetime.datetime(2019, 1, 1),
-        todate=datetime.datetime(2023, 8, 1),
-    )
+    data = load_data(args.symbol)
 
     cerebro.adddata(data)
     cerebro.broker.setcash(initial_investment)
@@ -178,6 +182,16 @@ def main(args):
     print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
     if not args.test:
         cerebro.plot()
+
+
+def load_data(symbol: str):
+    data_path = Path.cwd().joinpath("output").joinpath(f"{symbol}.csv")
+    data = bt.feeds.YahooFinanceCSVData(
+        dataname=data_path,
+        fromdate=datetime.datetime(2022, 1, 3),
+        todate=datetime.datetime(2023, 9, 1),
+    )
+    return data
 
 
 if __name__ == "__main__":
