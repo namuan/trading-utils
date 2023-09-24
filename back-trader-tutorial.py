@@ -5,12 +5,18 @@ from pathlib import Path
 import backtrader as bt
 import argparse
 
+
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Backtest using RSI strategy')
-    parser.add_argument('symbol', type=str, help='Stock symbol')
+    parser = argparse.ArgumentParser(description="Backtest using RSI strategy")
+    parser.add_argument(
+        "-s",
+        "--symbol",
+        type=str,
+        default="AAPL",
+        help="Stock symbol (default: AAPL)",
+    )
     return parser.parse_args()
 
-args = parse_arguments()
 
 # Factor to percent of investment
 scale_in = {1: 0.05, 2: 0.15, 3: 0.3, 4: 0.5}
@@ -121,12 +127,7 @@ class TestStrategy(bt.Strategy):
             print(f"{dt.isoformat()}, {txt}", flush=True)
 
 
-def main():
-    pass
-
-if __name__ == "__main__":
-    main()
-def main():
+def main(args):
     cerebro = bt.Cerebro()
     initial_investment = 10000.0
     cerebro.optstrategy(
@@ -161,3 +162,8 @@ def main():
     cerebro.run()
     print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
     # cerebro.plot()
+
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    main(args)
