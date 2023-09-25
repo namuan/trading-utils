@@ -61,7 +61,9 @@ def main(args):
     )
 
     print("Max Consecutive Lower Closes:", max_consecutive_lower_close)
-    print("Periods when it happened:", consecutive_lower_close_periods)
+    print("Periods when it happened:")
+    for start_date, end_date in consecutive_lower_close_periods:
+        print(f"From {start_date.date()} to {end_date.date()}")
     print("Max Percentage Drop in Consecutive Daily Lower Closes:", max_percentage_drop)
 
     df_weekly = resample_data(df, "W")
