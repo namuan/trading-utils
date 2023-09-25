@@ -1,4 +1,6 @@
 import argparse
+from pathlib import Path
+
 import pandas as pd
 
 
@@ -42,9 +44,10 @@ def resample_data(df, freq):
     return df.resample(freq, on="Date").last().reset_index()
 
 
-def main():
+def main(args):
     # Load the CSV file
-    file_path = "output/TQQQ.csv"  # Replace with the path of your file
+    # file_path = "output/TQQQ.csv"  # Replace with the path of your file
+    file_path = Path(args.file)
     df = pd.read_csv(file_path)
     df["Date"] = pd.to_datetime(df["Date"])
 
@@ -79,5 +82,12 @@ def main():
     )
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Calculate consecutive losses")
+    parser.add_argument("--file", type=str, required=True, help="Path to the CSV file")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(args)
