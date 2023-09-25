@@ -76,8 +76,8 @@ def main(args):
 
     print("Max Consecutive Lower Closes (Weekly):", max_consecutive_lower_close_weekly)
     print("Periods when it happened (Weekly):")
-    for period in consecutive_lower_close_periods_weekly:
-        print(period)
+    for start_date, end_date in consecutive_lower_close_periods_weekly:
+        print(f"From {start_date} to {end_date}")
     print(
         "Max Percentage Drop in Consecutive Weekly Lower Closes:",
         max_percentage_drop_weekly,
