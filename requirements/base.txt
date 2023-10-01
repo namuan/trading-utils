@@ -28,3 +28,4 @@ finvizfinance
 squarify
 py-executable-checklist==1.3.1
 backtrader[plotting]
+quantstats
