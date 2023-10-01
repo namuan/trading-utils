@@ -15,14 +15,14 @@ ib.connect("127.0.0.1", 7497, clientId=1)
 print(ib_insync.__all__)
 print(ib.positions())
 
-contract = Stock('TSLA', 'SMART', 'USD')
+contract = Stock("TSLA", "SMART", "USD")
 print(ib.reqContractDetails(contract))
 
 print(ib.qualifyContracts(contract))
 
-chains = ib.reqSecDefOptParams(contract.symbol, '', contract.secType, contract.conId)
+chains = ib.reqSecDefOptParams(contract.symbol, "", contract.secType, contract.conId)
 
-chain = next(c for c in chains if c.tradingClass == 'TSLA')
+chain = next(c for c in chains if c.tradingClass == "TSLA")
 
 print(chain)
 
