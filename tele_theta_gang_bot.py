@@ -66,15 +66,20 @@ def collect_strikes(options_df):
     return selected_strikes
 
 
+def format_price(price):
+    price = float(price)
+    return int(price) if price.is_integer() else price
+
+
 def build_options_trade_info(ticker, options_df):
     selected_strikes = collect_strikes(options_df)
     referrer = "@thetagangbot"
     m = ["_Possible trades_"]
     for idx, (call_strike_record, put_strike_record) in enumerate(selected_strikes):
         selected_expiry = call_strike_record.get("expiration_date")
-        call_strike = call_strike_record.get("strike")
+        call_strike = format_price(call_strike_record.get("strike"))
         call_credit = call_strike_record.get("bid")
-        put_strike = put_strike_record.get("strike")
+        put_strike = format_price(put_strike_record.get("strike"))
         put_delta = put_strike_record.get("greeks_delta")
         put_credit = put_strike_record.get("bid")
         put_break_even = put_strike - put_credit
@@ -169,5 +174,5 @@ def run_once(ticker):
 
 if __name__ == "__main__":
     init_logging()
-    # run_once("GBTC") # - Enable for testing
+    # run_once("TSLA")  # - Enable for testing
     main()
