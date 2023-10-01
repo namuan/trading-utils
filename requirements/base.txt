@@ -29,3 +29,4 @@ squarify
 py-executable-checklist==1.4.0
 backtrader[plotting]
 quantstats
+ib_insync
