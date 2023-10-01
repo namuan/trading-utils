@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Backtest using RSI strategy
+Backtest TQQQ using ATR trailing stop loss
 
 Usage:
 To test over a range and find the best parameters:
-$ py bt_rsi_scale_in_strategy.py | python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
+$ py bt_trailing_atr_strategy.py | python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
 """
 import argparse
 import datetime
@@ -17,7 +17,7 @@ import backtrader as bt
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Backtest using RSI strategy")
+    parser = argparse.ArgumentParser(description="Backtest using ATR strategy")
     parser.add_argument(
         "-s",
         "--symbol",
@@ -57,73 +57,58 @@ def parse_arguments():
     return parser.parse_args()
 
 
-# Factor to percent of investment
-scale_in = {1: 0.05, 2: 0.15, 3: 0.3, 4: 0.5}
-
-
-class RsiStrategy(bt.Strategy):
+class AtrStrategy(bt.Strategy):
     params = dict(
         initial_investment=10000.0,
-        rsi_period=14,
-        rsi_lower=30,
-        rsi_upper=70,
+        atr_period=14,
+        hhv_period=10,
+        atr_multiplier=3.0,
         print_log=False,
     )
+    start_price = None
 
     def __init__(self):
         self.data_close = self.datas[0].close
+        self.data_high = self.datas[0].high
         self.order = None
-        self.trades_holding = 0
-        self.scale_in_step = 1
-        self.total_stocks_purchased = 0
         self.number_of_trades = 0
-        self.rsi = bt.indicators.RSI(
+        self.atr = bt.indicators.AverageTrueRange(
             self.datas[0],
-            period=self.params.rsi_period,
-            upperband=self.params.rsi_upper,
-            lowerband=self.params.rsi_lower,
+            period=self.params.atr_period,
+            plot=False,
         )
+        self.highest_high = bt.indicators.Highest(
+            self.data_high, period=self.params.hhv_period, plot=False
+        )
+        self.trailing_stop = self.data_high[0]
 
     def next(self):
-        if self.rsi[0] < self.params.rsi_lower:
-            emoji = "👍"
-        elif self.rsi[0] > self.params.rsi_upper:
-            emoji = "👎"
-        else:
-            emoji = "❌"
+        if not self.start_price:
+            self.start_price = self.data_close[0]
 
-        if emoji != "❌":
-            self.log(f"Close, {self.data_close[0]}, RSI = {self.rsi[0]:.2f} {emoji}")
+        self.end_price = self.data_close[0]
 
-        # Buy
-        if self.scale_in_step <= len(scale_in) and self.rsi[0] < self.params.rsi_lower:
-            current_scale_factor = scale_in[self.scale_in_step]
-            scale_factor_investment = self.broker.getcash() * current_scale_factor
+        if self.order:
+            return
+
+        highest_high = self.highest_high[0]
+        atr_value = self.params.atr_multiplier * self.atr[0]
+
+        if (
+            self.data.close[0] > highest_high - atr_value
+            and self.data.close[0] > self.data.close[-1]
+        ):
+            self.trailing_stop = highest_high - atr_value
+
+        if self.position:
+            if self.data.close[0] < self.trailing_stop:
+                self.close()
+
+        elif self.data.close[0] > self.trailing_stop:
             stocks_to_purchase = math.floor(
-                scale_factor_investment / self.data_close[0]
+                (self.broker.getcash() * 0.90) / self.data_close[0]
             )
-
-            self.log(
-                f"📈 Buy Create {stocks_to_purchase:.2f} @ Close {self.data_close[0]} - RSI {self.rsi[0]}"
-            )
-            self.order = self.buy(size=stocks_to_purchase)
-            self.scale_in_step += 1
-            self.trades_holding += 1
-            self.total_stocks_purchased += stocks_to_purchase
-            self.log(
-                f"📰 Scale Factor: {current_scale_factor}"
-                f"🟠 Investment: {scale_factor_investment:.2f}"
-                f"🟠 Total Stocks Purchased {self.total_stocks_purchased:.2f}"
-                f"🟠 Broker Cash: {self.broker.getcash():.2f}"
-            )
-
-        # Sell
-        if self.trades_holding > 0 and self.rsi[0] > self.params.rsi_upper:
-            self.log(f"📉 Sell Create, Close {self.data_close[0]} - RSI {self.rsi[0]}")
-            self.order = self.sell(size=self.total_stocks_purchased)
-            self.trades_holding = 0
-            self.scale_in_step = 1
-            self.total_stocks_purchased = 0
+            self.buy(size=stocks_to_purchase)
 
     def notify_order(self, order):
         if order.status in [order.Submitted, order.Accepted]:
@@ -155,13 +140,24 @@ class RsiStrategy(bt.Strategy):
     def stop(self):
         percent_gain = (self.broker.getvalue() / self.params.initial_investment) - 1
         self.log(
-            f"(RSI Period {self.params.rsi_period:2d})"
-            f" ⚫ (Upper {self.params.rsi_upper} : Lower {self.params.rsi_lower})"
+            f"(ATR Period {self.params.atr_period:2d})"
+            f" ⚫ HHV Period {self.params.hhv_period}"
+            f" ⚫ ATR Multiplier {self.params.atr_multiplier}"
             f" ⚫ Ending Value {self.broker.getvalue():.2f}"
             f" ⚫ Number of Trades {self.number_of_trades}"
             f" ⚫ Percent Gain {percent_gain:.2%}",
             do_print=True,
         )
+        # holdings_value = (
+        #     self.end_price - self.start_price
+        # ) * self.params.initial_investment
+        # self.log(
+        #     f"Buy and Hold Value: {holdings_value}"
+        #     f" ⚫ Start Price {self.start_price}"
+        #     f" ⚫ End Price {self.end_price}"
+        #     f" ⚫ Percent Gain {holdings_value / self.params.initial_investment:.2%}",
+        #     do_print=True,
+        # )
 
     def log(self, txt, dt=None, do_print=False):
         if self.params.print_log or do_print:
@@ -174,19 +170,19 @@ def main(args):
     initial_investment = args.initial_investment
     if args.test:
         cerebro.optstrategy(
-            RsiStrategy,
+            AtrStrategy,
             initial_investment=initial_investment,
-            rsi_period=range(4, 21),
-            rsi_lower=range(5, 21),
-            rsi_upper=range(75, 91),
+            atr_period=range(4, 21),
+            hhv_period=range(10, 20),
+            atr_multiplier=range(2, 5),
         )
     else:
         cerebro.addstrategy(
-            RsiStrategy,
+            AtrStrategy,
             initial_investment=initial_investment,
-            rsi_period=10,
-            rsi_lower=20,
-            rsi_upper=90,
+            atr_period=5,
+            hhv_period=10,
+            atr_multiplier=3,
         )
 
     data = load_data(args.symbol, args.start_date, args.end_date)
