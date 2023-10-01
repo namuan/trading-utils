@@ -6,15 +6,14 @@ Usage:
 To test over a range and find the best parameters:
 $ py back-trader-tutorial.py | python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
 """
-import os
-import subprocess
+import argparse
 import datetime
 import math
+import os
+import subprocess
 from pathlib import Path
 
 import backtrader as bt
-import argparse
-import pandas
 
 
 def parse_arguments():
