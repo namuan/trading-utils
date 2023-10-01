@@ -26,6 +26,6 @@ finta
 slug
 finvizfinance
 squarify
-py-executable-checklist==1.3.1
+py-executable-checklist==1.4.0
 backtrader[plotting]
 quantstats
