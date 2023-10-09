@@ -37,11 +37,11 @@ py report_by_query.py -t "UpTrend" -q "(day_0_ema_3 > day_0_ema_5 > day_0_ema_7 
 
 ```shell
 # 21 x 50
-py report_by_query.py -t "UpTrend" -q "(ema_21 > ema_50) and (last_high > ema_8) and (last_low < ema_8)" -o "smooth_30" -v
+py report_by_query.py -t "UpTrend" -q "(day_0_ema_21 > day_0_ema_50) and (last_high > day_0_ema_8) and (last_low < day_0_ema_8)" -o "smooth_30" -v
 ```
 
 ```shell
-py report_by_query.py -t "Ema21 Bounce" -q "(ema_8 > ema_21) and (ema_8 > ema_21) and (last_high < ema_8) and (last_low > ema_21) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "smooth_30" -v
+py report_by_query.py -t "Ema21 Bounce" -q "(day_0_ema_8 > day_0_ema_21) and (day_0_ema_8 > day_0_ema_21) and (last_high < day_0_ema_8) and (last_low > day_0_ema_21) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "smooth_30" -v
 ```
 
 ```shell
@@ -53,11 +53,11 @@ py report_by_query.py -t "Power of 3 Weekly" -q "(power_of_3_week_1 == True) and
 ```
 
 ```shell
-py report_by_query.py -t "⬆ 5D Volume" -o natr_30 -v -q "(last_volume > day_2_before_last_volume > day_3_before_last_volume > day_4_before_last_volume > day_5_before_last_volume > day_6_before_last_volume > day_7_before_last_volume > day_8_before_last_volume > day_9_before_last_volume)"
+py report_by_query.py -t "⬆ 5D Volume" -o natr_30 -v -q "(last_volume > day_2_volume > day_3_volume > day_4_volume > day_5_volume > day_6_volume > day_7_volume > day_8_volume > day_9_volume)"
 ```
 
 ```shell
-py report_by_query.py -t "⬆ 4D Vol/R-G-G Candles" -o natr_30 -v -q "(last_volume > day_2_before_last_volume > day_3_before_last_volume > day_4_before_last_volume) and (daily_strat_candle.str.contains('red-green-green$'))"
+py report_by_query.py -t "⬆ 4D Vol/R-G-G Candles" -o natr_30 -v -q "(last_volume > day_2_volume > day_3_volume > day_4_volume) and (daily_strat_candle.str.contains('red-green-green$'))"
 ```
 
 ```shell
@@ -75,16 +75,16 @@ py report_by_query.py -t "123 Pullbacks(week_1)" -q "(adx_14 > 35) and (pdi_14 >
 
 ```shell
 # Oversold and mean reversion
-py report_by_query.py -t "Mean Rev 50 LowerBB" -o natr_30 -v -q "(daily_strat_candle.str.contains('.*-red-green$')) and (last_close < boll_50_3_lb)"
+py report_by_query.py -t "Mean Rev 50 LowerBB" -o natr_30 -v -q "(daily_strat_candle.str.contains('.*-red-green$')) and (last_close < day_0_boll_50_3_lb)"
 ```
 
 ```shell
-py report_by_query.py -t "Mean Rev LowerBB" -o natr_30 -v -q "(daily_strat_candle.str.contains('.*-green$')) and (last_close < boll_lb)"
+py report_by_query.py -t "Mean Rev LowerBB" -o natr_30 -v -q "(daily_strat_candle.str.contains('.*-green$')) and (last_close < day_0_boll_21_2_lb)"
 ```
 
 ```shell
 # boll_21_3_lb -> bollinger ban 21 day MA, 3 Stdev Lowerband
-py report_by_query.py -t "Mean Reversion 21 LowerBB" -o natr_30 -v -q "(last_close < boll_21_3_lb) and (daily_strat_candle.str.contains('.*-green$'))"
+py report_by_query.py -t "Mean Reversion 21 LowerBB" -o natr_30 -v -q "(last_close < day_0_boll_21_3_lb) and (daily_strat_candle.str.contains('.*-green$'))"
 ```
 
 ```shell
@@ -96,7 +96,7 @@ py report_by_query.py -t "Squeeze Up" -o natr_30 -v -q "(daily_strat.str.contain
 ```
 
 ```shell
-py report_by_query.py -t "Momentum Trending" -q "last_close > ema_3 > ema_5 > ema_7 > ema_9 > ema_11 > ema_13 > ema_30 > ema_35 > ema_40 > ema_45 > ema_50 > ema_55 > ema_60" -o week_1_close_change_delta_1 -v
+py report_by_query.py -t "Momentum Trending" -q "last_close > day_0_ema_3 > day_0_ema_5 > day_0_ema_7 > day_0_ema_9 > day_0_ema_11 > day_0_ema_13 > day_0_ema_30 > day_0_ema_35 > day_0_ema_40 > day_0_ema_45 > day_0_ema_50 > day_0_ema_55 > day_0_ema_60" -o week_1_close_change_delta_1 -v
 ```
 
 ```shell
@@ -125,12 +125,12 @@ QUERY=$(SYMBOLS=$(cat file.csv | awk -F\, '{print $1}' | grep -v symbol | while 
 ```
 
 ```shell
-py report_by_query.py -t "BB lb (oversold)" -o natr_30 -v -q "(day_5_before_last_low < boll_4_day_before_last_21_2_lb) and (day_4_before_last_low < boll_3_day_before_last_21_2_lb) and (day_3_before_last_low < boll_2_day_before_last_21_2_lb) and (last_low > boll_lb) and (daily_strat_candle.str.contains('.*-green$'))"
+py report_by_query.py -t "BB lb (oversold)" -o natr_30 -v -q "(day_5_low < day_4_boll_21_2_lb) and (day_4_low < day_3_boll_21_2_lb) and (day_3_low < day_2_boll_21_2_lb) and (last_low > day_0_boll_21_2_lb) and (daily_strat_candle.str.contains('.*-green$'))"
 ```
 
 ```shell
 # Few days down in a row
-py report_by_query.py -t "9 Days Down in a row" -o natr_30 -v -q "(day_2_before_last_low < day_3_before_last_low < day_4_before_last_low < day_5_before_last_low < day_6_before_last_low < day_7_before_last_low < day_8_before_last_low < day_9_before_last_low < day_10_before_last_low)"
+py report_by_query.py -t "9 Days Down in a row" -o natr_30 -v -q "(day_2_low < day_3_low < day_4_low < day_5_low < day_6_low < day_7_low < day_8_low < day_9_low < day_10_low)"
 ```
 
 ```shell
@@ -139,11 +139,15 @@ py report_by_query.py -t "Month Change" -o month_1_close_change_delta_1 -v -q "(
 ```
 
 ```shell
-py report_by_query.py -o smooth_30 -t "4RSI" -v -q "(last_close < 100) and (last_close > ma_50) and (monthly_gains_3 > 0) and (rsi_2 < 10)"
+py report_by_query.py -o smooth_30 -t "4RSI" -v -q "(last_close < 100) and (last_close > day_0_ma_50) and (monthly_gains_3 > 0) and (rsi_2 < 10)"
 ```
 
 ```shell
-py report_by_query.py -o smooth_90 -v -t "Long Key Reversal" -q "((day_2_before_last_low < day_3_before_last_low) and (last_close > day_3_before_last_high) and (last_close > day_2_before_last_high)) and (daily_strat_candle.str.contains('red-red-green$')) and (last_close > ema_8 > ema_21) and (week_1_strat_candle.str.contains('.*-green$'))"
+py report_by_query.py -o smooth_30 -t "AllRSI" -v -q "(rsi_2 < 10) and (rsi_4 < 10) and (rsi_9 < 10) and (last_close > 10)"
+```
+
+```shell
+py report_by_query.py -o smooth_90 -v -t "Long Key Reversal" -q "((day_2_low < day_3_low) and (last_close > day_3_high) and (last_close > day_2_high)) and (daily_strat_candle.str.contains('red-red-green$')) and (last_close > day_0_ema_8 > day_0_ema_21) and (week_1_strat_candle.str.contains('.*-green$'))"
 ```
 
 ```shell
@@ -152,7 +156,7 @@ py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volu
 
 ```shell
 # last_candle is 3x previous candle, last_volume is 3x previous candle volume
-./rbq "(abs(last_high - last_close) < 3 * abs(day_2_before_last_high - day_2_before_last_low)) and (last_volume > day_2_before_last_volume * 3) and (daily_strat_candle.str.contains('.*-green-green$')) and (daily_strat.str.contains('.*-2u$'))"
+./rbq "(last_close > 10) and (abs(last_high - last_close) < 3 * abs(day_2_high - day_2_low)) and (last_volume > day_2_volume * 3) and (daily_strat_candle.str.contains('.*-green-green$')) and (daily_strat.str.contains('.*-2u$'))"
 ```
 
 ```shell
@@ -161,5 +165,5 @@ py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volu
 ```
 
 ```shell
-./rbq "(day_2_before_last_volume > day_3_before_last_volume > day_4_before_last_volume > day_5_before_last_volume > day_6_before_last_volume) and (day_2_before_last_close < day_3_before_last_close < day_4_before_last_close < day_5_before_last_close < day_6_before_last_close < day_7_before_last_close)"
+./rbq "(day_2_volume > day_3_volume > day_4_volume > day_5_volume > day_6_volume) and (day_2_close < day_3_close < day_4_close < day_5_close < day_6_close < day_7_close)"
 ```
