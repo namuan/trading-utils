@@ -1,4 +1,4 @@
--r base.txt
+-r ../requirements.txt
 black
 dtale
 bpython
