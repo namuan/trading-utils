@@ -64,4 +64,3 @@ def build_links_in_markdown(ticker):
         for site_title, site_link in sites.items()
     ]
     return " | ".join(all_links)
-
