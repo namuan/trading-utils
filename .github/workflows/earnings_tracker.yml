@@ -1,0 +1,46 @@
+name: Download Earnings Data
+
+on:
+  schedule:
+    - cron: "5 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Check out repository under $GITHUB_WORKSPACE, so the job can access it
+      - uses: actions/checkout@v3
+
+      # Run using Python 3.8 for consistency and aiohttp
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+          architecture: 'x64'
+          cache: 'pip'
+
+      # Install dependencies with `pip`
+      - name: Install requirements
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install -r requirements/base.txt
+
+      - name: Download earnings data
+        run: |
+          python3 --version
+          python3 earnings_tracker.py
+
+      - name: Commit to the repo
+        run: |
+          git config user.name "Automated"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          timestamp=$(date -u)
+          git commit -m "Update on ${timestamp}" || exit 0
+          git pull --rebase
+          git push
