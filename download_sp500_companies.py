@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Download list of SP500 companies from Wikipedia
 """
