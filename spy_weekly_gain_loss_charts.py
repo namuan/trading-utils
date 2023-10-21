@@ -97,7 +97,7 @@ def main():
     )
     args = parser.parse_args()
 
-    working_folder = f"data/gains-working/{args.year}"
+    working_folder = f"output/gains-working/{args.year}"
     create_folder(working_folder)
     stocks_folder = f"{working_folder}/stocks-data"
     create_folder(stocks_folder)
