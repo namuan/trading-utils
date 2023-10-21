@@ -58,6 +58,7 @@ deploy: clean ## Copies any changed file to the server
 		tele_stock_alerts_bot.py \
 		webpages.txt \
 		requirements \
+		requirements.txt \
 		${PROJECTNAME}:./${PROJECTNAME}
 
 start: deploy ## Sets up a screen session on the server and start the app

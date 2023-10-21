@@ -1,5 +1,20 @@
+#!/usr/bin/env python3
+"""
+Telegram bot to provide options trading ideas for theta strategies
+It can be used in a group chat or run once for a specific ticker
+
+Usage:
+python3 tele_theta_gang_bot.py --help
+
+Run on a symbol:
+$ python3 tele_theta_gang_bot.py -s NVDA
+
+Run as bot:
+$ python3 tele_theta_gang_bot.py -b
+"""
 import logging
 import os
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 
 from telegram import Update
@@ -14,7 +29,7 @@ from telegram.ext import (
 from common.bot_wrapper import start, help_command
 from common.environment import TELEGRAM_THETA_GANG_BOT
 from common.external_charts import build_chart_link
-from common.logger import init_logging
+from common.logger import setup_logging
 from common.options import combined_options_df
 from common.reporting import build_links_in_markdown
 
@@ -60,8 +75,11 @@ def collect_strikes(options_df):
     unique_expiries = options_df.expiration_date.unique()
     selected_strikes = [
         filter_strikes(options_df, unique_expiries[0]),
+        filter_strikes(options_df, unique_expiries[0], delta=0.15),
         filter_strikes(options_df, unique_expiries[1]),
+        filter_strikes(options_df, unique_expiries[1], delta=0.15),
         filter_strikes(options_df, unique_expiries[2]),
+        filter_strikes(options_df, unique_expiries[2], delta=0.15),
     ]
     return selected_strikes
 
@@ -95,10 +113,10 @@ def build_options_trade_info(ticker, options_df):
         short_strangle_link = f"https://optionstrat.com/build/short-strangle/{ticker}/-{short_hand_date}P{put_strike},-{short_hand_date}C{call_strike}?referral={referrer}"
         time_emoji_msg = (idx + 1) * "🕐"
         m.append(
-            f"{time_emoji_msg} *Expiry* {selected_expiry} [Short Put]({short_put_link}) *Strike* ${put_strike}, *Delta* {put_delta}, *Credit* ${'%0.2f' % (put_credit * 100)} *Breakeven* ${put_break_even}"
+            f"{time_emoji_msg} *Expiry* {selected_expiry} [Short Put ({'%0.2f' % put_delta} Delta)]({short_put_link}) *Strike* ${put_strike}, *Credit* ${'%0.2f' % (put_credit * 100)} *Breakeven* ${put_break_even}"
         )
         m.append(
-            f"{time_emoji_msg} *Expiry* {selected_expiry} [Short Strangle]({short_strangle_link}) *Strikes* (${put_strike} <-> ${call_strike}), *Credit* ${'%0.2f' % (short_strangle_credit * 100)}, *Breakeven* {strangle_break_even}"
+            f"{time_emoji_msg} *Expiry* {selected_expiry} [Short Strangle ({'%0.2f' % put_delta} Delta)]({short_strangle_link}) *Strikes* (${put_strike} <-> ${call_strike}), *Credit* ${'%0.2f' % (short_strangle_credit * 100)}, *Breakeven* {strangle_break_even}"
         )
         m.append(os.linesep)
 
@@ -126,7 +144,7 @@ def build_response_message(ticker):
 def generate_report(ticker, update: Update, context: CallbackContext):
     bot = context.bot
     cid = update.effective_chat.id
-    update.message.reply_text(f"Looking up #{ticker}", quote=True)
+    bot.send_message(cid, f"Looking up options for #{ticker}")
 
     try:
         chart_file, full_message = build_response_message(ticker)
@@ -142,13 +160,12 @@ def handle_cmd(update: Update, context: CallbackContext) -> None:
     message_text: str = update.message.text
     print(message_text)
 
-    if message_text.startswith("$") and message_text.endswith("options"):
-        maybe_symbol, _ = message_text.split(" ")
-        ticker = maybe_symbol[1:]
+    if message_text.startswith("$"):
+        ticker = message_text[1:]
         generate_report(ticker, update, context)
 
 
-def main():
+def run_bot():
     """Start the bot."""
     logging.info("Starting tele-theta-gang bot")
     updater = Updater(TELEGRAM_THETA_GANG_BOT, use_context=True)
@@ -166,13 +183,46 @@ def main():
 
 
 def run_once(ticker):
-    # Testing
-    m = populate_additional_info(ticker)
-    print(m)
-    exit(-1)
+    chart_file, full_message = build_response_message(ticker)
+    print(f"[Chart]({chart_file}){os.linesep}")
+    print(full_message)
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    parser.add_argument(
+        "-s",
+        "--symbol",
+        type=str,
+        default="AAPL",
+        help="Stock symbol (default: AAPL)",
+    )
+    parser.add_argument(
+        "-b",
+        "--run-as-bot",
+        action="store_true",
+        default=False,
+        help="Run as telegram bot (default: False)",
+    )
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    init_logging()
-    # run_once("TSLA")  # - Enable for testing
-    main()
+    args = parse_args()
+    setup_logging(args.verbose)
+    run_as_bot = args.run_as_bot
+    if run_as_bot:
+        run_bot()
+    else:
+        symbol = args.symbol
+        run_once(symbol)
