@@ -45,6 +45,9 @@ def combine_list(filenames, all_listed):
                 ):
                     continue
 
+                if "Common Stock" not in line[1]:
+                    continue
+
                 all_listed.write(line[0].replace(".", "") + ',"' + line[1] + '"\n')
 
 
