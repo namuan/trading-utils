@@ -12,11 +12,14 @@ To install required packages:
 """
 
 import argparse
-import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
+
+OUTPUT_FOLDER = Path.cwd() / "output"
+OUTPUT_FOLDER.mkdir(exist_ok=True, parents=True)
 
 
 def parse_arguments():
@@ -45,10 +48,8 @@ def download_stock_data(symbol, start_date, end_date):
 
 
 def save_to_file(symbol, data, start_date, end_date):
-    folder_name = "stock_data"
-    os.makedirs(folder_name, exist_ok=True)
-    file_name = f"{folder_name}/{symbol}_{start_date}_{end_date}.csv"
-    if not os.path.exists(file_name):
+    file_name = OUTPUT_FOLDER.joinpath(f"{symbol}_{start_date}_{end_date}.csv")
+    if not file_name.exists():
         data.to_csv(file_name)
     return file_name
 
