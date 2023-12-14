@@ -13,9 +13,10 @@ To install required packages:
 
 import argparse
 import os
+from datetime import datetime, timedelta
+
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta
 
 
 def parse_arguments():
@@ -23,17 +24,19 @@ def parse_arguments():
     parser.add_argument(
         "--symbol", type=str, default="TSLA", help="Stock symbol (default: TSLA)"
     )
-    parser.add_argument("--from_date", type=str, help="Start date in YYYY-MM-DD format")
-    parser.add_argument("--to_date", type=str, help="End date in YYYY-MM-DD format")
+    parser.add_argument(
+        "--from_date",
+        type=str,
+        default=(datetime.now() - timedelta(days=10 * 365)).strftime("%Y-%m-%d"),
+        help="Start date in YYYY-MM-DD format",
+    )
+    parser.add_argument(
+        "--to_date",
+        type=str,
+        default=datetime.now().strftime("%Y-%m-%d"),
+        help="End date in YYYY-MM-DD format",
+    )
     return parser.parse_args()
-
-
-def get_default_dates(from_date, to_date):
-    if not to_date:
-        to_date = datetime.now().strftime("%Y-%m-%d")
-    if not from_date:
-        from_date = (datetime.now() - timedelta(days=3 * 365)).strftime("%Y-%m-%d")
-    return from_date, to_date
 
 
 def download_stock_data(symbol, start_date, end_date):
@@ -54,24 +57,34 @@ def load_data_frame(file_path):
     return pd.read_csv(file_path)
 
 
-def find_max_consecutive_increase(df):
-    consecutive = (df["Close"] > df["Close"].shift()).astype(int)
+def find_max_consecutive(df, consecutive):
     max_consecutive = consecutive * (
         consecutive.groupby((consecutive != consecutive.shift()).cumsum()).cumcount()
         + 1
     )
-    return max_consecutive.max()
+    max_increase_days = max_consecutive.max()
+    max_period = max_consecutive.idxmax()
+    start_date = df.iloc[max_period - max_increase_days + 1]["Date"]
+    end_date = df.iloc[max_period]["Date"]
+    return max_increase_days, start_date, end_date
 
 
 def main():
     args = parse_arguments()
-    from_date, to_date = get_default_dates(args.from_date, args.to_date)
-    stock_data = download_stock_data(args.symbol, from_date, to_date)
-    file_path = save_to_file(args.symbol, stock_data, from_date, to_date)
+    stock_data = download_stock_data(args.symbol, args.from_date, args.to_date)
+    file_path = save_to_file(args.symbol, stock_data, args.from_date, args.to_date)
     df = load_data_frame(file_path)
-    max_increase_days = find_max_consecutive_increase(df)
+    max_increase_days, start_date, end_date = find_max_consecutive(
+        df, (df["Adj Close"] > df["Adj Close"].shift()).astype(int)
+    )
     print(
-        f"Maximum number of consecutive days with closing price increase: {max_increase_days}"
+        f"✅ {start_date} to {end_date} closing price increase: {max_increase_days} days"
+    )
+    max_decrease_days, start_date, end_date = find_max_consecutive(
+        df, (df["Adj Close"] < df["Adj Close"].shift()).astype(int)
+    )
+    print(
+        f"❌ {start_date} to {end_date} closing price decrease: {max_decrease_days} days"
     )
 
 
