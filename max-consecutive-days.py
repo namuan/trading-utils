@@ -1,70 +1,63 @@
-import argparse
-import os
-from datetime import datetime, timedelta
+#!/usr/bin/env python3
+"""
+Script to download and analyze stock data using yfinance.
 
+Example usage:
+python stock_analysis.py --symbol AAPL --from_date 2020-01-01 --to_date 2023-01-01
+"""
+
+import os
+import argparse
 import pandas as pd
 import yfinance as yf
+from datetime import datetime, timedelta
 
 
-def download_data(symbol="TSLA", start_date=None, end_date=None):
-    return yf.download(symbol, start=start_date, end=end_date)
+def download_stock_data(symbol, from_date, to_date):
+    file_name = f"{symbol}_{from_date}_{to_date}.csv"
+
+    if os.path.isfile(file_name):
+        print(f"Using existing file: {file_name}")
+        df = pd.read_csv(file_name)
+    else:
+        print("Downloading stock data...")
+        start_date = datetime.strptime(from_date, "%Y-%m-%d")
+        end_date = datetime.strptime(to_date, "%Y-%m-%d")
+
+        df = yf.download(symbol, start=start_date, end=end_date)
+        df.to_csv(file_name)
+
+    return df
 
 
-def save_data(data, symbol, start_date, end_date):
-    filename = f"{symbol}_{start_date}_{end_date}.csv"
+def find_max_consecutive_days(df):
+    df["prev_close"] = df["Close"].shift(1)
+    df["consecutive_days"] = (df["Close"] > df["prev_close"]).astype(int)
+    max_consecutive_days = df["consecutive_days"].max()
 
-    if not os.path.exists("stock_data"):
-        os.makedirs("stock_data")
-
-    file_path = f"stock_data/{filename}"
-    data.to_csv(file_path)
-    return file_path
-
-
-def load_data(filename):
-    return pd.read_csv(filename)
-
-
-def calculate_consecutive_days(df):
-    df["PrevClose"] = df["Close"].shift(1)
-    df["Increase"] = df["Close"] > df["PrevClose"]
-    consecutive_increases = df["Increase"].sum()
-
-    return consecutive_increases
+    return max_consecutive_days
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Download stock data and calculate consecutive days."
-    )
-    parser.add_argument("-s", "--symbol", default="TSLA", help="Stock symbol")
-    parser.add_argument(
-        "-f",
-        "--fromdate",
-        default=(datetime.now() - timedelta(days=3 * 365)).strftime("%Y-%m-%d"),
-        help="From date in yyyy-mm-dd format",
-    )
-    parser.add_argument(
-        "-t",
-        "--todate",
-        default=datetime.now().strftime("%Y-%m-%d"),
-        help="To date in yyyy-mm-dd format",
-    )
+    parser = argparse.ArgumentParser(description="Download and analyze stock data")
+    parser.add_argument("--symbol", default="TSLA", help="Stock symbol (default: TSLA)")
+    parser.add_argument("--from_date", help="Start date in yyyy-mm-dd format")
+    parser.add_argument("--to_date", help="End date in yyyy-mm-dd format")
 
     args = parser.parse_args()
 
-    data = download_data(
-        symbol=args.symbol, start_date=args.fromdate, end_date=args.todate
-    )
-    filename = save_data(
-        data, symbol=args.symbol, start_date=args.fromdate, end_date=args.todate
-    )
+    if not args.from_date:
+        three_years_ago = datetime.now() - timedelta(days=365 * 3)
+        args.from_date = three_years_ago.strftime("%Y-%m-%d")
 
-    df = load_data(filename)
-    consecutive_increases = calculate_consecutive_days(df)
+    if not args.to_date:
+        args.to_date = datetime.now().strftime("%Y-%m-%d")
+
+    df = download_stock_data(args.symbol, args.from_date, args.to_date)
+    max_consecutive_days = find_max_consecutive_days(df)
 
     print(
-        f"Number of consecutive days where the current close is greater than previous close: {consecutive_increases}"
+        f"Maximum consecutive days where current close is greater than previous close: {max_consecutive_days}"
     )
 
 
