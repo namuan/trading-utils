@@ -6,7 +6,9 @@ Example:
     $ python3 stock-pct-change.py --symbol SPY --pct-change 2
 
 To install required packages:
-    pip install pandas yfinance
+    pip install -r requirements.txt
+    or
+    pip install pandas yfinance stockstats
 """
 
 import argparse
@@ -15,6 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
+from stockstats import StockDataFrame
 
 OUTPUT_FOLDER = Path.cwd() / "output"
 OUTPUT_FOLDER.mkdir(exist_ok=True, parents=True)
@@ -48,7 +51,7 @@ def parse_arguments():
 
 def download_stock_data(symbol, start_date, end_date):
     data = yf.download(symbol, start=start_date, end=end_date)
-    return data
+    return StockDataFrame.retype(data)
 
 
 def save_to_file(file_path, data):
@@ -57,7 +60,7 @@ def save_to_file(file_path, data):
 
 
 def load_data_frame(file_path):
-    return pd.read_csv(file_path)
+    return StockDataFrame.retype(pd.read_csv(file_path))
 
 
 def load_from_file(file_path):
@@ -68,6 +71,10 @@ def load_from_file(file_path):
 
 
 def main():
+    pd.set_option("display.max_columns", None)
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.width", None)
+
     args = parse_arguments()
     pct_change = args.pct_change
     from_date = args.from_date
@@ -80,30 +87,31 @@ def main():
     if df.empty:
         df = download_stock_data(args.symbol, args.from_date, args.to_date)
         save_to_file(file_path, df)
-    df["Change_Pct"] = ((df["Close"] - df["Open"]) / df["Open"]) * 100
-    df["Change_Pct_Last_Close"] = df["Adj Close"].pct_change() * 100
-    df_filtered = df[df["Change_Pct_Last_Close"] > pct_change]
-    total_rows = len(df.index)
-    filtered_rows = len(df_filtered.index)
-    print("Total trading days: ", total_rows)
-    print(f"Total days when change is greater than {pct_change}%: ", filtered_rows)
-    percentage = (filtered_rows / total_rows) * 100
-    print(f"Between {from_date} and {to_date}, {percentage:.2f}% of days where change is greater than: {pct_change}%")
-    next_day_is_positive = 0
-    for i in range(len(df_filtered.index) - 1):
-        row_original = df.loc[df_filtered.index[i]]
-        next_row_original = df.loc[df_filtered.index[i] + 1]
-        pcf_gain_current_day = row_original["Change_Pct_Last_Close"]
-        pct_gain_next_day = next_row_original["Change_Pct_Last_Close"]
-        if pct_gain_next_day is not None:
-            if pct_gain_next_day > 0:
-                next_day_is_positive += 1
-        print(
-            f"Date: {row_original['Date']}, Day Gain: {pcf_gain_current_day:.2f}%, Next Day: {pct_gain_next_day:.2f}%"
-        )
+    df.init_all()
+    df["delta_1"] = df["close_-1_r"]
+    df["jump_day"] = df["delta_1"] > pct_change
+    df["next_day_after_jump"] = df["jump_day"].shift(1)
 
+    jump_days_df = df[(df["next_day_after_jump"] == True) | (df["jump_day"] == True)]
+
+    jump_days_df["next_day_gains"] = jump_days_df["delta_1"].shift(-1)
+
+    total_rows = len(df.index)
+    jump_days = df["jump_day"].sum()
+    print("Total trading days: ", total_rows)
+    print(f"Total days when change is greater than {pct_change}%: ", jump_days)
+    percentage = (jump_days / total_rows) * 100
     print(
-        f"Next day is positive: {next_day_is_positive} out of {len(df_filtered.index)}"
+        f"Between {from_date} and {to_date}, {percentage:.2f}% of days where change is greater than: {pct_change}%"
+    )
+
+    print("|Date| Gain| NextDay| RSI")
+    print("|---| ---| ---| ---")
+    jump_days_df[jump_days_df["jump_day"] == True].apply(
+        lambda row: print(
+            f"|{row.name} | {row['delta_1']:.2f} | {row['next_day_gains']:.2f} | {row['rsi_14']:.2f} |"
+        ),
+        axis=1,
     )
 
 
