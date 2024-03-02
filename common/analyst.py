@@ -17,6 +17,9 @@ MINIMUM_DAYS_DATA_REQUIRED = 200
 
 
 def load_earnings_tickers():
+    if not earnings_file_path().exists():
+        return pd.DataFrame()
+
     return pd.read_json(earnings_file_path().as_posix())
 
 
