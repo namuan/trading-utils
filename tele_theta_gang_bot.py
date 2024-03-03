@@ -131,14 +131,10 @@ def populate_additional_info(ticker):
 
 def build_response_message(ticker):
     logging.info("Processing ticker: {}".format(ticker))
-    daily_chart_link = build_chart_link(ticker)
-    sites_urls = build_links_in_markdown(ticker)
     additional_info = populate_additional_info(ticker)
     disclaimer = "_ Disclaimer: Not financial advice _"
-    return (
-        daily_chart_link,
-        sites_urls + os.linesep + additional_info + os.linesep + disclaimer,
-    )
+    return os.linesep + additional_info + os.linesep + disclaimer
+
 
 
 def generate_report(ticker, update: Update, context: CallbackContext):
@@ -147,8 +143,7 @@ def generate_report(ticker, update: Update, context: CallbackContext):
     bot.send_message(cid, f"Looking up options for #{ticker}")
 
     try:
-        chart_file, full_message = build_response_message(ticker)
-        bot.send_photo(cid, chart_file)
+        full_message = build_response_message(ticker)
         bot.send_message(
             cid, full_message, disable_web_page_preview=True, parse_mode="Markdown"
         )
@@ -183,8 +178,7 @@ def run_bot():
 
 
 def run_once(ticker):
-    chart_file, full_message = build_response_message(ticker)
-    print(f"[Chart]({chart_file}){os.linesep}")
+    full_message = build_response_message(ticker)
     print(full_message)
 
 
