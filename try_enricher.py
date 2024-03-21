@@ -12,7 +12,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from common.analyst import fetch_data_on_demand
+from common.analyst import fetch_data_on_demand, fetch_data_from_cache
 from common.logger import setup_logging
 
 plt.ioff()
@@ -37,8 +37,8 @@ def parse_args():
         "-s",
         "--symbol",
         type=str,
-        default="AAPL",
-        help="Stock symbol (default: AAPL)",
+        default="TSLA",
+        help="Stock symbol (default: TSLA)",
     )
     return parser.parse_args()
 
@@ -46,8 +46,6 @@ def parse_args():
 def main(args):
     ticker = args.symbol
     data, ticker_df = fetch_data_on_demand(ticker)
-
-    # data = fetch_data_from_cache(ticker, is_etf=False)
     key_values = list([(k, data[k]) for k in data.keys()])
     for kv in key_values:
         print(kv)
