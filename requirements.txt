@@ -31,3 +31,4 @@ backtrader[plotting]
 quantstats
 ib_insync
 pandasai
+gradio
