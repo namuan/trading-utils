@@ -328,6 +328,7 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # Stoch CrossOver
     data_row[f'stoch_kdjk_3_xu_kdjd_3'] = ticker_df['kdjj_3_xu_kdjd_3'].iloc[-1]
+    data_row[f'stoch_d'] = TA.STOCHD(ticker_df, 3).iloc[-1]
 
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
