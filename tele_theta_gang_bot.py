@@ -136,7 +136,6 @@ def build_response_message(ticker):
     return os.linesep + additional_info + os.linesep + disclaimer
 
 
-
 def generate_report(ticker, update: Update, context: CallbackContext):
     bot = context.bot
     cid = update.effective_chat.id

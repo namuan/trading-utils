@@ -44,15 +44,8 @@ def parse_args():
 
 
 with gr.Blocks(fill_height=True, theme=gr.themes.Monochrome()) as demo:
-    stock = gr.Textbox(
-        label="Stock Symbol",
-        interactive=True
-    )
-    submit_button = gr.Button(
-        label="Submit",
-        value="Submit",
-        variant="primary"
-    )
+    stock = gr.Textbox(label="Stock Symbol", interactive=True)
+    submit_button = gr.Button(label="Submit", value="Submit", variant="primary")
 
 
 def main(args):
