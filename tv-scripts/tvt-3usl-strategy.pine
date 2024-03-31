@@ -1,0 +1,35 @@
+//@version=5
+indicator(title="[TVT] 3USL Scale In Out", shorttitle="TVT-3USL", overlay=true, timeframe="", timeframe_gaps=true)
+
+// === INPUTS ===
+src = input(close)
+use_ema = input(false, title="Use EMA over SMA?")
+smoothK = input.int(3, "K", minval=1)
+smoothD = input.int(3, "D", minval=1)
+lengthRSI = input.int(14, "RSI Length", minval=1)
+lengthStoch = input.int(14, "Stochastic Length", minval=1)
+
+// Short Moving Averages
+ma1   = input(25,title='Short MA-1')
+ma2   = input(50,title='Short MA-2')
+ma3   = input(75,title='Short MA-3')
+
+blend_color = color.white
+
+ma_series1 = use_ema ? ta.sma(src, ma1) : ta.ema(src, ma1)
+ma_series2 = use_ema ? ta.sma(src, ma2) : ta.ema(src, ma2)
+ma_series3 = use_ema ? ta.sma(src, ma3) : ta.ema(src, ma3)
+
+//plot moving averages
+p_ma1 = plot(ma_series1,title='MA-1',color=color.blue, linewidth=0)
+p_ma2 = plot(ma_series2,title='MA-2',color=color.orange, linewidth=0)
+p_ma3 = plot(ma_series3,title='MA-3',color=color.red, linewidth=2)
+
+rsi1 = ta.rsi(src, lengthRSI)
+k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
+d = ta.sma(k, smoothD)
+
+// highlight background if k < d and k and d < 10
+// highlight background if k > d and k > 10 and d < 10
+bgcolor((k < d) and (k < 10) and (d < 10) ? color.new(color.orange, 90) : na, title="Squeeze")
+bgcolor((k > d) and (k > 10) and (d < 10) ? color.new(color=color.lime, transp=70) : na, title="Squeeze")
