@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-Telegram bot to provide options trading ideas for theta strategies
+Telegram bot to provide SPX options trading ideas for theta strategies
 It can be used in a group chat or run once for a specific ticker
 
 Usage:
-python3 tele_theta_gang_bot.py --help
+python3 tele_spx_theta_gang_bot.py --help
 
-Run on a symbol:
-$ python3 tele_theta_gang_bot.py -s NVDA
+Run it once:
+$ python3 tele_spx_theta_gang_bot.py
 
 Run as bot:
-$ python3 tele_theta_gang_bot.py -b
+$ python3 tele_spx_theta_gang_bot.py -b
 """
 import logging
 import os
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from telegram import Update
 from telegram.ext import (
@@ -27,11 +27,18 @@ from telegram.ext import (
 )
 
 from common.bot_wrapper import start, help_command
-from common.environment import TELEGRAM_THETA_GANG_BOT
-from common.external_charts import build_chart_link
+from common.environment import (
+    TELEGRAM_SPX_THETA_GANG_BOT,
+    DTE_TO_TARGET,
+    LONG_STRIKE_DISTANCE,
+    SHORT_STRIKE_DELTA,
+)
 from common.logger import setup_logging
-from common.options import combined_options_df
-from common.reporting import build_links_in_markdown
+from common.options import (
+    option_expirations,
+    option_chain,
+    process_options_data,
+)
 
 
 def select_strikes_for(
@@ -71,69 +78,75 @@ def filter_strikes(options_df, selected_expiry, delta=0.3):
     )
 
 
-def collect_strikes(options_df):
-    unique_expiries = options_df.expiration_date.unique()
-    selected_strikes = [
-        filter_strikes(options_df, unique_expiries[0]),
-        filter_strikes(options_df, unique_expiries[0], delta=0.15),
-        filter_strikes(options_df, unique_expiries[1]),
-        filter_strikes(options_df, unique_expiries[1], delta=0.15),
-        filter_strikes(options_df, unique_expiries[2]),
-        filter_strikes(options_df, unique_expiries[2], delta=0.15),
-    ]
-    return selected_strikes
-
-
 def format_price(price):
     price = float(price)
     return int(price) if price.is_integer() else price
 
 
-def build_options_trade_info(ticker, options_df):
-    selected_strikes = collect_strikes(options_df)
-    referrer = "@thetagangbot"
-    m = ["_Possible trades_"]
-    for idx, (call_strike_record, put_strike_record) in enumerate(selected_strikes):
-        selected_expiry = call_strike_record.get("expiration_date")
-        call_strike = format_price(call_strike_record.get("strike"))
-        call_credit = call_strike_record.get("bid")
-        put_strike = format_price(put_strike_record.get("strike"))
-        put_delta = put_strike_record.get("greeks_delta")
-        put_credit = put_strike_record.get("bid")
-        put_break_even = put_strike - put_credit
-        short_hand_date = datetime.strptime(selected_expiry, "%Y-%m-%d").strftime(
-            "%y%m%d"
-        )
-        short_put_link = f"https://optionstrat.com/build/short-put/{ticker}/-.{ticker}{short_hand_date}P{put_strike}?referral={referrer}"
+def populate_additional_info(ticker, expiry_date, short_delta, long_strike_gap):
+    # fetch option chain for that expiry
+    options_data = option_chain(ticker, expiry_date)
+    options_df = process_options_data(options_data)
+    call_strike_record, put_strike_record = filter_strikes(
+        options_df, expiry_date, delta=short_delta
+    )
+    long_on_put_side = put_strike_record.get("strike") - long_strike_gap
+    long_on_call_side = call_strike_record.get("strike") + long_strike_gap
 
-        short_strangle_credit = call_credit + put_credit
-        strangle_break_even = "(${} <-> ${})".format(
-            put_strike - short_strangle_credit, call_strike + short_strangle_credit
-        )
-        short_strangle_link = f"https://optionstrat.com/build/short-strangle/{ticker}/-.{ticker}{short_hand_date}P{put_strike},-{short_hand_date}C{call_strike}?referral={referrer}"
-        time_emoji_msg = (idx + 1) * "🕐"
-        m.append(
-            f"{time_emoji_msg} *Expiry* {selected_expiry} [Short Put ({'%0.2f' % put_delta} Delta)]({short_put_link}) *Strike* ${put_strike}, *Credit* ${'%0.2f' % (put_credit * 100)} *Breakeven* ${put_break_even}"
-        )
-        m.append(
-            f"{time_emoji_msg} *Expiry* {selected_expiry} [Short Strangle ({'%0.2f' % put_delta} Delta)]({short_strangle_link}) *Strikes* (${put_strike} <-> ${call_strike}), *Credit* ${'%0.2f' % (short_strangle_credit * 100)}, *Breakeven* {strangle_break_even}"
-        )
-        m.append(os.linesep)
-
-    return os.linesep.join(m)
+    # Create Iron Condor position
+    short_hand_date = expiry_date.strftime("%y%m%d")
+    call_strike = format_price(call_strike_record.get("strike"))
+    long_on_call_strike = format_price(long_on_call_side)
+    put_strike = format_price(put_strike_record.get("strike"))
+    long_on_put_strike = format_price(long_on_put_side)
+    iron_condor_link_template = f"https://optionstrat.com/build/iron-condor/SPX/.SPXW{short_hand_date}P{long_on_put_strike},-.SPXW{short_hand_date}P{put_strike},-.SPXW{short_hand_date}C{call_strike},.SPXW{short_hand_date}C{long_on_call_strike}"
+    return iron_condor_link_template
 
 
-def populate_additional_info(ticker):
-    options_df = combined_options_df(ticker, expiries=3)
-    options_trade_info = build_options_trade_info(ticker, options_df)
-    return options_trade_info
+def calculate_target_dte(ticker, dte):
+    # get all expiries
+    expirations_output = option_expirations(ticker, include_expiration_type=True)
+    today = datetime.today().date()
+    forty_five_days_from_now = today + timedelta(days=dte)
+    weekly_expiries = [
+        x.date
+        for x in expirations_output.expirations.expiration
+        if x.expiration_type == "weeklys"
+    ]
+    dates = [
+        datetime.strptime(date_string, "%Y-%m-%d").date()
+        for date_string in weekly_expiries
+    ]
+    first_date_before = None
+
+    for d in dates:
+        if d < forty_five_days_from_now:
+            first_date_before = d
+        else:
+            break
+
+    return first_date_before
 
 
 def build_response_message(ticker):
     logging.info("Processing ticker: {}".format(ticker))
-    additional_info = populate_additional_info(ticker)
+    first_day_before_dte = calculate_target_dte(ticker, DTE_TO_TARGET)
+    dte_message = f"The first date just before {DTE_TO_TARGET} days from today is: {first_day_before_dte}"
+    additional_info = populate_additional_info(
+        ticker,
+        expiry_date=first_day_before_dte,
+        short_delta=SHORT_STRIKE_DELTA,
+        long_strike_gap=LONG_STRIKE_DISTANCE,
+    )
     disclaimer = "_ Disclaimer: Not financial advice _"
-    return os.linesep + additional_info + os.linesep + disclaimer
+    return (
+        os.linesep
+        + dte_message
+        + os.linesep
+        + additional_info
+        + os.linesep
+        + disclaimer
+    )
 
 
 def generate_report(ticker, update: Update, context: CallbackContext):
@@ -152,17 +165,14 @@ def generate_report(ticker, update: Update, context: CallbackContext):
 
 def handle_cmd(update: Update, context: CallbackContext) -> None:
     message_text: str = update.message.text
-    print(message_text)
-
-    if message_text.startswith("$"):
-        ticker = message_text[1:]
-        generate_report(ticker, update, context)
+    if message_text.lower().startswith("$$spx"):
+        generate_report("SPX", update, context)
 
 
 def run_bot():
     """Start the bot."""
     logging.info("Starting tele-theta-gang bot")
-    updater = Updater(TELEGRAM_THETA_GANG_BOT, use_context=True)
+    updater = Updater(TELEGRAM_SPX_THETA_GANG_BOT, use_context=True)
 
     dispatcher = updater.dispatcher
 
@@ -217,5 +227,5 @@ if __name__ == "__main__":
     if run_as_bot:
         run_bot()
     else:
-        symbol = args.symbol
+        symbol = "SPX"
         run_once(symbol)

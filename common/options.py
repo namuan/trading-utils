@@ -27,9 +27,12 @@ def option_chain(symbol, expiration):
     return get_data(path, params)
 
 
-def option_expirations(symbol):
+def option_expirations(symbol, include_expiration_type=False):
     path = "/markets/options/expirations"
     params = {"symbol": symbol, "includeAllRoots": "true"}
+    if include_expiration_type:
+        params["expirationType"] = "true"
+
     return get_data(path, params)
 
 
