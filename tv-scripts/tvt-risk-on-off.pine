@@ -91,6 +91,10 @@ ind_mv = 100 - ta.percentrank(mv, 252)
 
 //geo_fg = math.pow((ind_shd+1)(ind_spb+1)(ind_mm+1)(ind_sps+1)(ind_pco+1)(ind_jbd+1)(ind_mv+1), 0.14285714)
 fg = (ind_shd + ind_spb + ind_mm + ind_sps + ind_pco + ind_jbd + ind_mv) / 7
+fg_ema_short = ta.ema(fg, 14)
+fg_ema_long = ta.ema(fg, 21)
+// plot(fg_ema_short, color=color.new(color.lime, transp=0))
+// plot(fg_ema_long, color=color.new(color.maroon, transp=0))
 
 // plot(ind_shd, color=color.new(#00FF00, 0), linewidth=1, title="Safe Haven Demand")
 // plot(ind_spb, color=color.new(#88FF00, 0), linewidth=1, title="Stock Price Breadth")
@@ -101,7 +105,19 @@ fg = (ind_shd + ind_spb + ind_mm + ind_sps + ind_pco + ind_jbd + ind_mv) / 7
 // plot(ind_mv, color=color.new(#BB00BB, 0), linewidth=1, title="Market Volatility")
 
 // Plotting the Fear and Greed Index with color condition
-plot(fg, linewidth=2, color=(fg > 50 ? color.new(color.green, 0) : color.new(color.red, 0)))
+risk_on_amber = color.orange
+risk_on_green = color.green
+risk_off_amber = color.orange
+risk_off_green = color.red
+
+fg_color = fg > 50 ? color.new(color.green, 0) : color.new(color.red, 0)
+if fg_ema_short > fg_ema_long and fg < 50
+    fg_color := risk_on_amber
+
+if fg_ema_short < fg_ema_long and fg > 50
+    fg_color := risk_on_amber
+
+plot(fg, linewidth=2, color=fg_color)
 
 hline(10, color=color.black, linestyle=hline.style_dotted, linewidth=1)
 hline(80, color=color.black, linestyle=hline.style_dotted, linewidth=1)
