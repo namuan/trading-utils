@@ -1,26 +1,26 @@
-//@version=4
+//@version=5
 
-study(title="[TVT] BB Squeeze w/ 8 21 SMA/EMA", shorttitle="TVT-BBS-821", overlay=true)
+indicator(title="[TVT] BB Squeeze w/ 8 21 SMA/EMA", shorttitle="TVT-BBS-821", overlay=true)
 
-length = input(21, minval=1, title="Length")
+length = input.int(21, minval=1, title="Length")
 src = input(close, title="Source")
-use_ema = input(true, title="Use EMA over SMA?")
-k_mult = input(2, title="Keltner Range")
-bb2_mult = input(2.0, minval=0.001, maxval=50, title="Band 1 StDev")
-bb3_mult = input(3.0, minval=0.001, maxval=50, title="Band 2 StDev")
-higher_res = input(title="High Res 8x21 EMA TF", type=input.resolution, defval="D")
+use_ema = input.bool(true, title="Use EMA over SMA?")
+k_mult = input.float(2, title="Keltner Range")
+bb2_mult = input.float(2.0, minval=0.001, maxval=50, title="Band 1 StDev")
+bb3_mult = input.float(3.0, minval=0.001, maxval=50, title="Band 2 StDev")
+higher_res = input.timeframe(title="High Res 8x21 EMA TF", defval="D")
 
 blend_color = color.white
 
-ma = use_ema ? ema(src, length) : sma(src, length)
+ma = use_ema ? ta.ema(src, length) : ta.sma(src, length)
 
 //BB 1
-bb2_stdev = bb2_mult * stdev(src, length)
+bb2_stdev = bb2_mult * ta.stdev(src, length)
 bb2_upper = ma + bb2_stdev
 bb2_lower = ma - bb2_stdev
 
 //BB 2
-bb3_stdev = bb3_mult * stdev(src, length)
+bb3_stdev = bb3_mult * ta.stdev(src, length)
 bb3_upper = ma + bb3_stdev
 bb3_lower = ma - bb3_stdev
 
@@ -33,18 +33,17 @@ fill(p_bb2_upper, p_bb3_upper, color=color.red)
 fill(p_bb2_lower, p_bb3_lower, color=color.green)
 
 // Keltner Channel
-k_range_ma = use_ema ? ema(tr, length) : sma(tr, length)
+k_range_ma = use_ema ? ta.ema(ta.tr, length) : ta.sma(ta.tr, length)
 k_upper = ma + k_range_ma * k_mult
 k_lower = ma - k_range_ma * k_mult
 
 // Higher Res EMA
-ema_8_high_res = security(syminfo.tickerid, higher_res, ema(src, 8), barmerge.gaps_on, barmerge.lookahead_off)
-ema_21_high_res = security(syminfo.tickerid, higher_res, ema(src, 21), barmerge.gaps_on, barmerge.lookahead_off)
+ema_8_high_res = request.security(syminfo.tickerid, higher_res, ta.ema(src, 8), gaps=barmerge.gaps_on, lookahead=barmerge.lookahead_off)
+ema_21_high_res = request.security(syminfo.tickerid, higher_res, ta.ema(src, 21), gaps=barmerge.gaps_on, lookahead=barmerge.lookahead_off)
 
 ema_8_plt = plot(ema_8_high_res, color=ema_8_high_res > ema_21_high_res ? color.lime : color.maroon, style=plot.style_line, linewidth=0, title="EMA 8 (HTF)")
 ema_21_plt = plot(ema_21_high_res, color=ema_8_high_res > ema_21_high_res ? color.lime : color.maroon, style=plot.style_line, linewidth=2, title="EMA 21 (HTF)")
-fill(ema_8_plt, ema_21_plt, color=ema_8_high_res > ema_21_high_res ? color.new(color=color.lime, transp=70) : color.new(color=color.maroon, transp=70))
+fill(ema_8_plt, ema_21_plt, color=ema_8_high_res > ema_21_high_res ? color.new(color.lime, 70) : color.new(color.maroon, 70))
 
-//--- Bollinger Keltner Sqeeze
+//--- Bollinger Keltner Squeeze
 bgcolor((bb2_upper < k_upper) and (bb2_lower > k_lower) ? color.new(color.orange, 90) : na, title="Squeeze")
-

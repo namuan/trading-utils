@@ -1,23 +1,24 @@
-//@version=4
+//@version=5
 
-study("[TVT] ATR Trailing Stoploss",overlay=true)
-Atr=input(defval=5,title="Atr Period",minval=1,maxval=500)
-Hhv=input(defval=10,title="HHV Period",minval=1,maxval=500)
-Mult=input(defval=2.5,title="Multiplier",minval=0.1)
-Barcolor=input(true,title="Barcolor")
+indicator("[TVT] ATR Trailing Stoploss", overlay = true)
 
-Prev = highest(high-Mult*atr(Atr),Hhv),barssince(close>highest(high-Mult*atr(Atr),Hhv) and close>close[1])
-TS = iff(cum(1)<16 ,close,iff( close > highest(high-Mult*atr(Atr),Hhv) and close>close[1],highest(high-Mult*atr(Atr),Hhv),Prev))
+Atr = input.int(defval = 5, title = "Atr Period", minval = 1, maxval = 500)
+Hhv = input.int(defval = 10, title = "HHV Period", minval = 1, maxval = 500)
+Mult = input.float(defval = 2.5, title = "Multiplier", minval = 0.1)
+Barcolor = input.bool(true, title = "Barcolor")
 
-Color=iff(close>TS,color.green,iff(close<TS,color.red,color.black))
-barcolor(Barcolor? Color:na)
-plot(TS,color=Color,linewidth=3,title="ATR Trailing Stoploss")
+Prev = ta.highest(high - Mult * ta.atr(Atr), Hhv), ta.barssince(close > ta.highest(high - Mult * ta.atr(Atr), Hhv) and close > close[1])
+TS = ta.cum(1) < 16 ? close : close > ta.highest(high - Mult * ta.atr(Atr), Hhv) and close > close[1] ? ta.highest(high - Mult * ta.atr(Atr), Hhv) : Prev
 
-Buy=crossover(close,TS)
-Sell=crossunder(close,TS)
+Color = close > TS ? color.green : close < TS ? color.red : color.black
+barcolor(Barcolor ? Color : na)
+plot(TS, color = Color, linewidth = 3, title = "ATR Trailing Stoploss")
 
-plotshape(Buy,"BUY", shape.labelup, location.belowbar, color.green, text="BBUY",textcolor=color.black)
-plotshape(Sell,"SELL", shape.labeldown, location.abovebar, color.red, text="SELL",textcolor=color.black)
+Buy = ta.crossover(close, TS)
+Sell = ta.crossunder(close, TS)
+
+plotshape(Buy, "BUY", shape.labelup, location.belowbar, color.green, text = "BUY", textcolor = color.black)
+plotshape(Sell, "SELL", shape.labeldown, location.abovebar, color.red, text = "SELL", textcolor = color.black)
 
 alertcondition(Buy, "Buy Signal", "Buy ATR Trailing Stoploss")
 alertcondition(Sell, "Sell Signal", "Sell ATR Trailing Stoploss")

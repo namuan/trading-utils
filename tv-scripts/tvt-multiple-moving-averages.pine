@@ -1,10 +1,11 @@
-//@version=4
-study(title="[TVT] Multiple Moving Averages", shorttitle="TVT-MMA", overlay=true)
+//@version=5
+
+indicator(title="[TVT] Multiple Moving Averages", shorttitle="TVT-MMA", overlay=true)
 
 // === INPUTS ===
 src = input(close)
-use_ema = input(true, title="Use EMA over SMA?")
-bb_mult = input(2.0, minval=0.001, maxval=50, title="BB Oversold/Overbought deviation")
+use_ema = input.bool(defval = true, title="Use EMA over SMA?")
+bb_mult = input.float(defval = 2.0, minval=0.001, maxval=50, title="BB Oversold/Overbought deviation")
 
 // Short Moving Averages
 ma1   = input(3,title='Short MA-1')
@@ -14,16 +15,16 @@ ma4   = input(50,title='Short MA-4')
 
 blend_color = color.white
 
-ma_series1 = use_ema ? sma(src, ma1) : ema(src, ma1)
-ma_series2 = use_ema ? sma(src, ma2) : ema(src, ma2)
-ma_series3 = use_ema ? sma(src, ma3) : ema(src, ma3)
-ma_series4 = use_ema ? sma(src, ma4) : ema(src, ma4)
+ma_series1 = use_ema ? ta.sma(src, ma1) : ta.ema(src, ma1)
+ma_series2 = use_ema ? ta.sma(src, ma2) : ta.ema(src, ma2)
+ma_series3 = use_ema ? ta.sma(src, ma3) : ta.ema(src, ma3)
+ma_series4 = use_ema ? ta.sma(src, ma4) : ta.ema(src, ma4)
 
 //plot moving averages
-p_ma1 = plot(ma_series1,title='MA-1',color=blend_color, linewidth=0)
-p_ma2 = plot(ma_series2,title='MA-2',color=blend_color, linewidth=0)
-p_ma3 = plot(ma_series3,title='MA-3',color=blend_color, linewidth=0)
-p_ma4 = plot(ma_series4,title='MA-4',color=blend_color, linewidth=0)
+p_ma1 = plot(ma_series1,title='MA-1',color=blend_color, linewidth=1)
+p_ma2 = plot(ma_series2,title='MA-2',color=blend_color, linewidth=1)
+p_ma3 = plot(ma_series3,title='MA-3',color=blend_color, linewidth=1)
+p_ma4 = plot(ma_series4,title='MA-4',color=blend_color, linewidth=1)
 
 up_color = color.lime
 down_color = color.maroon
@@ -33,7 +34,7 @@ fill(p_ma2, p_ma3, color=ma_series2 > ma_series3 ? color.new(up_color, transp=55
 fill(p_ma3, p_ma4, color=ma_series3 > ma_series4 ? color.new(up_color, transp=30) : color.new(down_color, transp=30))
 
 // BB Expansion
-bb_stdev = bb_mult * stdev(src, ma3)
+bb_stdev = bb_mult * ta.stdev(src, ma3)
 bb_upper = ma_series3 + bb_stdev
 bb_lower = ma_series3 - bb_stdev
 
