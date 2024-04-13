@@ -1,5 +1,5 @@
 //@version=5
-indicator(title="[TVT] 3USL Scale In Out", shorttitle="TVT-3USL", overlay=true, timeframe="", timeframe_gaps=true)
+indicator(title="[TVT] 3X Scale In Out", shorttitle="TVT-3X", overlay=true, timeframe="", timeframe_gaps=true)
 
 // === INPUTS ===
 src = input(close)
@@ -21,9 +21,15 @@ ma_series2 = use_ema ? ta.sma(src, ma2) : ta.ema(src, ma2)
 ma_series3 = use_ema ? ta.sma(src, ma3) : ta.ema(src, ma3)
 
 //plot moving averages
-p_ma1 = plot(ma_series1,title='MA-1',color=color.blue, linewidth=0)
-p_ma2 = plot(ma_series2,title='MA-2',color=color.orange, linewidth=0)
+p_ma1 = plot(ma_series1,title='MA-1',color=color.blue, linewidth=1)
+p_ma2 = plot(ma_series2,title='MA-2',color=color.orange, linewidth=1)
 p_ma3 = plot(ma_series3,title='MA-3',color=color.red, linewidth=2)
+
+up_color = color.lime
+down_color = color.maroon
+
+fill(p_ma1, p_ma2, color=color.new(up_color, transp=90))
+fill(p_ma2, p_ma3, color=color.new(down_color, transp=70))
 
 rsi1 = ta.rsi(src, lengthRSI)
 k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
