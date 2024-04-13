@@ -29,7 +29,5 @@ rsi1 = ta.rsi(src, lengthRSI)
 k = ta.sma(ta.stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
 d = ta.sma(k, smoothD)
 
-// highlight background if k < d and k and d < 10
-// highlight background if k > d and k > 10 and d < 10
-bgcolor((k < d) and (k < 10) and (d < 10) ? color.new(color.orange, 90) : na, title="Squeeze")
-bgcolor((k > d) and (k > 10) and (d < 10) ? color.new(color=color.lime, transp=70) : na, title="Squeeze")
+// highlight background if k > d and k > 10 and d < 10 (Oversold but going up)
+bgcolor((k > d) and (k > 10) and (d < 10) ? color.new(color=color.lime, transp=70) : na)
