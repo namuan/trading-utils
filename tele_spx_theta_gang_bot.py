@@ -104,49 +104,36 @@ def populate_additional_info(ticker, expiry_date, short_delta, long_strike_gap):
 
 
 def calculate_target_dte(ticker, dte):
-    # get all expiries
     expirations_output = option_expirations(ticker, include_expiration_type=True)
     today = datetime.today().date()
-    forty_five_days_from_now = today + timedelta(days=dte)
-    weekly_expiries = [
-        x.date
+    target_date = today + timedelta(days=3)
+    next_three_dates = [
+        datetime.strptime(x.date, "%Y-%m-%d").date()
         for x in expirations_output.expirations.expiration
-        if x.expiration_type == "weeklys"
-    ]
-    dates = [
-        datetime.strptime(date_string, "%Y-%m-%d").date()
-        for date_string in weekly_expiries
-    ]
-    first_date_before = None
+        if datetime.strptime(x.date, "%Y-%m-%d").date() > target_date
+    ][:4]
 
-    for d in dates:
-        if d < forty_five_days_from_now:
-            first_date_before = d
-        else:
-            break
-
-    return first_date_before
+    return next_three_dates
 
 
 def build_response_message(ticker):
     logging.info("Processing ticker: {}".format(ticker))
-    first_day_before_dte = calculate_target_dte(ticker, DTE_TO_TARGET)
-    dte_message = f"The first date just before {DTE_TO_TARGET} days from today is: {first_day_before_dte}"
-    additional_info = populate_additional_info(
-        ticker,
-        expiry_date=first_day_before_dte,
-        short_delta=SHORT_STRIKE_DELTA,
-        long_strike_gap=LONG_STRIKE_DISTANCE,
-    )
+    dates_to_calculate_positions = calculate_target_dte(ticker, DTE_TO_TARGET)
+    expiry_date_and_option_position_info = []
+    for expiry_date in dates_to_calculate_positions:
+        dte_message = f"Options for {expiry_date}:"
+        additional_info = populate_additional_info(
+            ticker,
+            expiry_date=expiry_date,
+            short_delta=SHORT_STRIKE_DELTA,
+            long_strike_gap=LONG_STRIKE_DISTANCE,
+        )
+        expiry_date_and_option_position_info.append(
+            f"{os.linesep}{dte_message}{additional_info}"
+        )
+
     disclaimer = "_ Disclaimer: Not financial advice _"
-    return (
-        os.linesep
-        + dte_message
-        + os.linesep
-        + additional_info
-        + os.linesep
-        + disclaimer
-    )
+    return " ".join(expiry_date_and_option_position_info) + os.linesep + disclaimer
 
 
 def generate_report(ticker, update: Update, context: CallbackContext):
