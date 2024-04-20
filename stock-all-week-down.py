@@ -43,7 +43,7 @@ def main():
     df["Price Change"] = df["Close"].diff()
     df["Is Down"] = (df["Close"] < df["Open"]) & (df["Price Change"] < 0)
     weekly_down = df.resample("W").apply(
-        lambda x: (x["Is Down"].sum() == 5) and (len(x) >= 4)
+        lambda x: (x["Is Down"].sum() == 5) and (len(x) == 5)
     )
     down_weeks = weekly_down[weekly_down]
 
