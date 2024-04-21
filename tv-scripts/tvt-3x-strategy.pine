@@ -8,15 +8,18 @@ use_ema = input(false, title="Use EMA over SMA?")
 // Short Moving Averages
 ma1   = input(8,title='MA-1')
 ma2   = input(21,title='MA-2')
+ma3   = input(50,title='MA-3')
 
 blend_color = color.white
 
 ma_series1 = use_ema ? ta.sma(src, ma1) : ta.ema(src, ma1)
 ma_series2 = use_ema ? ta.sma(src, ma2) : ta.ema(src, ma2)
+ma_series3 = use_ema ? ta.sma(src, ma3) : ta.ema(src, ma3)
 
 //plot moving averages
 p_ma1 = plot(ma_series1,title='MA-1',color=color.blue, linewidth=1)
 p_ma2 = plot(ma_series2,title='MA-2',color=color.maroon, linewidth=1)
+p_ma3 = plot(ma_series3,title='MA-3',color=color.red, linewidth=2)
 
 up_color = color.lime
 down_color = color.maroon
