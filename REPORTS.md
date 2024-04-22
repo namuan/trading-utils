@@ -41,6 +41,11 @@ py report_by_query.py -t "UpTrend" -q "(day_0_ema_21 > day_0_ema_50) and (last_h
 ```
 
 ```shell
+# 8 x 21 CrossOver (Possible Beginning of new trend)
+py report_by_query.py -t "8x21" -q "(last_close > 100) and (last_close > day_0_ema_8) and (day_0_ema_8 > day_0_ema_21) and (day_1_ema_8 < day_1_ema_21)" -o "natr_30" -v
+```
+
+```shell
 py report_by_query.py -t "Ema21 Bounce" -q "(day_0_ema_8 > day_0_ema_21) and (day_0_ema_8 > day_0_ema_21) and (last_high < day_0_ema_8) and (last_low > day_0_ema_21) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "smooth_30" -v
 ```
 
