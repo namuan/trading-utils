@@ -172,3 +172,13 @@ py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volu
 ```shell
 ./rbq "(day_2_volume > day_3_volume > day_4_volume > day_5_volume > day_6_volume) and (day_2_close < day_3_close < day_4_close < day_5_close < day_6_close < day_7_close)"
 ```
+
+S&P Equal Weighted ETFs
+```shell
+QUERY=$(SYMBOLS=$(cat data/equal-weighted.csv | awk -F\, '{print $1}' | grep -v symbol | while read line; do echo "'$line'"; done | tr '\n' ','); echo "(symbol in ($SYMBOLS))"); ./rbq $QUERY
+```
+
+S&P Sector ETFs
+```shell
+QUERY=$(SYMBOLS=$(cat data/sector-etfs.csv | awk -F\, '{print $1}' | grep -v symbol | while read line; do echo "'$line'"; done | tr '\n' ','); echo "(symbol in ($SYMBOLS))"); ./rbq $QUERY
+```

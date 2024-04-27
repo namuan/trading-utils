@@ -10,6 +10,7 @@ To install required packages:
 """
 
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -106,8 +107,10 @@ def plot_stock_performance(stock_data_list, ticker_list, start_date, end_date):
     plt.legend(loc="upper left")
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("stock_performance_comparison.png")
-    plt.show()
+    ticker_list_for_file_name = "-".join(ticker_list)
+    plt.savefig(
+        f"output/stock_performance_comparison-{ticker_list_for_file_name}-{start_date}-{end_date}.png"
+    )
 
 
 def main():
@@ -123,11 +126,22 @@ def main():
     parser.add_argument(
         "--start-date",
         type=str,
-        required=True,
+        required=False,
+        default=(datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),
         help="Start date in the format YYYY-MM-DD",
     )
     parser.add_argument(
-        "--end-date", type=str, required=True, help="End date in the format YYYY-MM-DD"
+        "--end-date",
+        type=str,
+        required=False,
+        default=datetime.now().strftime("%Y-%m-%d"),
+        help="End date in the format YYYY-MM-DD",
+    )
+    parser.add_argument(
+        "--show-plot",
+        action="store_true",
+        default=False,
+        help="Show plot",
     )
     args = parser.parse_args()
     tickers = args.tickers.split(",")
@@ -145,6 +159,8 @@ def main():
 
     # Plot the stock performance comparison
     plot_stock_performance(stock_data_list, ticker_list, start_date, end_date)
+    if args.show_plot:
+        plt.show()
 
     # Print summary statistics for each stock
     print("\nSummary Statistics:")
