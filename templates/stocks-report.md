@@ -28,7 +28,8 @@ Sort By: {{ stocks["sort_by"] }}
 | ▶️ Max Loss (Based on buy at last close) | {{ '%0.2f' % ((stock['last_close']|float - (2 * stock['atr_20']|float)) * stock['position_size']|float - (stock['position_size']|float * stock['last_close']|float)) }} |
 
 
-[LazyTrader](https://namuan.github.io/lazy-trader/?symbol={{ stock['symbol'] }})
+[LazyTrader](https://namuan.github.io/lazy-trader/?symbol={{ stock['symbol'] }}) |
+[TradingView](https://www.tradingview.com/chart/?symbol={{ stock['symbol'] }})
 
 ___
 
