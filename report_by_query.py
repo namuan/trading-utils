@@ -24,6 +24,13 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "-e",
+        "--export-csv",
+        action="store_true",
+        default=False,
+        help="Export the output as a CSV file",
+    )
+    parser.add_argument(
         "-v",
         "--view-in-browser",
         action="store_true",
@@ -42,6 +49,7 @@ if __name__ == "__main__":
     query = args.query
     report_title = args.title
     view_in_browser = args.view_in_browser
+    export_csv = args.export_csv
     input_file = args.input_file
 
     logging.info(f"Reading from file: {input_file}")
@@ -65,7 +73,19 @@ if __name__ == "__main__":
     output_file = generate_report(
         report_title, template_data, report_file_name="stocks-report.md"
     )
-    if view_in_browser:
+    if export_csv:
+        output_csv_file = output_file.with_suffix(".csv")
+        selected_stocks['purchase_cost'] = selected_stocks['position_size'] * selected_stocks['last_close']
+        selected_stocks['strategy'] = report_title
+        selected_stocks[[
+            'strategy',
+            'last_close',
+            'last_close_date',
+            'position_size',
+            'purchase_cost'
+        ]].to_csv(output_csv_file)
+        logging.info("Exporting report to CSV file: {}".format(output_csv_file))
+    elif view_in_browser:
         convert_to_html(output_file, open_page=True)
     else:
         logging.info(f"Generated {output_file}")
