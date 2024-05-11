@@ -89,5 +89,5 @@ macro_etfs = {
     "FXF": "Swiss Franc",
     "CYB": "Chinese Yuan",
     "CEW": "Emerging Currency",
-    "DBV": "G10 Currency Harvest"
+    "DBV": "G10 Currency Harvest",
 }

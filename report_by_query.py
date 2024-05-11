@@ -75,15 +75,19 @@ if __name__ == "__main__":
     )
     if export_csv:
         output_csv_file = output_file.with_suffix(".csv")
-        selected_stocks['purchase_cost'] = selected_stocks['position_size'] * selected_stocks['last_close']
-        selected_stocks['strategy'] = report_title
-        selected_stocks[[
-            'strategy',
-            'last_close',
-            'last_close_date',
-            'position_size',
-            'purchase_cost'
-        ]].to_csv(output_csv_file)
+        selected_stocks["purchase_cost"] = (
+            selected_stocks["position_size"] * selected_stocks["last_close"]
+        )
+        selected_stocks["strategy"] = report_title
+        selected_stocks[
+            [
+                "strategy",
+                "last_close",
+                "last_close_date",
+                "position_size",
+                "purchase_cost",
+            ]
+        ].to_csv(output_csv_file)
         logging.info("Exporting report to CSV file: {}".format(output_csv_file))
     elif view_in_browser:
         convert_to_html(output_file, open_page=True)
