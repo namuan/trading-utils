@@ -101,7 +101,7 @@ py report_by_query.py -t "Squeeze Up" -o natr_30 -v -q "(daily_strat.str.contain
 ```
 
 ```shell
-py report_by_query.py -t "Momentum Trending" -q "last_close > day_0_ema_3 > day_0_ema_5 > day_0_ema_7 > day_0_ema_9 > day_0_ema_11 > day_0_ema_13 > day_0_ema_30 > day_0_ema_35 > day_0_ema_40 > day_0_ema_45 > day_0_ema_50 > day_0_ema_55 > day_0_ema_60" -o week_1_close_change_delta_1 -v
+py report_by_query.py -t "Momentum Trending" -q "last_close > day_0_ema_3 > day_0_ema_5 > day_0_ema_7 > day_0_ema_9 > day_0_ema_11 > day_0_ema_13 > day_0_ema_30 > day_0_ema_35 > day_0_ema_40 > day_0_ema_45 > day_0_ema_50 > day_0_ema_55 > day_0_ema_60" -o green_candles_30 -v
 ```
 
 ```shell
@@ -118,10 +118,6 @@ py report_by_query.py -t "Boomer" -q "(last_volume > 100000) and (month_3_strat.
 
 ```shell
 py report_by_query.py -t "KC inside BB Channel" -o natr_30 -v -q "(boll_ub < kc_ub) and (boll_lb > kc_lb) and (vol_ema_3 > vol_ema_5 > vol_ema_7) and (daily_strat.str.contains('.*-2u$')) and (daily_strat_candle.str.contains('.*-green$'))"
-```
-
-```shell
-py report_by_query.py -t "Strat near prev week high" -o natr_30 -v -q "(week_1_strat.str.contains('.*-1$')) and (last_close > ema_50 > ema_200 ) and (((week_2_high - week_1_close)/(week_2_high - week_2_low)) < 0.1)"
 ```
 
 ```shell
@@ -156,6 +152,10 @@ py report_by_query.py -o smooth_90 -v -t "Long Key Reversal" -q "((day_2_low < d
 ```
 
 ```shell
+py report_by_query.py -o smooth_90 -v -t "Long Key Reversal 2" -q "((week_2_low < week_3_low) and (last_close > week_3_high) and (last_close > week_2_high))"
+```
+
+```shell
 py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volume < day_2_volume) and (last_low < day_2_high) and (last_close > month_1_high) and (last_close > month_2_high) and (last_close > month_3_high) and (day_2_volume < last_close)"
 ```
 
@@ -166,7 +166,7 @@ py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volu
 
 ```shell
 # Volume/Price divergence/convergence
-./rbq "(vol_ma_3 > vol_ma_5 > vol_ma_7 > vol_ma_9 > vol_ma_11 > vol_ma_13 > vol_ma_15 > vol_ma_17 > vol_ma_19 > vol_ma_21) and (ma_3 < ma_5 < ma_7 < ma_9 < ma_11 < ma_13 < ma_15)"
+./rbq "(vol_ma_3 > vol_ma_5 > vol_ma_7 > vol_ma_9 > vol_ma_11 > vol_ma_13 > vol_ma_15 > vol_ma_17 > vol_ma_19 > vol_ma_21) and (day_0_ma_3 < day_0_ma_5 < day_0_ma_7 < day_0_ma_9 < day_0_ma_11 < day_0_ma_13 < day_0_ma_15)"
 ```
 
 ```shell
