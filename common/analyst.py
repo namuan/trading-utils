@@ -70,6 +70,21 @@ def smooth_trend(df):
     return pos_neg.sum()
 
 
+def count_positive_returns(df):
+    positive_returns = df > df.shift(1)
+    return positive_returns.sum()
+
+
+def smoothed_rate_of_change(df):
+    # Calculate the Rate of Change of this 13-day EMA over a 21-day period
+    # We need to shift the EMA by 21 days to get the value 21 days ago
+    df["ema21"] = df["close_13_ema"].shift(21)
+    df["roc"] = (df["close_13_ema"] - df["ema21"]) / df["ema21"] * 100
+
+    # Smooth the ROC using another EMA (13-day EMA of the ROC)
+    return df["roc"].ewm(span=13, adjust=False).mean()
+
+
 def calc_strat_n(first_candle, second_candle):
     strat_n = "0"
     if first_candle.high > second_candle.high and first_candle.low > second_candle.low:
@@ -363,8 +378,18 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # Trend smoothness
     for mo in [30, 60, 90, 180]:
-        smoothness = smooth_trend(stock_data_52_weeks[-mo:])
+        smoothness = smooth_trend(ticker_df[-mo:])
         data_row[f"smooth_{mo}"] = smoothness
+
+    # Calculate positive candles (Smooth uptrend)
+    for mo in [30, 60, 90, 180]:
+        positive_returns = count_positive_returns(ticker_df[-mo:])
+        data_row[f"green_candles_{mo}"] = positive_returns.iloc[-1]
+
+    # Smoothed Rate of Change
+    for mo in [30, 60, 90, 180]:
+        sroc = smoothed_rate_of_change(ticker_df[-mo:])
+        data_row[f"sroc_{mo}"] = sroc.iloc[-1]
 
     daily_strat, daily_strat_candle = calculate_strat(ticker_df)
     data_row["daily_strat"] = daily_strat
