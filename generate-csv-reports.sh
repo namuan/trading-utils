@@ -1,7 +1,3 @@
-python3 report_by_query.py -t "SP500 Daily Movers" -q "(is_large_cap == True)" -o "daily_close_change_delta_1" -e
-python3 report_by_query.py -t "SP500 Weekly Movers" -q "(is_large_cap == True)" -o "week_1_close_change_delta_1" -e
-python3 report_by_query.py -t "SP500 Monthly Movers" -q "(is_large_cap == True)" -o "month_1_close_change_delta_1" -e
-python3 report_by_query.py -t "EMA Bounce" -q "(day_0_ema_60 < day_0_ema_50 < day_0_ema_45 < day_0_ema_40 < day_0_ema_35 < last_close < day_0_ema_30) and (adx_14 > 35) and (daily_strat.str.contains('.*-2d-2d')) and (daily_strat_candle.str.contains('.*-red-green$'))" -o "natr_30" -e
 python3 report_by_query.py -t "EMA 8x21 Pullback" -q "(day_0_ema_60 < day_0_ema_50 < day_0_ema_45 < day_0_ema_40 < day_0_ema_35 < day_0_ema_21 < day_0_ema_8) and (vol_ema_3 > vol_ema_5 > vol_ema_7) and (last_low > day_0_ema_21) and (last_low < day_0_ema_8) and (adx_14 < 30) and (adx_9 > adx_14 > adx_21)" -o "natr_30" -e
 python3 report_by_query.py -t "UpTrend" -q "(day_0_ema_3 > day_0_ema_5 > day_0_ema_7 > day_0_ema_9 > day_0_ema_11 > day_0_ema_13 > day_0_ema_15 > day_0_ema_21 > day_0_ema_30 > day_0_ema_35 > day_0_ema_40 > day_0_ema_45 > day_0_ema_50 > day_0_ema_60)" -o "smooth_30" -e
 python3 report_by_query.py -t "UpTrend" -q "(day_0_ema_21 > day_0_ema_50) and (last_high > day_0_ema_8) and (last_low < day_0_ema_8)" -o "smooth_30" -e
