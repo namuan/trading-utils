@@ -182,3 +182,6 @@ S&P Sector ETFs
 ```shell
 QUERY=$(SYMBOLS=$(cat data/sector-etfs.csv | awk -F\, '{print $1}' | grep -v symbol | while read line; do echo "'$line'"; done | tr '\n' ','); echo "(symbol in ($SYMBOLS))"); ./rbq $QUERY
 ```
+
+
+QUERY=$(SYMBOLS=$(cat combined_output.csv | awk -F\, '{print $1}' | grep -v symbol | while read line; do echo "'$line'"; done | tr '\n' ','); echo "(symbol in ($SYMBOLS))"); ./rbq $QUERY
