@@ -20,11 +20,11 @@ import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 
-import matplotlib.pyplot as plt
 from finta import TA
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
+
 from common.market import download_ticker_data
 
 
@@ -96,11 +96,9 @@ def identify_dips(df, lower, higher):
     max_continuous_dips = 0
     max_continuous_dips_date = None
     total_dips = 0
-    initial_investment = 10000
     positions = []
 
     table = Table()
-    # Add columns
     table.add_column("Date", justify="center", style="cyan", no_wrap=True)
     table.add_column("total_shares", justify="right", style="magenta")
     table.add_column("sold_price", justify="right", style="green")
@@ -119,7 +117,7 @@ def identify_dips(df, lower, higher):
                 dips_below_threshold += 1
                 dip_dates.append(index)
                 above_lower_once = False
-                logging.debug("📉 Buy:", index, " Close:", close, " RSI:", rsi)
+                logging.debug(f"📉 Buy: {index} Close: {close} RSI: {rsi}")
                 positions.append(
                     dict(
                         date_purchased=index,
@@ -131,14 +129,7 @@ def identify_dips(df, lower, higher):
 
         if rsi > higher and dips_below_threshold > 0:
             logging.debug(
-                "✅ Dips below threshold:",
-                dips_below_threshold,
-                " Date:",
-                index,
-                " Close:",
-                close,
-                " RSI:",
-                rsi,
+                f"✅ Dips below threshold: {dips_below_threshold} Date: {index} Close: {close} RSI: {rsi}"
             )
             total_shares = sum([p["shares"] for p in positions])
             invested_amount = sum(p["purchase_price"] for p in positions)
@@ -154,57 +145,21 @@ def identify_dips(df, lower, higher):
             table.add_row(
                 str(date_sold), str(total_shares), f"{sold_price:.2f}", pnl_text
             )
-            positions.clear()
-
             if dips_below_threshold > max_continuous_dips:
                 max_continuous_dips = dips_below_threshold
-                max_continuous_dips_date = index
+                max_continuous_dips_date = index.date()
             dips_below_threshold = 0
+            positions.clear()
 
     print(
-        "Maximum continuous dips:",
-        max_continuous_dips,
-        " on:",
-        max_continuous_dips_date,
+        f"Maximum continuous dips: {max_continuous_dips} on {max_continuous_dips_date}"
     )
-    print("Total dips:", total_dips)
+    print(f"Total dips: {total_dips}")
     console = Console()
     console.print(table)
 
 
-def plot_results(df, dip_dates, lower, higher):
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
-
-    # Plot the close prices
-    ax1.plot(df.index, df["Close"], label="Close Price", color="blue")
-    ax1.set_ylabel("Close Price")
-    ax1.set_title(f"Close Price and RSI for {args.symbol}")
-    ax1.legend(loc="upper left")
-
-    # Plot the RSI
-    ax2.plot(df.index, df["RSI"], label="RSI", color="orange")
-    ax2.axhline(lower, color="red", linestyle="--", label=f"RSI {lower}")
-    ax2.axhline(higher, color="green", linestyle="--", label=f"RSI {higher}")
-    ax2.set_ylabel("RSI")
-    ax2.set_xlabel("Date")
-    ax2.legend(loc="upper left")
-
-    # Annotate the dips below the lower threshold
-    for date in dip_dates:
-        ax2.annotate(
-            "Dip below {}".format(lower),
-            xy=(date, df.loc[date, "RSI"]),
-            xytext=(date, df.loc[date, "RSI"] + 10),
-            arrowprops=dict(facecolor="red", shrink=0.05),
-            horizontalalignment="right",
-            verticalalignment="bottom",
-        )
-
-    plt.show()
-
-
 def main(args):
-    # Fetch stock data from Yahoo Finance
     ticker = args.symbol
     end_date = datetime.now().strftime("%Y-%m-%d")
     df = download_ticker_data(
