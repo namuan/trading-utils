@@ -22,7 +22,9 @@ from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 from finta import TA
-
+from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 from common.market import download_ticker_data
 
 
@@ -97,6 +99,13 @@ def identify_dips(df, lower, higher):
     initial_investment = 10000
     positions = []
 
+    table = Table()
+    # Add columns
+    table.add_column("Date", justify="center", style="cyan", no_wrap=True)
+    table.add_column("total_shares", justify="right", style="magenta")
+    table.add_column("sold_price", justify="right", style="green")
+    table.add_column("pnl", justify="right", style="bold")
+
     for index, row in df.iterrows():
         close = row["Close"]
         rsi = row["RSI"]
@@ -134,8 +143,16 @@ def identify_dips(df, lower, higher):
             total_shares = sum([p["shares"] for p in positions])
             invested_amount = sum(p["purchase_price"] for p in positions)
             sold_price = close * total_shares
-            print(
-                f"{index.date()},{total_shares},{sold_price:.2f},{(sold_price - invested_amount):.2f}"
+            date_sold = index.date()
+            pnl = sold_price - invested_amount
+            if pnl > 0:
+                pnl_text = Text(f"{pnl:.2f}", style="green")
+            elif pnl < 0:
+                pnl_text = Text(f"{pnl:.2f}", style="red")
+            else:
+                pnl_text = Text(f"{pnl:.2f}")
+            table.add_row(
+                str(date_sold), str(total_shares), f"{sold_price:.2f}", pnl_text
             )
             positions.clear()
 
@@ -151,6 +168,8 @@ def identify_dips(df, lower, higher):
         max_continuous_dips_date,
     )
     print("Total dips:", total_dips)
+    console = Console()
+    console.print(table)
 
 
 def plot_results(df, dip_dates, lower, higher):
@@ -208,6 +227,5 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    print(args.verbose)
     setup_logging(args.verbose)
     main(args)
