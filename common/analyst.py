@@ -327,8 +327,11 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
         ).iloc[-1]
 
     # RSI
-    for rsi in [2, 4, 9, 14]:
-        data_row[f"rsi_{rsi}"] = ticker_df[f"rsi_{rsi}"][-1]
+    rsi_range = [2, 3, 4, 9, 14]
+    for prev_day in [0, 1, 2, 3, 4, 5]:
+        for rsi in rsi_range:
+            trimmed_ticker_df = trim_recent_data(ticker_df, prev_day)
+            data_row[f"day_{prev_day}_rsi_{rsi}"] = trimmed_ticker_df[f"rsi_{rsi}"][-1]
 
     # Keltner Channel
     kc_bands = TA.KC(ticker_df, kc_mult=1)
@@ -430,6 +433,12 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
                 ).iloc[-1]
 
             data_row[f"power_of_3_week_{week}"] = power_of_3(weekly_ticker_candles)
+
+            # Weekly RSIs
+            for rsi in rsi_range:
+                data_row[f"week_{week}_rsi_{rsi}"] = weekly_ticker_candles[
+                    f"rsi_{rsi}"
+                ][-1]
         except Exception as e:
             print(
                 "{} - {}".format(
