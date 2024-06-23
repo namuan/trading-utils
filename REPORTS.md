@@ -140,11 +140,19 @@ py report_by_query.py -t "Month Change" -o month_1_close_change_delta_1 -v -q "(
 ```
 
 ```shell
-py report_by_query.py -o smooth_30 -t "4RSI" -v -q "(last_close < 100) and (last_close > day_0_ma_50) and (monthly_gains_3 > 0) and (rsi_2 < 10)"
+py report_by_query.py -o smooth_30 -t "4RSI" -v -q "(last_close < 100) and (last_close > day_0_ma_50) and (monthly_gains_3 > 0) and (day_0_rsi_2 < 10)"
 ```
 
 ```shell
-py report_by_query.py -o smooth_30 -t "AllRSI" -v -q "(rsi_2 < 10) and (rsi_4 < 10) and (rsi_9 < 10) and (last_close > 10)"
+py report_by_query.py -o smooth_30 -t "AllRSI" -v -q "(day_0_rsi_2 < 10) and (day_0_rsi_4 < 10) and (day_0_rsi_9 < 10) and (last_close > 10)"
+```
+
+```shell
+py report_by_query.py -o smooth_30 -t "RSI3 Dips" -v -q "(last_close > 100 and week_0_rsi_3 < 10)"
+```
+
+```shell
+py report_by_query.py -o smooth_30 -t "RSI3 Bounce" -v -q "last_close > 10 and week_1_rsi_3 < 5 and week_0_rsi_3 > 5 and week_0_rsi_3 < 10"
 ```
 
 ```shell
@@ -157,6 +165,10 @@ py report_by_query.py -o smooth_90 -v -t "Long Key Reversal 2" -q "((week_2_low 
 
 ```shell
 py report_by_query.py -o smooth_90 -v -t "Long base and Breakout" -q "(last_volume < day_2_volume) and (last_low < day_2_high) and (last_close > month_1_high) and (last_close > month_2_high) and (last_close > month_3_high) and (day_2_volume < last_close)"
+```
+
+```shell
+py report_by_query.py -t "MMA Breakout" -q "(last_close > day_0_ema_3 > day_0_ema_5 > day_0_ema_7 > day_0_ema_9 > day_0_ema_11 > day_0_ema_13) and (last_close < day_0_ema_30 < day_0_ema_35 < day_0_ema_40 < day_0_ema_45 < day_0_ema_50 < day_0_ema_55 < day_0_ema_60)" -o green_candles_30 -v
 ```
 
 ```shell
