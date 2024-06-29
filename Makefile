@@ -57,6 +57,7 @@ deploy: clean ## Copies any changed file to the server
 		tele_theta_gang_bot.py \
 		tele_spx_theta_gang_bot.py \
 		tele_stock_alerts_bot.py \
+		tqqq-for-the-long-run.py \
 		webpages.txt \
 		requirements \
 		requirements.txt \

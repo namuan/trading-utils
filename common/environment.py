@@ -43,3 +43,8 @@ COIN_MARKET_CAP_API_KEY = os.getenv("COIN_MARKET_CAP_API_KEY")
 DTE_TO_TARGET = int(os.getenv("DTE_TO_TARGET"))
 SHORT_STRIKE_DELTA = float(os.getenv("SHORT_STRIKE_DELTA"))
 LONG_STRIKE_DISTANCE = int(os.getenv("LONG_STRIKE_DISTANCE"))
+
+# Pushover
+PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
+PUSHOVER_USER = os.getenv("PUSHOVER_USER")
+PUSHOVER_URL = "https://api.pushover.net/1/messages.json"

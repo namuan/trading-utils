@@ -1,6 +1,12 @@
 import requests
 
-from common.environment import DEFAULT_BOT_TOKEN, GROUP_CHAT_ID
+from common.environment import (
+    DEFAULT_BOT_TOKEN,
+    GROUP_CHAT_ID,
+    PUSHOVER_TOKEN,
+    PUSHOVER_USER,
+    PUSHOVER_URL,
+)
 
 
 def get_url(method, token):
@@ -29,3 +35,16 @@ def send_message_to_telegram(
         "disable_web_page_preview": disable_web_preview,
     }
     requests.post(get_url("sendMessage", DEFAULT_BOT_TOKEN), data=data)
+
+
+def pushover_send_message(title, message):
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+    data = {
+        "token": PUSHOVER_TOKEN,
+        "user": PUSHOVER_USER,
+        "title": title,
+        "message": message,
+    }
+    requests.post(url=PUSHOVER_URL, headers=headers, data=data)
