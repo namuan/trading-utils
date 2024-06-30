@@ -41,7 +41,7 @@ def parse_args():
 def compile_report(spy_data):
     heading = f"""
 *Last Close* ({'%0.2f' % spy_data["last_close"]})
-RSI2 ({'%0.2f' % spy_data['rsi_2']}), RSI4 ({'%0.2f' % spy_data['rsi_4']}), RSI9 ({'%0.2f' % spy_data['rsi_9']}), RSI14 ({'%0.2f' % spy_data['rsi_14']})        
+RSI2 ({'%0.2f' % spy_data['day_0_rsi_2']}), RSI4 ({'%0.2f' % spy_data['day_0_rsi_4']}), RSI9 ({'%0.2f' % spy_data['day_0_rsi_9']}), RSI14 ({'%0.2f' % spy_data['day_0_rsi_14']})        
         """
     reports = [
         "------------ *{}*  ------------".format(
@@ -61,7 +61,7 @@ def send_to_telegram(output_vol_plt, chart_link, report):
 def generate_reports(output_dir="output"):
     ticker = "SPY"
     plt_output_file = "{}/{}-intraday-vol.png".format(output_dir, ticker)
-    spx_plt = plot_intraday(ticker, period="2d")
+    spx_plt = plot_intraday(ticker, period="1d")
     spx_plt.savefig(plt_output_file)
     spx_plt.close()
     spy_data, _ = fetch_data_on_demand(ticker)

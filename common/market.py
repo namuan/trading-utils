@@ -1,17 +1,12 @@
 import logging
-from datetime import timedelta
 
 import pandas as pd
-import requests_cache
 import yfinance as yf
-from pandas_datareader import data as pdr
 from tqdm import tqdm
 from yahoo_earnings_calendar import YahooEarningsCalendar
 
 from common import ALL_LISTED_TICKERS_FILE, LARGE_CAP_TICKERS_FILE
 from common.filesystem import output_dir, file_exists
-
-yf.pdr_override()
 
 yec = YahooEarningsCalendar()
 
@@ -55,13 +50,7 @@ def load_all_tickers(market_type="all"):
 
 def download_ticker_data(ticker, start, end):
     try:
-        expire_after = timedelta(hours=1)
-        session = requests_cache.CachedSession(
-            cache_name="cache", backend="sqlite", expire_after=expire_after
-        )
-        ticker_df = pdr.DataReader(
-            ticker, data_source="yahoo", start=start, end=end, session=session
-        )
+        ticker_df = yf.download(ticker, start=start, end=end)
         ticker_df.to_csv(f"{output_dir()}/{ticker}.csv")
         return ticker_df
     except:
