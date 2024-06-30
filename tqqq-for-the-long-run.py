@@ -88,22 +88,33 @@ def rebalance():
     sqqq_data = get_asset_data("SQQQ")
     bsv_data = get_asset_data("BSV")
 
-    if current_price(spy_data) > spy_data["close_200_sma"].iloc[-1]:
-        if tqqq_data["rsi_10"].iloc[-1] > 79:
+    spy_current_price = current_price(spy_data)
+    spy_200_sma = spy_data["close_200_sma"].iloc[-1]
+    spy_rsi_10 = spy_data["rsi_10"].iloc[-1]
+    tqqq_rsi_10 = tqqq_data["rsi_10"].iloc[-1]
+    spxl_rsi_10 = spxl_data["rsi_10"].iloc[-1]
+    uvxy_rsi_10 = uvxy_data["rsi_10"].iloc[-1]
+    tqqq_current_price = current_price(tqqq_data)
+    tqqq_20_sma = tqqq_data["close_20_sma"].iloc[-1]
+    sqqq_rsi_10 = sqqq_data["rsi_10"].iloc[-1]
+    bsv_rsi_10 = bsv_data["rsi_10"].iloc[-1]
+
+    if spy_current_price > spy_200_sma:
+        if tqqq_rsi_10 > 79:
             return weight_equal(["UVXY"])
-        elif spxl_data["rsi_10"].iloc[-1] > 80:
+        elif spxl_rsi_10 > 80:
             return weight_equal(["UVXY"])
         else:
             return weight_equal(["TQQQ"])
     else:
-        if tqqq_data["rsi_10"].iloc[-1] < 31:
+        if tqqq_rsi_10 < 31:
             return weight_equal(["TECL"])
-        elif spy_data["rsi_10"].iloc[-1] < 30:
+        elif spy_rsi_10 < 30:
             return weight_equal(["SPXL"])
-        elif uvxy_data["rsi_10"].iloc[-1] > 74:
-            if uvxy_data["rsi_10"].iloc[-1] > 84:
-                if current_price("TQQQ") > tqqq_data["close_20_sma"].iloc[-1]:
-                    if sqqq_data["rsi_10"].iloc[-1] < 31:
+        elif uvxy_rsi_10 > 74:
+            if uvxy_rsi_10 > 84:
+                if tqqq_current_price > tqqq_20_sma:
+                    if sqqq_rsi_10 < 31:
                         return weight_equal(["SQQQ"])
                     else:
                         return weight_equal(["TQQQ"])
@@ -111,8 +122,8 @@ def rebalance():
                     top_asset = select_top_n(
                         pd.Series(
                             {
-                                "SQQQ": sqqq_data["rsi_10"].iloc[-1],
-                                "BSV": bsv_data["rsi_10"].iloc[-1],
+                                "SQQQ": sqqq_rsi_10,
+                                "BSV": bsv_rsi_10,
                             }
                         ),
                         1,
@@ -121,8 +132,8 @@ def rebalance():
             else:
                 return weight_equal(["UVXY"])
         else:
-            if current_price("TQQQ") > tqqq_data["close_20_sma"].iloc[-1]:
-                if sqqq_data["rsi_10"].iloc[-1] < 31:
+            if tqqq_current_price > tqqq_20_sma:
+                if sqqq_rsi_10 < 31:
                     return weight_equal(["SQQQ"])
                 else:
                     return weight_equal(["TQQQ"])
@@ -130,8 +141,8 @@ def rebalance():
                 top_asset = select_top_n(
                     pd.Series(
                         {
-                            "SQQQ": sqqq_data["rsi_10"].iloc[-1],
-                            "BSV": bsv_data["rsi_10"].iloc[-1],
+                            "SQQQ": sqqq_rsi_10,
+                            "BSV": bsv_rsi_10,
                         }
                     ),
                     1,
