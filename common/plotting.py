@@ -2,12 +2,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from common.market import download_with_yf
+from common.market import download_ticker_with_interval
 from common.subprocess_runner import open_file
 
 
 def plot_intraday(ticker, period="1d", interval="1m"):
-    data = download_with_yf(ticker, period=period, interval=interval)
+    data = download_ticker_with_interval(ticker, period=period, interval=interval)
     print(f"Plotting {ticker}")
     intraday = data.resample("30T").agg(
         {

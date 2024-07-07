@@ -18,7 +18,7 @@ def download_earnings_between(date_from, date_to):
         return {}
 
 
-def download_with_yf(ticker, period, interval):
+def download_ticker_with_interval(ticker, period, interval):
     try:
         opts = dict(
             tickers=ticker,
