@@ -81,8 +81,8 @@ def main():
     focused_stock = "TQQQ"
     qqq_holdings = get_qqq_holdings(args.qqq_csv)
     stocks = [focused_stock] + qqq_holdings
-    start_date = "2010-01-01"
-    end_date = "2024-01-01"
+    start_date = "2011-01-01"
+    end_date = "2024-08-01"
     df = pd.DataFrame()
     for stock in stocks:
         data = get_asset_data(stock, start_date, end_date)
