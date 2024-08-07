@@ -2,104 +2,84 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def short_straddle_pnl(spot_prices, strike, put_premium, call_premium):
-    put_payoff = np.maximum(strike - spot_prices, 0)
-    call_payoff = np.maximum(spot_prices - strike, 0)
-
-    total_premium = put_premium + call_premium
-    pnl = (total_premium - (put_payoff + call_payoff)) * 100
-
+def short_straddle_pnl(
+    spot_prices,
+    strike,
+    initial_put_premium,
+    initial_call_premium,
+    current_put_value,
+    current_call_value,
+):
+    initial_total_premium = initial_put_premium + initial_call_premium
+    current_total_value = current_put_value + current_call_value
+    pnl = (current_total_value - initial_total_premium) * 100
     return pnl
 
 
 # Parameters
-strike = 532
-put_premium = 6.13
-call_premium = 6.39
-total_premium = put_premium + call_premium
+strike = 547
+initial_put_premium = 9.19
+initial_call_premium = 13.16
+current_spot_price = 530  # Current spot price
+current_put_value = 14.97
+current_call_value = 5.20
 
-# Generate a range of spot prices
-spot_prices = np.linspace(495, 565, 200)
-
-# Calculate P&L
-pnl = short_straddle_pnl(spot_prices, strike, put_premium, call_premium)
-
-# Plotting
-fig, ax = plt.subplots(figsize=(12, 7))
-
-# Fill profit area with green and loss area with red
-ax.fill_between(spot_prices, pnl, 0, where=(pnl > 0), facecolor="#90EE90", alpha=0.5)
-ax.fill_between(spot_prices, pnl, 0, where=(pnl <= 0), facecolor="#FFB6C1", alpha=0.5)
-
-# Plot P&L line
-ax.plot(spot_prices, pnl, color="#228B22", linewidth=2)
-
-# Set up the plot
-ax.set_xlim(495, 565)
-ax.set_ylim(-2500, 1500)
-ax.set_yticks(range(-2500, 1501, 500))
-ax.set_xticks(range(495, 566, 5))
-
-# Add gridlines
-ax.grid(True, linestyle=":", alpha=0.7)
-
-# Remove top and right spines
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-
-# Format y-axis to show dollar amounts
-ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"${x:,.0f}"))
-
-# Add horizontal line at y=0
-ax.axhline(y=0, color="black", linewidth=1)
-
-# Calculate and plot breakeven points
-lower_breakeven = strike - total_premium
-upper_breakeven = strike + total_premium
-
-ax.axvline(x=lower_breakeven, color="#00BFFF", linestyle="--", linewidth=1)
-ax.axvline(x=upper_breakeven, color="#00BFFF", linestyle="--", linewidth=1)
-
-# Add text annotations for breakeven points
-ax.text(
-    lower_breakeven,
-    ax.get_ylim()[0],
-    f"{lower_breakeven:.2f}",
-    ha="center",
-    va="bottom",
-    color="#00BFFF",
-    fontweight="bold",
-)
-ax.text(
-    upper_breakeven,
-    ax.get_ylim()[0],
-    f"{upper_breakeven:.2f}",
-    ha="center",
-    va="bottom",
-    color="#00BFFF",
-    fontweight="bold",
+# Calculate current P&L
+current_pnl = short_straddle_pnl(
+    current_spot_price,
+    strike,
+    initial_put_premium,
+    initial_call_premium,
+    current_put_value,
+    current_call_value,
 )
 
-# Add vertical line for strike price
-ax.axvline(x=strike, color="black", linestyle="--", linewidth=1)
-
-# Point out max profit
-max_profit = total_premium * 100
-ax.annotate(
-    f"Max Profit: ${max_profit:.2f}",
-    xy=(strike, max_profit),
-    xytext=(strike - 15, max_profit + 200),
-    arrowprops=dict(facecolor="black", shrink=0.05),
-    fontweight="bold",
-)
-
-plt.tight_layout()
-plt.show()
-
-# Print important values
+# Print important values and P&L calculation
+print(f"Current Spot Price: ${current_spot_price}")
 print(f"Strike Price: ${strike}")
-print(f"Put Premium: ${put_premium} per share (${put_premium * 100} per contract)")
-print(f"Call Premium: ${call_premium} per share (${call_premium * 100} per contract)")
-print(f"Total Premium (Max Profit): ${total_premium * 100:.2f}")
-print(f"Lower Breakeven Point: ${lower_breakeven:.2f}")
-print(f"Upper Breakeven Point: ${upper_breakeven:.2f}")
+print(
+    f"Initial Put Premium: ${initial_put_premium} per share (${initial_put_premium * 100} per contract)"
+)
+print(
+    f"Initial Call Premium: ${initial_call_premium} per share (${initial_call_premium * 100} per contract)"
+)
+print(
+    f"Current Put Value: ${current_put_value} per share (${current_put_value * 100} per contract)"
+)
+print(
+    f"Current Call Value: ${current_call_value} per share (${current_call_value * 100} per contract)"
+)
+
+print("\nP&L Calculation:")
+total_initial_premium = (initial_put_premium + initial_call_premium) * 100
+print(f"1. Total Initial Premium Received: ${total_initial_premium:.2f}")
+print(f"   (({initial_put_premium} + {initial_call_premium}) * 100)")
+
+current_total_option_value = (current_put_value + current_call_value) * 100
+percentage_of_initial = (current_total_option_value / total_initial_premium) * 100
+print(
+    f"\n2. Current Total Option Value: ${current_total_option_value:.2f} ({percentage_of_initial:.2f}% of initial premium)"
+)
+print(f"   (({current_put_value} + {current_call_value}) * 100)")
+
+change_in_option_value = current_total_option_value - total_initial_premium
+percentage_of_change_in_value = (change_in_option_value / total_initial_premium) * 100
+print(
+    f"\n3. Change in Option Value (Current P&L): ${change_in_option_value:.2f}  ({percentage_of_change_in_value:.2f}% of initial premium)"
+)
+print(f"   {current_total_option_value:.2f} - {total_initial_premium:.2f}")
+
+print(f"\nCurrent P&L: ${current_pnl:.2f}")
+print(
+    f"(({current_put_value} + {current_call_value}) - ({initial_put_premium} + {initial_call_premium})) * 100"
+)
+
+print("\nBreakeven Points:")
+print(
+    f"Lower Breakeven Point: ${(strike - (initial_put_premium + initial_call_premium)):.2f}"
+)
+print(
+    f"Upper Breakeven Point: ${(strike + (initial_put_premium + initial_call_premium)):.2f}"
+)
+
+# Plot Payoff diagram
