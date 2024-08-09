@@ -29,10 +29,10 @@ class OptionPlot:
     def plot(self):
         self._setup_plot()
         self._plot_payoff()
-        self._plot_strike_lines()
         self._plot_spot_price()
         self._plot_breakeven_points()
         self._annotate_max_profit_loss()
+        self._add_option_callouts()
         self._set_x_ticks()
         plt.tight_layout()
         plt.show()
@@ -45,20 +45,25 @@ class OptionPlot:
         payoffs = [option.payoff(self.strike_range) for option in self.options]
         total_payoff = np.sum(payoffs, axis=0)
 
+        y_min, y_max = min(total_payoff) * 1.1, max(total_payoff) * 1.1
+        y_range = y_max - y_min
+
         self.ax.set_xlim(self.strike_range[0], self.strike_range[-1])
-        self.ax.set_ylim(min(total_payoff) * 1.1, max(total_payoff) * 1.1)
+        self.ax.set_ylim(
+            y_min - y_range * 0.5, y_max + y_range * 0.5
+        )  # Add extra space at top and bottom
+
         self.ax.spines["top"].set_visible(False)
         self.ax.spines["right"].set_visible(False)
         self.ax.spines["bottom"].set_position("zero")
-        self.ax.set_ylabel("Profit/Loss ($)", fontsize=10)
-        self.ax.set_xlabel("Stock Price", fontsize=10)
         self.ax.tick_params(axis="both", labelsize=8)
-        self.ax.grid(True, linestyle=":", alpha=0.7)
 
     def _plot_payoff(self):
         payoffs = [option.payoff(self.strike_range) for option in self.options]
         total_payoff = np.sum(payoffs, axis=0)
-        self.ax.plot(self.strike_range, total_payoff, linewidth=2)
+        self.ax.plot(
+            self.strike_range, total_payoff, color="black", linewidth=1, alpha=0.2
+        )
         self.ax.fill_between(
             self.strike_range,
             total_payoff,
@@ -76,19 +81,6 @@ class OptionPlot:
             alpha=0.5,
         )
 
-    def _plot_strike_lines(self):
-        for option in self.options:
-            self.ax.axvline(x=option.strike_price, color="skyblue", linestyle="--")
-            self.ax.text(
-                option.strike_price,
-                self.ax.get_ylim()[1],
-                f"{option.strike_price}",
-                color="skyblue",
-                ha="center",
-                va="bottom",
-                fontsize=8,
-            )
-
     def _plot_spot_price(self):
         self.ax.axvline(x=self.spot_price, color="black", linestyle=":", linewidth=1)
         self.ax.text(
@@ -101,6 +93,9 @@ class OptionPlot:
             fontsize=8,
         )
 
+    def _calculate_percentage_change(self, price):
+        return (price - self.spot_price) / self.spot_price * 100
+
     def _plot_breakeven_points(self):
         payoffs = [option.payoff(self.strike_range) for option in self.options]
         total_payoff = np.sum(payoffs, axis=0)
@@ -109,13 +104,20 @@ class OptionPlot:
         ]
 
         for point in breakeven_points:
+            percentage_change = self._calculate_percentage_change(point)
+            if point > self.spot_price:
+                label = f"Breakeven: {point:.2f}\n({percentage_change:.2f}%)"
+            else:
+                label = f"Breakeven: {point:.2f}\n({percentage_change:.2f}%)"
+
             self.ax.annotate(
-                f"Breakeven: {point:.2f}",
+                label,
                 xy=(point, 0),
                 xytext=(point, self.ax.get_ylim()[1] * 0.2),
                 color="red",
                 fontsize=8,
                 ha="center",
+                va="bottom",
                 arrowprops=dict(arrowstyle="->", color="red", lw=1),
             )
 
@@ -149,6 +151,69 @@ class OptionPlot:
             color="red",
         )
 
+    def _add_option_callouts(self):
+        y_min, y_max = self.ax.get_ylim()
+        y_range = y_max - y_min
+        base_top_offset = y_range * 0.05  # Base offset above x-axis
+        base_bottom_offset = -y_range * 0.07  # Base offset below x-axis
+        vertical_spacing = y_range * 0.03  # Spacing between stacked callouts
+
+        # Group options by strike price
+        strike_groups = {}
+        for option in self.options:
+            if option.strike_price not in strike_groups:
+                strike_groups[option.strike_price] = {"long": [], "short": []}
+            strike_groups[option.strike_price][option.position].append(option)
+
+        for strike, positions in strike_groups.items():
+            for position_type in ["long", "short"]:
+                options = positions[position_type]
+                for i, option in enumerate(options):
+                    contract_type = option.contract_type.capitalize()[0]
+                    label = f"{option.strike_price} {contract_type}"
+
+                    # Determine color and position based on option type and position
+                    if position_type == "long":
+                        y_offset = base_top_offset + i * vertical_spacing
+                        color = (
+                            "lightgreen"
+                            if option.contract_type == "call"
+                            else "lightcoral"
+                        )
+                        va = "bottom"
+                    else:  # short position
+                        y_offset = base_bottom_offset - i * vertical_spacing
+                        color = (
+                            "lightgreen"
+                            if option.contract_type == "call"
+                            else "lightcoral"
+                        )
+                        va = "top"
+
+                    self.ax.annotate(
+                        label,
+                        xy=(strike, 0),  # Arrow points to x-axis
+                        xytext=(strike, y_offset),
+                        ha="center",
+                        va=va,
+                        fontsize=8,
+                        bbox=dict(
+                            boxstyle="round,pad=0.3",
+                            fc=color,
+                            ec="black",
+                            lw=1,
+                            alpha=0.8,
+                        ),
+                        arrowprops=dict(arrowstyle="->", color="black", lw=1),
+                    )
+
+        # Adjust the plot limits to ensure all callouts are visible
+        max_stack = max(
+            len(group["long"] + group["short"]) for group in strike_groups.values()
+        )
+        extra_space = max_stack * vertical_spacing
+        self.ax.set_ylim(y_min - extra_space, y_max + extra_space)
+
     def _set_x_ticks(self):
         start = (self.strike_range[0] // 5) * 5
         end = (self.strike_range[-1] // 5 + 1) * 5
@@ -159,7 +224,7 @@ class OptionPlot:
 
 def main():
     spot_price = 5319
-    options = [
+    initial_position = [
         OptionContract(
             strike_price=5420, premium=15.10, contract_type="call", position="long"
         ),
@@ -173,8 +238,22 @@ def main():
             strike_price=5050, premium=36.70, contract_type="put", position="long"
         ),
     ]
+    adjustment = [
+        OptionContract(
+            strike_price=5320, premium=62.20, contract_type="put", position="short"
+        ),
+        OptionContract(
+            strike_price=5320, premium=68.90, contract_type="call", position="short"
+        ),
+        OptionContract(
+            strike_price=5450, premium=13.80, contract_type="call", position="long"
+        ),
+        OptionContract(
+            strike_price=5235, premium=34.95, contract_type="put", position="long"
+        ),
+    ]
 
-    plotter = OptionPlot(options, spot_price)
+    plotter = OptionPlot(initial_position + adjustment, spot_price)
     plotter.plot()
 
 
