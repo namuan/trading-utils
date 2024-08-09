@@ -143,19 +143,19 @@ ax.set_xticklabels(
     fontsize=8,
 )
 # Customize y-axis ticks with smaller font size
-ax.tick_params(axis='y', labelsize=8)
+ax.tick_params(axis="y", labelsize=8)
 
 ax.grid(True, linestyle=":", alpha=0.7)
 
 from matplotlib.lines import Line2D
 
 legend_elements = [
-    Line2D([0], [0], color='green', lw=1, label=f'Max Profit: ${max_profit:.2f}'),
-    Line2D([0], [0], color='red', lw=1, label=f'Max Loss: ${max_loss:.2f}')
+    Line2D([0], [0], color="green", lw=1, label=f"Max Profit: ${max_profit:.2f}"),
+    Line2D([0], [0], color="red", lw=1, label=f"Max Loss: ${max_loss:.2f}"),
 ]
 
 # Add legend
-ax.legend(handles=legend_elements, fontsize=8, loc='upper left')
+ax.legend(handles=legend_elements, fontsize=8, loc="upper left")
 
 # Show the plot
 plt.tight_layout()
