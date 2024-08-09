@@ -1,6 +1,52 @@
+#!/usr/bin/env python3
+"""
+This Python script generates payoff plots for option trading strategies. It visualizes the potential profit or loss of a set of option contracts at different underlying asset prices.
+
+## Features
+
+- Supports both call and put options
+- Handles long and short positions
+- Plots initial position and adjusted position
+- Displays breakeven points, max profit, and max loss
+- Configurable via YAML file
+
+## Usage
+
+1. Create a YAML trade file with your option strategy details.
+2. Run the script from the command line, providing the path to your YAML file:
+
+Usage:
+python3 options-payoff.py your_trade_file.yaml
+
+Example Trade File:
+spot_price: 100
+
+initial_position:
+  - strike_price: 95
+    premium: 1.5
+    contract_type: put
+    position: short
+  - strike_price: 90
+    premium: 0.5
+    contract_type: put
+    position: long
+  - strike_price: 105
+    premium: 1.5
+    contract_type: call
+    position: short
+  - strike_price: 110
+    premium: 0.5
+    contract_type: call
+    position: long
+
+adjustment: []
+"""
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import yaml
 
 
 class OptionContract:
@@ -24,7 +70,7 @@ class OptionPlot:
         self.options = options if isinstance(options, list) else [options]
         self.spot_price = spot_price
 
-    def plot(self):
+    def plot(self, title):
         # Reset the style and create a new figure for each plot
         plt.clf()
         plt.close("all")
@@ -39,6 +85,8 @@ class OptionPlot:
         self._annotate_max_profit_loss()
         self._add_option_callouts()
         self._set_x_ticks()
+        if title:
+            plt.title(title)
         plt.tight_layout()
         plt.show()
 
@@ -229,42 +277,51 @@ class OptionPlot:
         self.ax.set_xticklabels([f"{x:g}" for x in x_ticks], rotation=45, ha="right")
 
 
+def load_config(file_path):
+    with open(file_path, "r") as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+def create_option_contracts(options_data):
+    return [
+        OptionContract(
+            strike_price=option["strike_price"],
+            premium=option["premium"],
+            contract_type=option["contract_type"],
+            position=option["position"],
+        )
+        for option in options_data
+    ]
+
+
 def main():
-    spot_price = 5319
-    initial_position = [
-        OptionContract(
-            strike_price=5420, premium=15.10, contract_type="call", position="long"
-        ),
-        OptionContract(
-            strike_price=5235, premium=94.30, contract_type="call", position="short"
-        ),
-        OptionContract(
-            strike_price=5235, premium=85.60, contract_type="put", position="short"
-        ),
-        OptionContract(
-            strike_price=5050, premium=36.70, contract_type="put", position="long"
-        ),
-    ]
-    adjustment = [
-        OptionContract(
-            strike_price=5320, premium=62.20, contract_type="put", position="short"
-        ),
-        OptionContract(
-            strike_price=5320, premium=68.90, contract_type="call", position="short"
-        ),
-        OptionContract(
-            strike_price=5450, premium=13.80, contract_type="call", position="long"
-        ),
-        OptionContract(
-            strike_price=5235, premium=34.95, contract_type="put", position="long"
-        ),
-    ]
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "config_file", type=str, help="Path to the YAML configuration file"
+    )
+    args = parser.parse_args()
 
+    config = load_config(args.config_file)
+
+    spot_price = config["spot_price"]
+    initial_position = create_option_contracts(config["initial_position"])
+
+    # Plot initial position
     initial_pos = OptionPlot(initial_position, spot_price)
-    initial_pos.plot()
+    initial_pos.plot(f"Initial Position")
 
-    adjusted_pos = OptionPlot(initial_position + adjustment, spot_price)
-    adjusted_pos.plot()
+    current_position = initial_position.copy()
+
+    # Plot each adjustment
+    if "adjustments" in config:
+        for i, adjustment in enumerate(config["adjustments"], 1):
+            adjustment_options = create_option_contracts(adjustment["options"])
+            current_position.extend(adjustment_options)
+            adjusted_pos = OptionPlot(current_position, spot_price)
+            adjusted_pos.plot(f"Position after {adjustment['name']}")
 
 
 if __name__ == "__main__":
