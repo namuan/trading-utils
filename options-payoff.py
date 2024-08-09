@@ -23,10 +23,15 @@ class OptionPlot:
     def __init__(self, options, spot_price):
         self.options = options if isinstance(options, list) else [options]
         self.spot_price = spot_price
-        self.fig, self.ax = plt.subplots(figsize=(14, 8))
-        sns.set(style="whitegrid")
 
     def plot(self):
+        # Reset the style and create a new figure for each plot
+        plt.clf()
+        plt.close("all")
+        sns.reset_orig()
+
+        self.fig, self.ax = plt.subplots(figsize=(14, 8))
+        sns.set_style("whitegrid")
         self._setup_plot()
         self._plot_payoff()
         self._plot_spot_price()
@@ -181,6 +186,7 @@ class OptionPlot:
                             else "lightcoral"
                         )
                         va = "bottom"
+                        ec = "green" if option.contract_type == "call" else "red"
                     else:  # short position
                         y_offset = base_bottom_offset - i * vertical_spacing
                         color = (
@@ -189,6 +195,7 @@ class OptionPlot:
                             else "lightcoral"
                         )
                         va = "top"
+                        ec = "green" if option.contract_type == "call" else "red"
 
                     self.ax.annotate(
                         label,
@@ -200,7 +207,7 @@ class OptionPlot:
                         bbox=dict(
                             boxstyle="round,pad=0.3",
                             fc=color,
-                            ec="black",
+                            ec=ec,
                             lw=1,
                             alpha=0.8,
                         ),
@@ -253,8 +260,11 @@ def main():
         ),
     ]
 
-    plotter = OptionPlot(initial_position + adjustment, spot_price)
-    plotter.plot()
+    initial_pos = OptionPlot(initial_position, spot_price)
+    initial_pos.plot()
+
+    adjusted_pos = OptionPlot(initial_position + adjustment, spot_price)
+    adjusted_pos.plot()
 
 
 if __name__ == "__main__":
