@@ -6,22 +6,27 @@ from tabulate import tabulate
 sns.set(style="whitegrid")
 
 # Spot Price
-spot_price = 5350
+spot_price = 5319
 # Long Call
-strike_price_long_call = 5425
-premium_long_call = 16
+strike_price_long_call = 5420
+premium_long_call = 15.10
+current_premium_long_call = 22.50 # Ask
 # Short Call
-strike_price_short_call = 5270
-premium_short_call = 73.59
-# Long Put
-strike_price_long_put = 5075
-premium_long_put = 40
+strike_price_short_options = 5235
+strike_price_short_call = strike_price_short_options
+premium_short_call = 94.30
+current_premium_short_call = 124.50 # Bid
 # Short Put
-strike_price_short_put = 5270
-premium_short_put = 100.50
+strike_price_short_put = strike_price_short_options
+premium_short_put = 85.60
+current_premium_short_put = 35.10 # Bid
+# Long Put
+strike_price_long_put = 5050
+premium_long_put = 36.70
+current_premium_long_put = 9.60 # Ask
 
 # Range of call option at expiry
-strike_range = np.arange(5000, 5601, 5)
+strike_range = np.arange(strike_price_long_put - 100, strike_price_long_call + 100, 5)
 
 
 def call_payoff(sT, strike_price, premium):
@@ -55,18 +60,21 @@ print(tabulate(profit_loss_table, headers=headers, floatfmt=".2f"))
 
 max_profit = np.max(iron_butterfly_payoff)
 max_loss = np.min(iron_butterfly_payoff)
+unrealized_pl = (
+        (current_premium_long_call - premium_long_call) * -100 +
+        (current_premium_short_call - premium_short_call) * 100 +
+        (current_premium_short_put - premium_short_put) * 100 +
+        (current_premium_long_put - premium_long_put) * -100
+)
 print("Max Profit %.2f" % max_profit)
 print("Min Loss %.2f" % max_loss)
+print("Unrealized Profit/Loss: $%.2f" % unrealized_pl)
 
 # Create the plot
 fig, ax = plt.subplots(figsize=(14, 8))
 
 # Plot the Iron Butterfly payoff
 ax.plot(strike_range, iron_butterfly_payoff, "grey", linewidth=1)
-# ax.plot(strike_range[iron_butterfly_payoff > 0], iron_butterfly_payoff[iron_butterfly_payoff > 0],
-#         color='darkgreen', linewidth=1)
-# ax.plot(strike_range[iron_butterfly_payoff < 0], iron_butterfly_payoff[iron_butterfly_payoff < 0],
-#         color='darkred', linewidth=1)
 
 # Fill areas
 ax.fill_between(
@@ -150,8 +158,9 @@ ax.grid(True, linestyle=":", alpha=0.7)
 from matplotlib.lines import Line2D
 
 legend_elements = [
-    Line2D([0], [0], color="green", lw=1, label=f"Max Profit: ${max_profit:.2f}"),
-    Line2D([0], [0], color="red", lw=1, label=f"Max Loss: ${max_loss:.2f}"),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='black', markersize=3, label=f"Max Profit: ${max_profit:.2f}"),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='black', markersize=3, label=f"Max Loss: ${max_loss:.2f}"),
+    Line2D([0], [0], marker='o', color='w', markerfacecolor='black', markersize=3, label=f"Unrealized P/L: ${unrealized_pl:.2f}"),
 ]
 
 # Add legend
