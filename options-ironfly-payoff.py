@@ -58,7 +58,11 @@ print("Min Loss %.2f" % max_loss)
 fig, ax = plt.subplots(figsize=(14, 8))
 
 # Plot the Iron Butterfly payoff
-ax.plot(strike_range, iron_butterfly_payoff, "black", linewidth=2)
+ax.plot(strike_range, iron_butterfly_payoff, "grey", linewidth=1)
+# ax.plot(strike_range[iron_butterfly_payoff > 0], iron_butterfly_payoff[iron_butterfly_payoff > 0],
+#         color='darkgreen', linewidth=1)
+# ax.plot(strike_range[iron_butterfly_payoff < 0], iron_butterfly_payoff[iron_butterfly_payoff < 0],
+#         color='darkred', linewidth=1)
 
 # Fill areas
 ax.fill_between(
