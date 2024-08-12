@@ -69,6 +69,9 @@ class OptionPlot:
     def __init__(self, options, spot_price):
         self.options = options if isinstance(options, list) else [options]
         self.spot_price = spot_price
+        min_strike = min(option.strike_price for option in self.options)
+        max_strike = max(option.strike_price for option in self.options)
+        self.strike_range = np.arange(min_strike - 1000, max_strike + 1000, 1)
 
     def plot(self, title):
         # Reset the style and create a new figure for each plot
@@ -78,10 +81,12 @@ class OptionPlot:
 
         self.fig, self.ax = plt.subplots(figsize=(14, 8))
         sns.set_style("whitegrid")
-        self._setup_plot()
+        payoffs = [option.payoff(self.strike_range) for option in self.options]
+        total_payoff = np.sum(payoffs, axis=0)
+        breakeven_points = self._plot_breakeven_points(total_payoff)
+        self._setup_plot(total_payoff, breakeven_points)
         self._plot_payoff()
         self._plot_spot_price()
-        self._plot_breakeven_points()
         self._annotate_max_profit_loss()
         self._add_option_callouts()
         self._set_x_ticks()
@@ -90,14 +95,13 @@ class OptionPlot:
         plt.tight_layout()
         plt.show()
 
-    def _setup_plot(self):
-        min_strike = min(option.strike_price for option in self.options)
-        max_strike = max(option.strike_price for option in self.options)
-        self.strike_range = np.arange(min_strike - 100, max_strike + 101, 1)
+    def _setup_plot(self, total_payoff, breakeven_points):
+        if len(breakeven_points) > 0:
+            min_strike = max(0, min(breakeven_points) - 100)
+            max_strike = max(breakeven_points) + 100
+            self.strike_range = np.arange(min_strike, max_strike + 1, 1)
 
-        payoffs = [option.payoff(self.strike_range) for option in self.options]
-        total_payoff = np.sum(payoffs, axis=0)
-
+        # TODO: Set boundary if it is an unlimited loss/gain
         y_min, y_max = min(total_payoff) * 1.1, max(total_payoff) * 1.1
         y_range = y_max - y_min
 
@@ -149,9 +153,7 @@ class OptionPlot:
     def _calculate_percentage_change(self, price):
         return (price - self.spot_price) / self.spot_price * 100
 
-    def _plot_breakeven_points(self):
-        payoffs = [option.payoff(self.strike_range) for option in self.options]
-        total_payoff = np.sum(payoffs, axis=0)
+    def _plot_breakeven_points(self, total_payoff):
         breakeven_points = self.strike_range[
             np.where(np.diff(np.sign(total_payoff)) != 0)[0]
         ]
@@ -173,6 +175,8 @@ class OptionPlot:
                 va="bottom",
                 arrowprops=dict(arrowstyle="->", color="red", lw=1),
             )
+
+        return breakeven_points
 
     def _annotate_max_profit_loss(self):
         payoffs = [option.payoff(self.strike_range) for option in self.options]
