@@ -173,20 +173,31 @@ class OptionPlot:
                 fontsize=8,
                 ha="center",
                 va="bottom",
-                arrowprops=dict(arrowstyle="->", color="red", lw=1),
             )
 
         return breakeven_points
+
+    def _calculate_max_losses(self):
+        payoffs = [option.payoff(self.strike_range) for option in self.options]
+        total_payoff = np.sum(payoffs, axis=0)
+
+        downside_max_loss = min(total_payoff[self.strike_range <= self.spot_price])
+        upside_max_loss = min(total_payoff[self.strike_range >= self.spot_price])
+
+        downside_max_loss_price = self.strike_range[total_payoff == downside_max_loss][0]
+        upside_max_loss_price = self.strike_range[total_payoff == upside_max_loss][-1]
+
+        return downside_max_loss, downside_max_loss_price, upside_max_loss, upside_max_loss_price
 
     def _annotate_max_profit_loss(self):
         payoffs = [option.payoff(self.strike_range) for option in self.options]
         total_payoff = np.sum(payoffs, axis=0)
         max_profit = max(total_payoff)
-        max_loss = min(total_payoff)
-
         max_profit_price = self.strike_range[np.argmax(total_payoff)]
-        max_loss_price = self.strike_range[np.argmin(total_payoff)]
 
+        downside_max_loss, downside_max_loss_price, upside_max_loss, upside_max_loss_price = self._calculate_max_losses()
+
+        # Annotate max profit
         self.ax.annotate(
             f"Max Profit: ${max_profit:.2f}",
             xy=(max_profit_price, max_profit),
@@ -197,12 +208,26 @@ class OptionPlot:
             fontsize=8,
             color="green",
         )
+
+        # Annotate downside max loss
         self.ax.annotate(
-            f"Max Loss: ${max_loss:.2f}",
-            xy=(max_loss_price, max_loss),
+            f"Downside Max Loss: ${downside_max_loss:.2f}",
+            xy=(downside_max_loss_price, downside_max_loss),
             xytext=(5, -5),
             textcoords="offset points",
             ha="left",
+            va="top",
+            fontsize=8,
+            color="red",
+        )
+
+        # Annotate upside max loss
+        self.ax.annotate(
+            f"Upside Max Loss: ${upside_max_loss:.2f}",
+            xy=(upside_max_loss_price, upside_max_loss),
+            xytext=(5, -5),
+            textcoords="offset points",
+            ha="right",
             va="top",
             fontsize=8,
             color="red",
@@ -227,7 +252,7 @@ class OptionPlot:
                 options = positions[position_type]
                 for i, option in enumerate(options):
                     contract_type = option.contract_type.capitalize()[0]
-                    label = f"{option.strike_price} {contract_type}"
+                    label = f"{option.strike_price} {contract_type} (${option.premium})"
 
                     # Determine color and position based on option type and position
                     if position_type == "long":
