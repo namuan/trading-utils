@@ -276,18 +276,6 @@ def determine_strategy_type(trade_legs: List[Position]) -> OptionStrategy:
     return factory.get_strategy(trade_legs)
 
 
-def check_adjustments_needed(strategy_type: str, days_to_expiry: int) -> bool:
-    return days_to_expiry <= 7 and strategy_type in ["short_call", "short_put"]
-
-
-def determine_possible_adjustments(strategy_type: str) -> List[str]:
-    adjustments = {
-        "short_call": ["roll_up", "roll_out"],
-        "short_put": ["roll_down", "roll_out"],
-    }
-    return adjustments.get(strategy_type, [])
-
-
 def generate_pl_payoff_diagrams(position: Position) -> str:
     if isinstance(position.contract, (Option, FuturesOption)):
         return f"P/L and Payoff diagram for {position.contract.symbol} {position.contract.right}{position.contract.strike}"
@@ -416,7 +404,6 @@ def main(args):
             print(f"⚠️ Adjustment required for {options_strategy_name}")
         else:
             print(f"✅ No Adjustment required for {options_strategy_name}")
-
 
         # for trade in trades:
         #     pl_payoff = generate_pl_payoff_diagrams(trade)
