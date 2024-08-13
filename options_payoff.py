@@ -16,7 +16,7 @@ This Python script generates payoff plots for option trading strategies. It visu
 2. Run the script from the command line, providing the path to your YAML file:
 
 Usage:
-python3 options-payoff.py your_trade_file.yaml
+python3 options_payoff.py your_trade_file.yaml
 
 Example Trade File:
 spot_price: 100
