@@ -8,7 +8,7 @@ It will not open a new trade if an existing trade is open for the symbol on the 
 but will still update the ContractPrices table with the latest data.
 
 To see the data from command line
-sqlite3 output/trades.db "SELECT Trades.*, ContractPrices.Time, ContractPrices.CurrentPrice, ContractPrices.CallPrice, ContractPrices.PutPrice FROM Trades LEFT JOIN ContractPrices ON Trades.TradeId = ContractPrices.TradeId;"
+sqlite3 output/spx_straddle.db "SELECT Trades.*, ContractPrices.Time, ContractPrices.CallPrice, ContractPrices.PutPrice FROM Trades LEFT JOIN ContractPrices ON Trades.TradeId = ContractPrices.TradeId;"
 
 Usage:
 ./spx_0dte_straddle_tracker.py -h
@@ -17,30 +17,20 @@ Usage:
 import argparse
 import sqlite3
 import random
+import time
 from datetime import datetime, timedelta
 import os
+import schedule
 
-# Mock functions (connected with blue arrows)
-def get_current_price(symbol):
-    return random.uniform(50, 200)
+import pandas as pd
 
+from common.options import option_expirations, option_chain, process_options_data
 
-def get_option_chain(symbol):
-    return [
-        {
-            "strike": random.uniform(40, 220),
-            "expiry": datetime.now() + timedelta(days=random.randint(1, 365)),
-        }
-        for _ in range(10)
-    ]
-
-
-def get_market_data(symbol, strike_price):
-    return {"call_price": random.uniform(1, 20), "put_price": random.uniform(1, 20)}
+DB_NAME = "spx_straddle.db"
 
 
 # Setup database and tables
-def setup_database(db_name="trades.db"):
+def setup_database(db_name):
     if not os.path.exists("output"):
         os.makedirs("output")
 
@@ -79,11 +69,38 @@ def setup_database(db_name="trades.db"):
     conn.close()
 
 
+def select_strikes_for(
+    options_df,
+    selected_expiry,
+    option_type,
+    additional_filters,
+    sort_criteria,
+    fetch_limit,
+):
+    option_query = f"(expiration_date == '{selected_expiry}') and (option_type == '{option_type}') and {additional_filters}"
+    return (
+        options_df.query(option_query).sort_values(**sort_criteria).head(n=fetch_limit)
+    )
+
+
 # Main process
 def process_symbol(symbol, db_name="trades.db"):
-    current_price = get_current_price(symbol)
-    option_chain = get_option_chain(symbol)
-    closest_expiry = min(option_chain, key=lambda x: x["expiry"])["expiry"]
+    expirations_output = option_expirations(symbol, include_expiration_type=True)
+    [todays_expiry] = [
+        datetime.strptime(x.date, "%Y-%m-%d").date()
+        for x in expirations_output.expirations.expiration
+    ][:1]
+    options_data = option_chain(symbol, todays_expiry)
+    pd.set_option("display.max_rows", None)
+    pd.set_option("display.max_columns", None)
+    pd.set_option("display.width", None)
+
+    pd.set_option("display.float_format", "{:.2f}".format)
+
+    options_df = process_options_data(options_data)
+    # print(options_df[['description', 'strike', 'greeks_delta', 'option_type']])
+    # total_premium = call_strike_record.get("bid") + put_strike_record.get("bid")
+    # print(f"Total premium received: {total_premium}")
 
     conn = sqlite3.connect(f"output/{db_name}")
     cursor = conn.cursor()
@@ -98,14 +115,50 @@ def process_symbol(symbol, db_name="trades.db"):
 
     if existing_trade:
         strike_price = existing_trade[3]
-    else:
-        strike_price = min(
-            [opt["strike"] for opt in option_chain if opt["strike"] > current_price]
+        print(f"Strike price from database {strike_price}")
+        selected_call_strikes = select_strikes_for(
+            options_df,
+            todays_expiry,
+            option_type="call",
+            additional_filters=f"(strike == {strike_price})",
+            sort_criteria=dict(by="greeks_delta", ascending=False),
+            fetch_limit=1,
         )
-
-    market_data = get_market_data(symbol, strike_price)
-
-    if not existing_trade:
+        selected_put_strikes = select_strikes_for(
+            options_df,
+            todays_expiry,
+            option_type="put",
+            additional_filters=f"(strike == {strike_price})",
+            sort_criteria=dict(by="greeks_delta", ascending=False),
+            fetch_limit=1,
+        )
+        call_strike_record, put_strike_record = (
+            selected_call_strikes.iloc[0].to_dict(),
+            selected_put_strikes.iloc[0].to_dict(),
+        )
+    else:
+        selected_call_strikes = select_strikes_for(
+            options_df,
+            todays_expiry,
+            option_type="call",
+            additional_filters=f"(greeks_delta > 0.5)",
+            sort_criteria=dict(by="greeks_delta", ascending=True),
+            fetch_limit=1,
+        )
+        selected_put_strikes = select_strikes_for(
+            options_df,
+            todays_expiry,
+            option_type="put",
+            additional_filters=f"(greeks_delta > -0.5)",
+            sort_criteria=dict(by="greeks_delta", ascending=True),
+            fetch_limit=1,
+        )
+        call_strike_record, put_strike_record = (
+            selected_call_strikes.iloc[0].to_dict(),
+            selected_put_strikes.iloc[0].to_dict(),
+        )
+        strike_price = call_strike_record.get("strike")
+        print(f"Strike price around 50 Delta from Option Chain {strike_price}")
         cursor.execute(
             """
             INSERT INTO Trades (Date, Symbol, StrikePrice, Status)
@@ -115,6 +168,8 @@ def process_symbol(symbol, db_name="trades.db"):
         )
 
     current_time = datetime.now().time().isoformat()  # Convert time to string
+    call_contract_price = call_strike_record.get("bid")
+    put_contract_price = put_strike_record.get("bid")
 
     cursor.execute(
         """
@@ -126,14 +181,32 @@ def process_symbol(symbol, db_name="trades.db"):
             current_time,
             symbol,
             strike_price,
-            market_data["call_price"],
-            market_data["put_price"],
+            call_contract_price,
+            put_contract_price,
             existing_trade[0] if existing_trade else cursor.lastrowid,
         ),
     )
 
+    # Check if adjustment is required
+    price_diff = max(call_contract_price, put_contract_price) / min(
+        call_contract_price, put_contract_price
+    )
+    print(
+        f"Current difference between options prices({call_contract_price, put_contract_price}): "
+        f"{price_diff}"
+    )
+    if price_diff > 5:
+        print("We may need an adjustment. Review data first")
+        print(call_strike_record)
+        print(put_strike_record)
+
     conn.commit()
     conn.close()
+
+
+def run_script(symbol):
+    process_symbol(symbol, db_name=DB_NAME)
+    print(f"Script ran at {datetime.now()}")
 
 
 # Argument parsing
@@ -141,49 +214,20 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("-s", "--symbol", required=True, help="Symbol to process")
+    parser.add_argument("-s", "--symbol", default="XSP", help="Symbol to process")
     args = parser.parse_args()
 
-    setup_database()
-    process_symbol(args.symbol)
+    setup_database(db_name=DB_NAME)
+    schedule.every(1).minutes.do(run_script, symbol=args.symbol)
+
+    print(f"Script scheduled to run every minute for symbol: {args.symbol}")
+    print("Press Ctrl+C to stop the script")
+
+    # Keep the script running
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
 
 if __name__ == "__main__":
     main()
-
-# Tests
-import unittest
-
-
-class TestSymbolProcessing(unittest.TestCase):
-    def setUp(self):
-        self.test_db = "test_trades.db"
-        setup_database(self.test_db)
-        self.conn = sqlite3.connect(f"output/{self.test_db}")
-        self.cursor = self.conn.cursor()
-
-    def tearDown(self):
-        self.conn.close()
-        os.remove(f"output/{self.test_db}")
-
-    def test_process_symbol_three_times(self):
-        symbol = "TEST"
-
-        for _ in range(3):
-            process_symbol(symbol, self.test_db)
-
-        self.cursor.execute("SELECT COUNT(*) FROM Trades WHERE Symbol = ?", (symbol,))
-        trades_count = self.cursor.fetchone()[0]
-        self.assertEqual(
-            trades_count, 1, "Should have a single entry in the Trades table"
-        )
-
-        self.cursor.execute(
-            "SELECT COUNT(*) FROM ContractPrices WHERE Symbol = ?", (symbol,)
-        )
-        contract_prices_count = self.cursor.fetchone()[0]
-        self.assertEqual(
-            contract_prices_count,
-            3,
-            "Should have 3 entries in the ContractPrices table",
-        )
