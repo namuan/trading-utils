@@ -41,21 +41,6 @@ from options_payoff import *
 
 # util.startLoop()  # uncomment this line when in a notebook
 # util.logToConsole("DEBUG")
-def group_positions(positions):
-    grouped = defaultdict(list)
-
-    for position in positions:
-        contract = position.contract
-        if hasattr(contract, "lastTradeDateOrContractMonth"):
-            key = contract.lastTradeDateOrContractMonth
-        else:
-            key = "Stock"  # For stocks or other instruments without expiration
-
-        grouped[key].append(position)
-
-    return grouped
-
-
 def es_premium(n):
     result = n * 2 / 100
     return round(result, 2)
