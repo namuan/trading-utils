@@ -19,6 +19,7 @@ from typing import List
 
 from ib_insync import *
 
+from common.options import get_mid_price
 from options_payoff import *
 
 # pip install ib_insync
@@ -54,10 +55,6 @@ grouped_positions = group_positions(positions)
 def es_premium(n):
     result = n * 2 / 100
     return round(result, 2)
-
-
-def get_mid_price(bid, ask):
-    return bid + ask / 2
 
 
 def calculate_total_premium(options: List[Ticker]) -> float:
@@ -206,9 +203,9 @@ for con in new_long_contracts:
     )
 
 for c in open_contracts:
-    print(c.to_yaml())
+    print(c)
 
-# amendment = OptionPlot(open_contracts, spot_price)
-# amendment.plot("Current Position with another ATM IronFly")
+amendment = OptionPlot(open_contracts, spot_price)
+amendment.plot("Current Position with another ATM IronFly")
 
 ib.disconnect()
