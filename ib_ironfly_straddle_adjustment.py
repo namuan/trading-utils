@@ -17,6 +17,7 @@ from collections import defaultdict
 
 from ib_insync import *
 
+from common.options import get_mid_price
 from options_payoff import *
 
 # pip install ib_insync
@@ -91,10 +92,6 @@ call_contract = FuturesOption(
     right="C",
 )
 new_contracts = ib.reqTickers(*(ib.qualifyContracts(*[put_contract, call_contract])))
-
-
-def get_mid_price(bid, ask):
-    return bid + ask / 2
 
 
 for con in new_contracts:
