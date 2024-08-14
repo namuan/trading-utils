@@ -72,11 +72,6 @@ def calculate_breakeven_on_each_side(premium_received, strike):
     )
 
 
-# Print the grouped positions
-open_contracts = []
-expiry_date = "20240816"
-
-
 def extract_contracts_from(pos_list):
     return [
         FuturesOption(
@@ -122,16 +117,16 @@ def combine_data(positions: List[Position], tickers: List[Ticker]) -> List[Resul
     return result
 
 
-for date, pos_list in grouped_positions.items():
-    if date != expiry_date:
-        continue
-    contracts_from_positions = extract_contracts_from(pos_list)
-    pos_with_current_prices = ib.reqTickers(
-        *(ib.qualifyContracts(*contracts_from_positions))
-    )
-    results = combine_data(pos_list, pos_with_current_prices)
-    for pos in results:
-        open_contracts.append(
+def open_contracts_for_expiry(expiry_date):
+    for date, pos_list in grouped_positions.items():
+        if date != expiry_date:
+            continue
+        contracts_from_positions = extract_contracts_from(pos_list)
+        pos_with_current_prices = ib.reqTickers(
+            *(ib.qualifyContracts(*contracts_from_positions))
+        )
+        results = combine_data(pos_list, pos_with_current_prices)
+        return [
             OptionContract(
                 strike_price=pos.strike,
                 premium=es_premium(pos.avgCost),
@@ -139,7 +134,12 @@ for date, pos_list in grouped_positions.items():
                 position="long" if pos.position > 0 else "short",
                 current_options_price=get_mid_price(pos.bid, pos.ask),
             )
-        )
+            for pos in results
+        ]
+
+
+expiry_date = "20240816"
+open_contracts = open_contracts_for_expiry(expiry_date)
 
 contract = Future("ES", exchange="CME", lastTradeDateOrContractMonth="202409")
 [ticker] = ib.reqTickers(*[contract])
