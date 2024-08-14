@@ -16,23 +16,18 @@ Update Expiry date (Line 59) to pick up the positions from the account
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List
-
+from datetime import datetime, timedelta
 from ib_insync import *
 
 from common.options import get_mid_price
 from options_payoff import *
+
 
 # pip install ib_insync
 # https://ib-insync.readthedocs.io/recipes.html
 
 # util.startLoop()  # uncomment this line when in a notebook
 # util.logToConsole("DEBUG")
-ib = IB()
-ib.connect("127.0.0.1", 7496, clientId=2)
-
-positions = ib.positions()
-
-
 def group_positions(positions):
     grouped = defaultdict(list)
 
@@ -46,10 +41,6 @@ def group_positions(positions):
         grouped[key].append(position)
 
     return grouped
-
-
-# Group the positions
-grouped_positions = group_positions(positions)
 
 
 def es_premium(n):
@@ -117,95 +108,159 @@ def combine_data(positions: List[Position], tickers: List[Ticker]) -> List[Resul
     return result
 
 
-def open_contracts_for_expiry(expiry_date):
-    for date, pos_list in grouped_positions.items():
-        if date != expiry_date:
-            continue
-        contracts_from_positions = extract_contracts_from(pos_list)
-        pos_with_current_prices = ib.reqTickers(
-            *(ib.qualifyContracts(*contracts_from_positions))
+def open_contracts_for_expiry(ib, positions):
+    contracts_from_positions = extract_contracts_from(positions)
+    pos_with_current_prices = ib.reqTickers(
+        *(ib.qualifyContracts(*contracts_from_positions))
+    )
+    results = combine_data(positions, pos_with_current_prices)
+    return [
+        OptionContract(
+            strike_price=pos.strike,
+            premium=es_premium(pos.avgCost),
+            contract_type="call" if pos.right == "C" else "put",
+            position="long" if pos.position > 0 else "short",
+            current_options_price=get_mid_price(pos.bid, pos.ask),
         )
-        results = combine_data(pos_list, pos_with_current_prices)
-        return [
+        for pos in results
+    ]
+
+
+def get_next_futures_expiry(last_trade_date: str) -> str:
+    current_date = datetime.strptime(last_trade_date, "%Y%m%d")
+    expiry_months = [3, 6, 9, 12]
+    current_month = current_date.month
+    next_expiry_month = next(
+        month for month in expiry_months if month > current_month % 12
+    )
+    next_expiry_year = current_date.year
+    if next_expiry_month <= current_month:
+        next_expiry_year += 1
+    next_expiry = datetime(next_expiry_year, next_expiry_month, 1) + timedelta(days=32)
+    next_expiry = next_expiry.replace(day=1) - timedelta(days=1)
+    return next_expiry.strftime("%Y%m")
+
+
+def find_options_for_expiry(open_positions, expiry_date):
+    return [
+        pos
+        for pos in open_positions
+        if isinstance(pos.contract, (Option, FuturesOption))
+        and pos.contract.lastTradeDateOrContractMonth == expiry_date
+    ]
+
+
+def main(args):
+    ib = IB()
+    ib.connect("127.0.0.1", 7496, clientId=2)
+    positions = ib.positions()
+    expiry_date = args.expiry_date
+    open_options = find_options_for_expiry(positions, expiry_date)
+
+    open_contracts = open_contracts_for_expiry(ib, open_options)
+    contract = Future(
+        "ES",
+        exchange="CME",
+        lastTradeDateOrContractMonth=get_next_futures_expiry(expiry_date),
+    )
+    [ticker] = ib.reqTickers(*[contract])
+    spot_price = ticker.marketPrice()
+
+    # Apply another ATM IronFly Adjustments
+    nearest_strike = round(spot_price, -1)
+    short_put_contract = FuturesOption(
+        symbol="ES",
+        lastTradeDateOrContractMonth=expiry_date,
+        strike=nearest_strike,
+        right="P",
+    )
+    short_call_contract = FuturesOption(
+        symbol="ES",
+        lastTradeDateOrContractMonth=expiry_date,
+        strike=nearest_strike,
+        right="C",
+    )
+    new_short_contracts = ib.reqTickers(
+        *(ib.qualifyContracts(*[short_put_contract, short_call_contract]))
+    )
+    total_premium_received = calculate_total_premium(new_short_contracts)
+    breakeven_low, breakeven_high = calculate_breakeven_on_each_side(
+        total_premium_received, nearest_strike
+    )
+    long_put_contract = FuturesOption(
+        symbol="ES",
+        lastTradeDateOrContractMonth=expiry_date,
+        strike=breakeven_low,
+        right="P",
+    )
+    long_call_contract = FuturesOption(
+        symbol="ES",
+        lastTradeDateOrContractMonth=expiry_date,
+        strike=breakeven_high,
+        right="C",
+    )
+    new_long_contracts = ib.reqTickers(
+        *(ib.qualifyContracts(*[long_put_contract, long_call_contract]))
+    )
+
+    for con in new_short_contracts:
+        open_contracts.append(
             OptionContract(
-                strike_price=pos.strike,
-                premium=es_premium(pos.avgCost),
-                contract_type="call" if pos.right == "C" else "put",
-                position="long" if pos.position > 0 else "short",
-                current_options_price=get_mid_price(pos.bid, pos.ask),
+                strike_price=con.contract.strike,
+                premium=get_mid_price(con.bid, con.ask),
+                contract_type="call" if con.contract.right == "C" else "put",
+                position="short",
             )
-            for pos in results
-        ]
-
-
-expiry_date = "20240816"
-open_contracts = open_contracts_for_expiry(expiry_date)
-
-contract = Future("ES", exchange="CME", lastTradeDateOrContractMonth="202409")
-[ticker] = ib.reqTickers(*[contract])
-spot_price = ticker.marketPrice()
-
-# Apply another ATM IronFly Adjustments
-nearest_strike = round(spot_price, -1)
-short_put_contract = FuturesOption(
-    symbol="ES",
-    lastTradeDateOrContractMonth=expiry_date,
-    strike=nearest_strike,
-    right="P",
-)
-short_call_contract = FuturesOption(
-    symbol="ES",
-    lastTradeDateOrContractMonth=expiry_date,
-    strike=nearest_strike,
-    right="C",
-)
-new_short_contracts = ib.reqTickers(
-    *(ib.qualifyContracts(*[short_put_contract, short_call_contract]))
-)
-total_premium_received = calculate_total_premium(new_short_contracts)
-breakeven_low, breakeven_high = calculate_breakeven_on_each_side(
-    total_premium_received, nearest_strike
-)
-long_put_contract = FuturesOption(
-    symbol="ES",
-    lastTradeDateOrContractMonth=expiry_date,
-    strike=breakeven_low,
-    right="P",
-)
-long_call_contract = FuturesOption(
-    symbol="ES",
-    lastTradeDateOrContractMonth=expiry_date,
-    strike=breakeven_high,
-    right="C",
-)
-new_long_contracts = ib.reqTickers(
-    *(ib.qualifyContracts(*[long_put_contract, long_call_contract]))
-)
-
-for con in new_short_contracts:
-    open_contracts.append(
-        OptionContract(
-            strike_price=con.contract.strike,
-            premium=get_mid_price(con.bid, con.ask),
-            contract_type="call" if con.contract.right == "C" else "put",
-            position="short",
         )
-    )
 
-for con in new_long_contracts:
-    open_contracts.append(
-        OptionContract(
-            strike_price=con.contract.strike,
-            premium=get_mid_price(con.bid, con.ask),
-            contract_type="call" if con.contract.right == "C" else "put",
-            position="long",
+    for con in new_long_contracts:
+        open_contracts.append(
+            OptionContract(
+                strike_price=con.contract.strike,
+                premium=get_mid_price(con.bid, con.ask),
+                contract_type="call" if con.contract.right == "C" else "put",
+                position="long",
+            )
         )
+
+    for c in open_contracts:
+        print(c.to_yaml() if args.generate_yaml else c)
+
+    if args.plot:
+        amendment = OptionPlot(open_contracts, spot_price)
+        amendment.plot("Current Position with another ATM IronFly")
+
+    ib.disconnect()
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
     )
+    parser.add_argument(
+        "-e",
+        "--expiry-date",
+        type=str,
+        required=True,
+        help="Expiry date for filter open contracts",
+    )
+    parser.add_argument(
+        "-y",
+        "--generate-yaml",
+        action="store_true",
+        default=False,
+        help="Generate YAML for Contracts",
+    )
+    parser.add_argument(
+        "-p",
+        "--plot",
+        action="store_true",
+        default=False,
+        help="Generate Plot for final position",
+    )
+    return parser.parse_args()
 
-for c in open_contracts:
-    print(c)
 
-amendment = OptionPlot(open_contracts, spot_price)
-amendment.plot("Current Position with another ATM IronFly")
-
-ib.disconnect()
+if __name__ == "__main__":
+    args = parse_args()
+    main(args)
