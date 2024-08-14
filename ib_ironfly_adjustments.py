@@ -19,12 +19,12 @@ from common.ib import (
     calculate_breakeven_on_each_side,
     setup_ib,
 )
-from common.options import get_mid_price
+from common.options import get_mid_price, calculate_nearest_strike
 from options_payoff import *
 
 
-def apply_ironfly_adjustment(expiry_date, ib, spot_price, number=1):
-    nearest_strike = round(spot_price, -1)
+def apply_ironfly_adjustment(expiry_date, ib, spot_price, quantity=1):
+    nearest_strike = calculate_nearest_strike(spot_price)
     short_put_contract = FuturesOption(
         symbol="ES",
         lastTradeDateOrContractMonth=expiry_date,
@@ -71,12 +71,12 @@ def apply_ironfly_adjustment(expiry_date, ib, spot_price, number=1):
             [(con, "short") for con in new_short_contracts]
             + [(con, "long") for con in new_long_contracts]
         )
-        for _ in range(number)
+        for _ in range(quantity)
     ]
 
 
-def apply_straddle_adjustment(expiry_date, ib, spot_price, number=1):
-    nearest_strike = round(spot_price, -1)
+def apply_straddle_adjustment(expiry_date, ib, spot_price, quantity=1):
+    nearest_strike = calculate_nearest_strike(spot_price)
     put_contract = FuturesOption(
         symbol="ES",
         lastTradeDateOrContractMonth=expiry_date,
@@ -101,7 +101,7 @@ def apply_straddle_adjustment(expiry_date, ib, spot_price, number=1):
             position="short",
         )
         for con in new_contracts
-        for _ in range(number)
+        for _ in range(quantity)
     ]
 
 

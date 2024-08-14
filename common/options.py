@@ -74,3 +74,7 @@ def combined_options_df(ticker, expiries):
 
 def get_mid_price(bid, ask):
     return round((bid + ask) / 2, 2)
+
+
+def calculate_nearest_strike(spot_price):
+    return round(spot_price, -1)
