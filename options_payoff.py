@@ -47,38 +47,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import yaml
-import yaml
 
-
-class OptionContract:
-    def __init__(self, strike_price, premium, contract_type, position, current_options_price=0.0):
-        self.strike_price = strike_price
-        self.premium = premium
-        self.contract_type = contract_type
-        self.position = position
-        self.current_options_price = current_options_price
-
-    def payoff(self, stock_prices):
-        if self.contract_type == "call":
-            payoff = np.maximum(stock_prices - self.strike_price, 0) - self.premium
-        else:  # put
-            payoff = np.maximum(self.strike_price - stock_prices, 0) - self.premium
-
-        return payoff * 100 * (1 if self.position == "long" else -1)
-
-    def to_yaml(self):
-        data = {
-            "strike_price": self.strike_price,
-            "premium": self.premium,
-            "contract_type": self.contract_type,
-            "position": self.position
-        }
-        if self.current_options_price != 0.0:
-            data["current_options_price"] = self.current_options_price
-        return yaml.dump([data], default_flow_style=False)
-
-    def __repr__(self):
-        return f"OptionContract({self.strike_price=}, {self.premium=}, {self.contract_type=}, {self.position=}, current_options_price={self.current_options_price if self.current_options_price != 0.0 else 'n/a'})"
+from common.ib import OptionContract
 
 
 class OptionPlot:
@@ -265,10 +235,20 @@ class OptionPlot:
     def calculate_combined_value(self, options):
         total_value = 0
         for option in options:
-            current_price = option.current_options_price if option.current_options_price != "n/a" else option.premium
-            option_value = (current_price - option.premium) * 100 * (1 if option.position == "long" else -1)
+            current_price = (
+                option.current_options_price
+                if option.current_options_price != "n/a"
+                else option.premium
+            )
+            option_value = (
+                (current_price - option.premium)
+                * 100
+                * (1 if option.position == "long" else -1)
+            )
             total_value += option_value
-            print(f"Option: {option}, Used price: {current_price}, Premium: {option.premium}, Value: {option_value}")
+            print(
+                f"Option: {option}, Used price: {current_price}, Premium: {option.premium}, Value: {option_value}"
+            )
         print(f"Total Combined Value: {total_value}")
         return total_value
 
@@ -307,9 +287,7 @@ class OptionPlot:
                         if option.current_options_price != "n/a"
                         else ""
                     )
-                    label = (
-                        f"{option.strike_price} {contract_type} (${option.premium}){current_price}"
-                    )
+                    label = f"{option.strike_price} {contract_type} (${option.premium}){current_price}"
 
                     # Determine color and position based on option type and position
                     if position_type == "long":
@@ -376,7 +354,7 @@ def create_option_contracts(options_data):
             premium=option["premium"],
             contract_type=option["contract_type"],
             position=option["position"],
-            current_options_price=option.get("current_options_price", "n/a")
+            current_options_price=option.get("current_options_price", "n/a"),
         )
         for option in options_data
     ]

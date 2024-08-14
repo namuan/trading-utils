@@ -70,3 +70,7 @@ def combined_options_df(ticker, expiries):
         "{}/{}-options-data.csv".format(output_dir(), ticker), index=False
     )
     return full_options_chain_df
+
+
+def get_mid_price(bid, ask):
+    return round((bid + ask) / 2, 2)
