@@ -12,6 +12,19 @@ Simulate adjusting an IronFly position by adding another ATM IronFly
 Assumptions:
 ES Options
 Update Expiry date (Line 59) to pick up the positions from the account
+
+$ python3 ib_ironfly_another_fly_adjustment.py --help
+usage: ib_ironfly_another_fly_adjustment.py [-h] -e EXPIRY_DATE [-y] [-p]
+options:
+  -h, --help            show this help message and exit
+  -e EXPIRY_DATE, --expiry-date EXPIRY_DATE
+                        Expiry date for filter open contracts
+  -y, --generate-yaml   Generate YAML for Contracts
+  -p, --plot            Generate Plot for final position
+
+Eg:
+$ python3 ib_ironfly_another_fly_adjustment.py --expiry-date 20240816  --plot
+$ python3 ib_ironfly_another_fly_adjustment.py --expiry-date 20240816 --generate-yaml --plot
 """
 from collections import defaultdict
 from dataclasses import dataclass
