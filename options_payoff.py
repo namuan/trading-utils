@@ -106,6 +106,7 @@ class OptionPlot:
         self._annotate_max_profit_loss()
         self._add_option_callouts()
         self._set_x_ticks()
+        self._annotate_combined_value()
         if title:
             plt.title(title)
         plt.tight_layout()
@@ -259,6 +260,27 @@ class OptionPlot:
             va="top",
             fontsize=8,
             color="red",
+        )
+
+    def calculate_combined_value(self, options):
+        total_value = 0
+        for option in options:
+            current_price = option.current_options_price if option.current_options_price != "n/a" else option.premium
+            option_value = (current_price - option.premium) * 100 * (1 if option.position == "long" else -1)
+            total_value += option_value
+            print(f"Option: {option}, Used price: {current_price}, Premium: {option.premium}, Value: {option_value}")
+        print(f"Total Combined Value: {total_value}")
+        return total_value
+
+    def _annotate_combined_value(self):
+        total_value = self.calculate_combined_value(self.options)
+        self.ax.annotate(
+            f"Combined Value: ${total_value:.2f}",
+            xy=(0.5, 1.05),
+            xycoords="axes fraction",
+            ha="center",
+            fontsize=10,
+            color="blue",
         )
 
     def _add_option_callouts(self):
