@@ -47,14 +47,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import yaml
+import yaml
 
 
 class OptionContract:
-    def __init__(self, strike_price, premium, contract_type, position):
+    def __init__(self, strike_price, premium, contract_type, position, current_options_price=0.0):
         self.strike_price = strike_price
         self.premium = premium
         self.contract_type = contract_type
         self.position = position
+        self.current_options_price = current_options_price
 
     def payoff(self, stock_prices):
         if self.contract_type == "call":
@@ -63,6 +65,20 @@ class OptionContract:
             payoff = np.maximum(self.strike_price - stock_prices, 0) - self.premium
 
         return payoff * 100 * (1 if self.position == "long" else -1)
+
+    def to_yaml(self):
+        data = {
+            "strike_price": self.strike_price,
+            "premium": self.premium,
+            "contract_type": self.contract_type,
+            "position": self.position
+        }
+        if self.current_options_price != 0.0:
+            data["current_options_price"] = self.current_options_price
+        return yaml.dump([data], default_flow_style=False)
+
+    def __repr__(self):
+        return f"OptionContract({self.strike_price=}, {self.premium=}, {self.contract_type=}, {self.position=}, current_options_price={self.current_options_price if self.current_options_price != 0.0 else 'n/a'})"
 
 
 class OptionPlot:
@@ -184,10 +200,17 @@ class OptionPlot:
         downside_max_loss = min(total_payoff[self.strike_range <= self.spot_price])
         upside_max_loss = min(total_payoff[self.strike_range >= self.spot_price])
 
-        downside_max_loss_price = self.strike_range[total_payoff == downside_max_loss][0]
+        downside_max_loss_price = self.strike_range[total_payoff == downside_max_loss][
+            0
+        ]
         upside_max_loss_price = self.strike_range[total_payoff == upside_max_loss][-1]
 
-        return downside_max_loss, downside_max_loss_price, upside_max_loss, upside_max_loss_price
+        return (
+            downside_max_loss,
+            downside_max_loss_price,
+            upside_max_loss,
+            upside_max_loss_price,
+        )
 
     def _annotate_max_profit_loss(self):
         payoffs = [option.payoff(self.strike_range) for option in self.options]
@@ -195,7 +218,12 @@ class OptionPlot:
         max_profit = max(total_payoff)
         max_profit_price = self.strike_range[np.argmax(total_payoff)]
 
-        downside_max_loss, downside_max_loss_price, upside_max_loss, upside_max_loss_price = self._calculate_max_losses()
+        (
+            downside_max_loss,
+            downside_max_loss_price,
+            upside_max_loss,
+            upside_max_loss_price,
+        ) = self._calculate_max_losses()
 
         # Annotate max profit
         self.ax.annotate(
@@ -319,6 +347,7 @@ def create_option_contracts(options_data):
             premium=option["premium"],
             contract_type=option["contract_type"],
             position=option["position"],
+            current_options_price=option.get("current_options_price", "n/a")
         )
         for option in options_data
     ]
