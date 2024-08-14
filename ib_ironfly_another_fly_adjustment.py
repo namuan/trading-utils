@@ -14,6 +14,7 @@ ES Options
 Update Expiry date (Line 59) to pick up the positions from the account
 """
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import List
 
 from ib_insync import *
@@ -26,7 +27,7 @@ from options_payoff import *
 # util.startLoop()  # uncomment this line when in a notebook
 # util.logToConsole("DEBUG")
 ib = IB()
-ib.connect("127.0.0.1", 4001, clientId=2)
+ib.connect("127.0.0.1", 7496, clientId=2)
 
 positions = ib.positions()
 
@@ -68,24 +69,78 @@ def calculate_total_premium(options: List[Ticker]) -> float:
 
 
 def calculate_breakeven_on_each_side(premium_received, strike):
-    return ((round(strike - premium_received, -1)),
-            (round(strike + premium_received, -1)))
+    return (
+        (round(strike - premium_received, -1)),
+        (round(strike + premium_received, -1)),
+    )
 
 
 # Print the grouped positions
 open_contracts = []
 expiry_date = "20240816"
+
+
+def extract_contracts_from(pos_list):
+    return [
+        FuturesOption(
+            symbol=fo.contract.symbol,
+            lastTradeDateOrContractMonth=fo.contract.lastTradeDateOrContractMonth,
+            strike=fo.contract.strike,
+            right=fo.contract.right,
+        )
+        for fo in pos_list
+    ]
+
+
+@dataclass
+class ResultItem:
+    conId: int
+    strike: float
+    avgCost: float
+    position: float
+    right: str
+    bid: float
+    ask: float
+
+
+def combine_data(positions: List[Position], tickers: List[Ticker]) -> List[ResultItem]:
+    result = []
+    ticker_dict = {ticker.contract.conId: ticker for ticker in tickers}
+
+    for pos in positions:
+        ticker = ticker_dict.get(pos.contract.conId)
+        if ticker:
+            result.append(
+                ResultItem(
+                    conId=pos.contract.conId,
+                    strike=pos.contract.strike,
+                    avgCost=pos.avgCost,
+                    position=pos.position,
+                    right=pos.contract.right,
+                    bid=ticker.bid,
+                    ask=ticker.ask,
+                )
+            )
+
+    return result
+
+
 for date, pos_list in grouped_positions.items():
     if date != expiry_date:
         continue
-    for pos in pos_list:
-        contract = pos.contract
+    contracts_from_positions = extract_contracts_from(pos_list)
+    pos_with_current_prices = ib.reqTickers(
+        *(ib.qualifyContracts(*contracts_from_positions))
+    )
+    results = combine_data(pos_list, pos_with_current_prices)
+    for pos in results:
         open_contracts.append(
             OptionContract(
-                strike_price=pos.contract.strike,
+                strike_price=pos.strike,
                 premium=es_premium(pos.avgCost),
-                contract_type="call" if pos.contract.right == "C" else "put",
+                contract_type="call" if pos.right == "C" else "put",
                 position="long" if pos.position > 0 else "short",
+                current_options_price=get_mid_price(pos.bid, pos.ask),
             )
         )
 
@@ -151,9 +206,9 @@ for con in new_long_contracts:
     )
 
 for c in open_contracts:
-    print(c)
+    print(c.to_yaml())
 
-amendment = OptionPlot(open_contracts, spot_price)
-amendment.plot("Current Position with another ATM IronFly")
+# amendment = OptionPlot(open_contracts, spot_price)
+# amendment.plot("Current Position with another ATM IronFly")
 
 ib.disconnect()
