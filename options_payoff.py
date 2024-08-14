@@ -280,7 +280,14 @@ class OptionPlot:
                 options = positions[position_type]
                 for i, option in enumerate(options):
                     contract_type = option.contract_type.capitalize()[0]
-                    label = f"{option.strike_price} {contract_type} (${option.premium})"
+                    current_price = (
+                        f", Now: ${option.current_options_price:.2f}"
+                        if option.current_options_price != "n/a"
+                        else ""
+                    )
+                    label = (
+                        f"{option.strike_price} {contract_type} (${option.premium}){current_price}"
+                    )
 
                     # Determine color and position based on option type and position
                     if position_type == "long":
