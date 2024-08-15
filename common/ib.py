@@ -31,9 +31,8 @@ def setup_ib(client_id=1):
     return ib
 
 
-def es_premium(n):
-    result = n * 2 / 100
-    return round(result, 2)
+def premium_from(average_cost):
+    return round(average_cost / 100, 2)
 
 
 def calculate_total_premium(options: List[Ticker]) -> float:
@@ -72,6 +71,7 @@ class ResultItem:
     right: str
     bid: float
     ask: float
+    multiplier: int
 
 
 def combine_data(positions: List[Position], tickers: List[Ticker]) -> List[ResultItem]:
@@ -90,6 +90,7 @@ def combine_data(positions: List[Position], tickers: List[Ticker]) -> List[Resul
                     right=pos.contract.right,
                     bid=ticker.bid,
                     ask=ticker.ask,
+                    multiplier=int(ticker.contract.multiplier)
                 )
             )
 
@@ -140,16 +141,18 @@ def open_contracts_for_expiry(ib, positions):
         *(ib.qualifyContracts(*contracts_from_positions))
     )
     results = combine_data(positions, pos_with_current_prices)
-    return [
-        OptionContract(
-            strike_price=pos.strike,
-            premium=es_premium(pos.avgCost),
-            contract_type="call" if pos.right == "C" else "put",
-            position="long" if pos.position > 0 else "short",
-            current_options_price=get_mid_price(pos.bid, pos.ask),
+
+    def create_option_contracts(result):
+        contract = OptionContract(
+            strike_price=result.strike,
+            premium=premium_from(result.avgCost),
+            contract_type="call" if result.right == "C" else "put",
+            position="long" if result.position > 0 else "short",
+            current_options_price=get_mid_price(result.bid, result.ask) / (1 / result.multiplier * 100),
         )
-        for pos in results
-    ]
+        return [contract] * abs(int(result.position))
+
+    return [contract for res in results for contract in create_option_contracts(res)]
 
 
 def get_next_futures_expiry(last_trade_date: str) -> str:

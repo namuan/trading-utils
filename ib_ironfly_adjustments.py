@@ -128,6 +128,12 @@ def main(args):
 
     if args.plot:
         (
+            OptionPlot(open_contracts, spot_price).plot(
+                "Current Position"
+            )
+        )
+
+        (
             OptionPlot(open_contracts + ironfly_adjustment, spot_price).plot(
                 "Current Position with another ATM IronFly"
             )
