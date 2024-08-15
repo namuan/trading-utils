@@ -90,7 +90,7 @@ def combine_data(positions: List[Position], tickers: List[Ticker]) -> List[Resul
                     right=pos.contract.right,
                     bid=ticker.bid,
                     ask=ticker.ask,
-                    multiplier=int(ticker.contract.multiplier)
+                    multiplier=int(ticker.contract.multiplier),
                 )
             )
 
@@ -148,7 +148,8 @@ def open_contracts_for_expiry(ib, positions):
             premium=premium_from(result.avgCost),
             contract_type="call" if result.right == "C" else "put",
             position="long" if result.position > 0 else "short",
-            current_options_price=get_mid_price(result.bid, result.ask) / (1 / result.multiplier * 100),
+            current_options_price=get_mid_price(result.bid, result.ask)
+            / (1 / result.multiplier * 100),
         )
         return [contract] * abs(int(result.position))
 
@@ -177,3 +178,15 @@ def find_options_for_expiry(open_positions, expiry_date):
         if isinstance(pos.contract, (Option, FuturesOption))
         and pos.contract.lastTradeDateOrContractMonth == expiry_date
     ]
+
+
+def exclude_option_contracts_with(contracts, strike_price, contract_type, position):
+    output = []
+    for contract in contracts:
+        if (
+            contract.strike_price != strike_price
+            or contract.contract_type != contract_type
+            or contract.position != position
+        ):
+            output.append(contract)
+    return output
