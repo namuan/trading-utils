@@ -67,6 +67,15 @@ class OptionPlot:
 
         self.fig, self.ax = plt.subplots(figsize=(14, 8))
         sns.set_style("whitegrid")
+        self.annot = self.ax.annotate(
+            "",
+            xy=(0, 0),
+            xytext=(0, 20),
+            textcoords="offset points",
+            bbox=dict(boxstyle="round", fc="w", ec="gray", alpha=0.8),
+            fontsize=8,
+        )
+        self.annot.set_visible(False)
         payoffs = [option.payoff(self.strike_range) for option in self.options]
         total_payoff = np.sum(payoffs, axis=0)
         breakeven_points = self._plot_breakeven_points(total_payoff)
@@ -80,7 +89,25 @@ class OptionPlot:
         if title:
             plt.title(title)
         plt.tight_layout()
+        self.fig.canvas.mpl_connect("motion_notify_event", self.hover)
         plt.show()
+
+    def update_annot(self, pos):
+        x, y = pos.xdata, pos.ydata
+        self.annot.xy = (x, y)
+        text = f"@ {x:.2f} P/L: {y:.2f})"
+        self.annot.set_text(text)
+
+    def hover(self, event):
+        vis = self.annot.get_visible()
+        if event.inaxes == self.ax:
+            self.annot.set_visible(True)
+            self.update_annot(event)
+            self.fig.canvas.draw_idle()
+        else:
+            if vis:
+                self.annot.set_visible(False)
+                self.fig.canvas.draw_idle()
 
     def _setup_plot(self, total_payoff, breakeven_points):
         if len(breakeven_points) > 0:
