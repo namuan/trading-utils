@@ -1,0 +1,27 @@
+//@version=5
+indicator(title="[TVT] Short Term (1h)", shorttitle="TVT-DT", overlay=true, timeframe="", timeframe_gaps=true)
+
+src = input(close)
+exponential = input(true, title="Exponential MA")
+bb_mult = input.float(defval = 2.0, minval=0.001, maxval=50, title="BB Oversold/Overbought deviation")
+ma1_in = input(40,title='MA-1')
+ma2_in = input(60,title='MA-2')
+
+ma1 = exponential ? ta.ema(src, ma1_in) : ta.sma(src, ma1_in)
+ma2 = exponential ? ta.ema(src, ma2_in) : ta.sma(src, ma2_in)
+
+p_ma1 = plot(ma1, color=color.green,  title="MMA1", linewidth=1)
+p_ma2 = plot(ma2, color=color.red, title="MMA2", linewidth=1)
+
+up_color = color.lime
+down_color = color.maroon
+
+fill(p_ma1, p_ma2, color=ma1 > ma2 ? color.new(up_color, transp=70) : color.new(down_color, transp=70))
+
+// BB Expansion
+bb_stdev = bb_mult * ta.stdev(src, ma1_in)
+bb_upper = ma2 + bb_stdev
+bb_lower = ma2 - bb_stdev
+
+plot(bb_upper, color=color.new(color.blue, 50), title="BB Upper", linewidth=1)
+plot(bb_lower, color=color.new(color.blue, 50) , title="BB Lower", linewidth=1)
