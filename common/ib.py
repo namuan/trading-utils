@@ -20,7 +20,7 @@ from typing import List
 
 import numpy as np
 import yaml
-from ib_insync import *
+from ib_async import *
 
 from common.options import get_mid_price
 
