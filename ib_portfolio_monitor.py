@@ -4,10 +4,11 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import List, Dict
 
-from ib_insync import *
+from ib_async import *
 
-ib = IB()
-ib.connect("127.0.0.1", 4001, clientId=2)
+from common.ib import setup_ib
+
+ib = setup_ib()
 ib.reqMarketDataType(2)
 
 
@@ -50,54 +51,14 @@ class OptionStrategy(ABC):
     ) -> bool:
         pass
 
-
-class SingleLegStrategy(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return len(trade_legs) == 1
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
-
-
-class VerticalSpread(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return (
-            len(trade_legs) >= 2
-            and all(
-                leg.contract.right == trade_legs[0].contract.right for leg in trade_legs
-            )
-            and any(
-                leg1.position * leg2.position < 0
-                for leg1 in trade_legs
-                for leg2 in trade_legs
-                if leg1 != leg2
-            )
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
-
-
-class LongStraddle(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return (
-            len(trade_legs) == 2
-            and trade_legs[0].contract.right != trade_legs[1].contract.right
-            and trade_legs[0].position > 0
-            and trade_legs[1].position > 0
-            and trade_legs[0].contract.strike == trade_legs[1].contract.strike
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        # Implement long straddle specific adjustment logic
-        # This is a placeholder. Replace with your actual logic.
-        return False
+    @abstractmethod
+    def simulate_adjustments(
+        self,
+        trades: List[Position],
+        days_to_expiry: int,
+        latest_prices: Dict[str, float],
+    ):
+        pass
 
 
 class ShortStraddle(OptionStrategy):
@@ -113,27 +74,15 @@ class ShortStraddle(OptionStrategy):
     def adjustment_required(
         self, days_to_expiry: int, latest_prices: Dict[str, float]
     ) -> bool:
-        # Implement short straddle specific adjustment logic
-        # This is a placeholder. Replace with your actual logic.
         return False
 
-
-class LongStrangle(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return (
-            len(trade_legs) == 2
-            and trade_legs[0].contract.right != trade_legs[1].contract.right
-            and trade_legs[0].position > 0
-            and trade_legs[1].position > 0
-            and trade_legs[0].contract.strike != trade_legs[1].contract.strike
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        # Implement long strangle specific adjustment logic
-        # This is a placeholder. Replace with your actual logic.
-        return False
+    def simulate_adjustments(
+        self,
+        trades: List[Position],
+        days_to_expiry: int,
+        latest_prices: Dict[str, float],
+    ):
+        pass
 
 
 class ShortStrangle(OptionStrategy):
@@ -149,23 +98,15 @@ class ShortStrangle(OptionStrategy):
     def adjustment_required(
         self, days_to_expiry: int, latest_prices: Dict[str, float]
     ) -> bool:
-        # Implement short strangle specific adjustment logic
-        # This is a placeholder. Replace with your actual logic.
         return False
 
-
-class Collar(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return (
-            len(trade_legs) == 2
-            and trade_legs[0].contract.right != trade_legs[1].contract.right
-            and trade_legs[0].position * trade_legs[1].position < 0
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
+    def simulate_adjustments(
+        self,
+        trades: List[Position],
+        days_to_expiry: int,
+        latest_prices: Dict[str, float],
+    ):
+        pass
 
 
 class IronCondor(OptionStrategy):
@@ -199,8 +140,23 @@ class IronCondor(OptionStrategy):
     ) -> bool:
         return False
 
+    def simulate_adjustments(
+        self,
+        trades: List[Position],
+        days_to_expiry: int,
+        latest_prices: Dict[str, float],
+    ):
+        pass
+
+
+class IronButterflyStraddleAdjustment:
+    pass
+
 
 class IronButterfly(OptionStrategy):
+    def __init__(self):
+        self.adjustments = [IronButterflyStraddleAdjustment()]
+
     def is_match(self, trade_legs: List[Position]) -> bool:
         if len(trade_legs) != 4:
             return False
@@ -224,15 +180,13 @@ class IronButterfly(OptionStrategy):
     ) -> bool:
         return True
 
-
-class ComplexStrategy(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return len(trade_legs) > 2
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
+    def simulate_adjustments(
+        self,
+        trades: List[Position],
+        days_to_expiry: int,
+        latest_prices: Dict[str, float],
+    ):
+        pass
 
 
 class UnknownStrategy(OptionStrategy):
@@ -244,20 +198,22 @@ class UnknownStrategy(OptionStrategy):
     ) -> bool:
         return False
 
+    def simulate_adjustments(
+        self,
+        trades: List[Position],
+        days_to_expiry: int,
+        latest_prices: Dict[str, float],
+    ):
+        pass
+
 
 class StrategyFactory:
     def __init__(self):
         self.strategies = [
-            SingleLegStrategy(),
-            VerticalSpread(),
-            LongStraddle(),
             ShortStraddle(),
-            LongStrangle(),
             ShortStrangle(),
-            Collar(),
             IronCondor(),
             IronButterfly(),
-            ComplexStrategy(),
             UnknownStrategy(),
         ]
 
@@ -304,28 +260,17 @@ def generate_report(positions: List[Position], adjustments: Dict) -> str:
 
 
 def get_next_futures_expiry(last_trade_date: str) -> str:
-    # Convert the input string to a datetime object
     current_date = datetime.strptime(last_trade_date, "%Y%m%d")
-
-    # Define the quarterly expiry months
     expiry_months = [3, 6, 9, 12]
-
-    # Find the next expiry month
     current_month = current_date.month
     next_expiry_month = next(
         month for month in expiry_months if month > current_month % 12
     )
-
-    # Calculate the year of the next expiry
     next_expiry_year = current_date.year
     if next_expiry_month <= current_month:
         next_expiry_year += 1
-
-    # Create the next expiry date (always use the last day of the month)
     next_expiry = datetime(next_expiry_year, next_expiry_month, 1) + timedelta(days=32)
     next_expiry = next_expiry.replace(day=1) - timedelta(days=1)
-
-    # Format the result as a string
     return next_expiry.strftime("%Y%m")
 
 
@@ -347,7 +292,6 @@ def get_underlying_contract(contract_symbol, contract_last_trade_date) -> Contra
 
 
 def get_latest_prices(positions: List[Position]) -> Dict[str, float]:
-    # First, build a dictionary of unique underlyings
     unique_underlyings = {}
     for position in positions:
         symbol = position.contract.symbol
@@ -360,11 +304,9 @@ def get_latest_prices(positions: List[Position]) -> Dict[str, float]:
             )
             unique_underlyings[storage_key] = underlying
 
-    # Fetch prices for all unique underlyings in one batch
     underlyings_list = list(unique_underlyings.values())
     batch_prices = get_latest_price(underlyings_list)
 
-    # Map the prices back to the storage keys
     prices = {}
     for storage_key, underlying in unique_underlyings.items():
         index = underlyings_list.index(underlying)
@@ -386,7 +328,7 @@ def get_latest_price(underlyings) -> List[float]:
 
 
 def main(args):
-    open_positions = get_open_positions()
+    open_positions = ib.positions()
     options_trades = filter_open_positions_for_options_trades(open_positions)
     latest_prices = get_latest_prices(options_trades)
     print(f"Latest prices: {latest_prices}")
@@ -402,6 +344,7 @@ def main(args):
 
         if options_strategy.adjustment_required(days_to_expiry, latest_prices):
             print(f"⚠️ Adjustment required for {options_strategy_name}")
+            options_strategy.simulate_adjustments(trades, days_to_expiry, latest_prices)
         else:
             print(f"✅ No Adjustment required for {options_strategy_name}")
 
