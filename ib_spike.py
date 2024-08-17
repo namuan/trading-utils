@@ -11,15 +11,16 @@ Port 4001 is for connection to IB Gateway using real trading account
 # pip install ib_insync
 # https://ib-insync.readthedocs.io/recipes.html
 
-from ib_insync import *
-import ib_insync
+from ib_async import *
+import ib_async
+
+from common.ib import setup_ib
 
 # util.startLoop()  # uncomment this line when in a notebook
+util.logToConsole("DEBUG")
 
-ib = IB()
-ib.connect("127.0.0.1", 4001, clientId=1)
-print(ib_insync.__all__)
-print(ib.positions())
+ib = setup_ib()
+print(ib_async.__all__)
 
 contract = Stock("TSLA", "SMART", "USD")
 print(ib.reqContractDetails(contract))
