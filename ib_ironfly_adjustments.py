@@ -9,7 +9,7 @@ $ python3 ib_ironfly_adjustments.py --help
 Eg:
 $ python3 ib_ironfly_adjustments.py --expiry-date 20240816  --plot
 """
-from ib_insync import *
+from ib_async import *
 
 from common.ib import (
     find_options_for_expiry,
