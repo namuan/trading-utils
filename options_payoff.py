@@ -59,7 +59,7 @@ class OptionPlot:
         max_strike = max(option.strike_price for option in self.options)
         self.strike_range = np.arange(min_strike - 1000, max_strike + 1000, 1)
 
-    def plot(self, title):
+    def plot(self, title, show_plot=False):
         # Reset the style and create a new figure for each plot
         plt.clf()
         plt.close("all")
@@ -90,7 +90,8 @@ class OptionPlot:
             plt.title(title)
         plt.tight_layout()
         self.fig.canvas.mpl_connect("motion_notify_event", self.hover)
-        plt.show()
+        if show_plot:
+            plt.show()
 
     def update_annot(self, pos):
         x, y = pos.xdata, pos.ydata
@@ -403,7 +404,7 @@ def main():
 
     # Plot initial position
     initial_pos = OptionPlot(initial_position, spot_price)
-    initial_pos.plot(f"Initial Position")
+    initial_pos.plot(f"Initial Position", show_plot=True)
 
     current_position = initial_position.copy()
 
