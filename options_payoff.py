@@ -55,9 +55,6 @@ class OptionPlot:
     def __init__(self, options, spot_price):
         self.options = options if isinstance(options, list) else [options]
         self.spot_price = spot_price
-        min_strike = min(option.strike_price for option in self.options)
-        max_strike = max(option.strike_price for option in self.options)
-        self.strike_range = np.arange(min_strike - 1000, max_strike + 1000, 1)
 
     def plot(self, title, show_plot=False):
         # Reset the style and create a new figure for each plot
@@ -76,10 +73,21 @@ class OptionPlot:
             fontsize=8,
         )
         self.annot.set_visible(False)
+        min_strike = min(option.strike_price for option in self.options)
+        max_strike = max(option.strike_price for option in self.options)
+        self.strike_range = np.arange(min_strike - 100, max_strike + 100, 1)
         payoffs = [option.payoff(self.strike_range) for option in self.options]
         total_payoff = np.sum(payoffs, axis=0)
         breakeven_points = self._plot_breakeven_points(total_payoff)
-        self._setup_plot(total_payoff, breakeven_points)
+        if len(breakeven_points) > 0:
+            min_range = min(min(breakeven_points), min_strike) - 200
+            max_range = max(max(breakeven_points), max_strike) + 200
+        else:
+            min_range = min_strike - 100
+            max_range = max_strike + 100
+
+        self.strike_range = np.arange(min_range, max_range, 1)
+        self._setup_plot(total_payoff)
         self._plot_payoff()
         self._plot_spot_price()
         self._annotate_max_profit_loss()
@@ -110,12 +118,7 @@ class OptionPlot:
                 self.annot.set_visible(False)
                 self.fig.canvas.draw_idle()
 
-    def _setup_plot(self, total_payoff, breakeven_points):
-        if len(breakeven_points) > 0:
-            min_strike = max(0, min(breakeven_points) - 100)
-            max_strike = max(breakeven_points) + 100
-            self.strike_range = np.arange(min_strike, max_strike + 1, 1)
-
+    def _setup_plot(self, total_payoff):
         # TODO: Set boundary if it is an unlimited loss/gain
         y_min, y_max = min(total_payoff) * 1.1, max(total_payoff) * 1.1
         y_range = y_max - y_min
