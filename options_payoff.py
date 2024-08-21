@@ -80,11 +80,11 @@ class OptionPlot:
         total_payoff = np.sum(payoffs, axis=0)
         breakeven_points = self._plot_breakeven_points(total_payoff)
         if len(breakeven_points) > 0:
-            min_range = min(min(breakeven_points), min_strike) - 200
-            max_range = max(max(breakeven_points), max_strike) + 200
+            min_range = min(min(breakeven_points), min_strike) - 100
+            max_range = max(max(breakeven_points), max_strike) + 100
         else:
-            min_range = min_strike - 100
-            max_range = max_strike + 100
+            min_range = min_strike - 50
+            max_range = max_strike + 50
 
         self.strike_range = np.arange(min_range, max_range, 1)
         self._setup_plot(total_payoff)
@@ -417,7 +417,7 @@ def main():
             adjustment_options = create_option_contracts(adjustment["options"])
             current_position.extend(adjustment_options)
             adjusted_pos = OptionPlot(current_position, spot_price)
-            adjusted_pos.plot(f"Position after {adjustment['name']}")
+            adjusted_pos.plot(f"Position after {adjustment['name']}", show_plot=True)
 
 
 if __name__ == "__main__":
