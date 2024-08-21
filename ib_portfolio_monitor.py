@@ -6,7 +6,7 @@ from typing import List, Dict
 
 from ib_async import *
 
-from common.ib import setup_ib
+from common.ib import setup_ib, get_next_futures_expiry
 
 ib = setup_ib()
 ib.reqMarketDataType(2)
@@ -257,21 +257,6 @@ def generate_report(positions: List[Position], adjustments: Dict) -> str:
     #         report += f"Proposed Adjustments: {', '.join(adjustments[pos.contract.localSymbol])}\n"
     #     report += "\n"
     return report
-
-
-def get_next_futures_expiry(last_trade_date: str) -> str:
-    current_date = datetime.strptime(last_trade_date, "%Y%m%d")
-    expiry_months = [3, 6, 9, 12]
-    current_month = current_date.month
-    next_expiry_month = next(
-        month for month in expiry_months if month > current_month % 12
-    )
-    next_expiry_year = current_date.year
-    if next_expiry_month <= current_month:
-        next_expiry_year += 1
-    next_expiry = datetime(next_expiry_year, next_expiry_month, 1) + timedelta(days=32)
-    next_expiry = next_expiry.replace(day=1) - timedelta(days=1)
-    return next_expiry.strftime("%Y%m")
 
 
 def get_underlying_contract(contract_symbol, contract_last_trade_date) -> Contract:
