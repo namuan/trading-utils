@@ -126,20 +126,13 @@ def main(args):
     # Apply ATM Straddle
     straddle_adjustment = apply_straddle_adjustment(expiry_date, ib, spot_price)
 
-    if args.plot:
-        (OptionPlot(open_contracts, spot_price).plot("Current Position"))
-
-        (
-            OptionPlot(open_contracts + ironfly_adjustment, spot_price).plot(
-                "Current Position with another ATM IronFly"
-            )
-        )
-
-        (
-            OptionPlot(open_contracts + straddle_adjustment, spot_price).plot(
-                "Current Position with ATM Straddle"
-            )
-        )
+    OptionPlot(open_contracts, spot_price).plot("Current Position", show_plot=args.plot)
+    OptionPlot(open_contracts + ironfly_adjustment, spot_price).plot(
+        "Current Position with another ATM IronFly", show_plot=args.plot
+    )
+    OptionPlot(open_contracts + straddle_adjustment, spot_price).plot(
+        "Current Position with ATM Straddle", show_plot=args.plot
+    )
 
     ib.disconnect()
 
