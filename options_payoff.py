@@ -277,10 +277,9 @@ class OptionPlot:
                 * (1 if option.position == "long" else -1)
             )
             total_value += option_value
-            print(
-                f"Option: {option}, Used price: {current_price}, Premium: {option.premium}, Value: {option_value}"
-            )
+            print(option.to_yaml())
         print(f"Total Combined Value: {total_value}")
+        print("--" * 50)
         return total_value
 
     def _annotate_combined_value(self):
