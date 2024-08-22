@@ -59,8 +59,6 @@ def create_plots(reit_data, market_data, start_date, end_date):
     market_start_price = market_data["Adj Close"].iloc[0]
     reit_end_price = reit_data["Adj Close"].iloc[-1]
     market_end_price = market_data["Adj Close"].iloc[-1]
-    # start_date = reit_data.index[0]
-    # end_date = reit_data.index[-1]
 
     # Start date annotations
     axs[0].annotate(
@@ -100,10 +98,10 @@ def create_plots(reit_data, market_data, start_date, end_date):
 
     # Plot the cumulative change comparison
     reit_cumulative_change = (
-        reit_data["Adj Close"] / reit_data["Adj Close"].iloc[0]
+        reit_data["Adj Close"] / reit_start_price
     ) - 1
     market_cumulative_change = (
-        market_data["Adj Close"] / market_data["Adj Close"].iloc[0]
+        market_data["Adj Close"] / market_start_price
     ) - 1
     axs[1].plot(
         reit_cumulative_change.index,
