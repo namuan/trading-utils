@@ -2,7 +2,6 @@
 Simulate adjusting an IronFly position by adding another ATM IronFly
 Assumptions:
 ES Options
-Update Expiry date (Line 59) to pick up the positions from the account
 
 $ python3 ib_ironfly_adjustments.py --help
 

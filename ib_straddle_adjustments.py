@@ -1,13 +1,10 @@
 """
-Simulate adjusting an IronFly position by adding another ATM IronFly
-Assumptions:
-ES Options
-Update Expiry date (Line 59) to pick up the positions from the account
+Simulate adjusting a Straddle position by adding another Straddle
 
-$ python3 ib_ironfly_adjustments.py --help
+$ python3 ib_straddle_adjustments.py --help
 
 Eg:
-$ python3 ib_ironfly_adjustments.py --expiry-date 20240816  --plot
+$ python3 ib_straddle_adjustments.py --expiry-date 20240816  --plot
 """
 from ib_async import *
 
