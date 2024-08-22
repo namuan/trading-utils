@@ -20,58 +20,6 @@ from common.options import get_mid_price, calculate_nearest_strike
 from options_payoff import *
 
 
-def apply_ironfly_adjustment(expiry_date, ib, spot_price, quantity=1):
-    nearest_strike = calculate_nearest_strike(spot_price)
-    short_put_contract = FuturesOption(
-        symbol="ES",
-        lastTradeDateOrContractMonth=expiry_date,
-        strike=nearest_strike,
-        right="P",
-    )
-    short_call_contract = FuturesOption(
-        symbol="ES",
-        lastTradeDateOrContractMonth=expiry_date,
-        strike=nearest_strike,
-        right="C",
-    )
-    new_short_contracts = ib.reqTickers(
-        *(ib.qualifyContracts(*[short_put_contract, short_call_contract]))
-    )
-    total_premium_received = calculate_total_premium(new_short_contracts)
-    breakeven_low, breakeven_high = calculate_breakeven_on_each_side(
-        total_premium_received, nearest_strike
-    )
-    long_put_contract = FuturesOption(
-        symbol="ES",
-        lastTradeDateOrContractMonth=expiry_date,
-        strike=breakeven_low,
-        right="P",
-    )
-    long_call_contract = FuturesOption(
-        symbol="ES",
-        lastTradeDateOrContractMonth=expiry_date,
-        strike=breakeven_high,
-        right="C",
-    )
-    new_long_contracts = ib.reqTickers(
-        *(ib.qualifyContracts(*[long_put_contract, long_call_contract]))
-    )
-
-    return [
-        OptionContract(
-            strike_price=con.contract.strike,
-            premium=get_mid_price(con.bid, con.ask),
-            contract_type="call" if con.contract.right == "C" else "put",
-            position=position,
-        )
-        for con, position in (
-            [(con, "short") for con in new_short_contracts]
-            + [(con, "long") for con in new_long_contracts]
-        )
-        for _ in range(quantity)
-    ]
-
-
 def apply_straddle_adjustment(expiry_date, ib, spot_price, quantity=1):
     nearest_strike = calculate_nearest_strike(spot_price)
     put_contract = FuturesOption(
