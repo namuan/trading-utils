@@ -97,12 +97,8 @@ def create_plots(reit_data, market_data, start_date, end_date):
     )
 
     # Plot the cumulative change comparison
-    reit_cumulative_change = (
-        reit_data["Adj Close"] / reit_start_price
-    ) - 1
-    market_cumulative_change = (
-        market_data["Adj Close"] / market_start_price
-    ) - 1
+    reit_cumulative_change = (reit_data["Adj Close"] / reit_start_price) - 1
+    market_cumulative_change = (market_data["Adj Close"] / market_start_price) - 1
     axs[1].plot(
         reit_cumulative_change.index,
         reit_cumulative_change,
