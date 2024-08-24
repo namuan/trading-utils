@@ -12,7 +12,7 @@ Export output to a file
 $ python3 rsi-estimate.py --generations 5 > spy-5-rsi.txt
 
 Filter rows using awk
-$ $ awk -F '[ ,:]+' '$10 > 15 && $10 < 16 && $2 = "2024-06-12" && $4 = "5"' data/spy-5-rsi.txt | grep -v "\---"
+$ awk -F '[ ,:]+' '$10 > 15 && $10 < 16 && $2 = "2024-06-12" && $4 = "5"' data/spy-5-rsi.txt | grep -v "\---"
 
 Help:
     $ python3 rsi-estimate.py -h
