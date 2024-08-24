@@ -85,12 +85,12 @@ class MovingAverageTrendStrategy(bt.Strategy):
             )
             if stocks_to_purchase > 0:
                 self.log(
-                    f"📈 Buy Create {stocks_to_purchase:.2f} @ Close {self.data_close[0]} - MA_1 {ma_1[0]}"
+                    f"📈 Buy Create {stocks_to_purchase:.2f} @ Close {self.data_close[0]} - MA_1 {ma_1[0]} - MA_2 {ma_2[0]}"
                 )
                 self.order = self.buy(size=stocks_to_purchase)
 
         if self.position and self.data_close < ma_1:
-            self.log(f"📉 Sell Create, Close {self.data_close[0]} - MA_1 {ma_1[0]}")
+            self.log(f"📉 Sell Create, Close {self.data_close[0]} - MA_1 {ma_1[0]} - MA_2 {ma_2[0]}")
             position = self.getposition()
             self.order = self.sell(size=position.size)
 
