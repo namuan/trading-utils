@@ -19,20 +19,23 @@ def parse_args():
     return parser.parse_args()
 
 
+def read_from_csv(ticker):
+    return StockDataFrame.retype(
+        pd.read_csv(
+            f"{output_dir()}/{ticker}.csv",
+            index_col="Date",
+            parse_dates=True,
+        )
+    )
+
+
 if __name__ == "__main__":
     args = parse_args()
 
     all_tickers = macro_etfs
     print(f"All Tickers: {all_tickers}")
     stocks_df = {
-        ticker: StockDataFrame.retype(
-            pd.read_csv(
-                f"{output_dir()}/{ticker}.csv",
-                index_col="Date",
-                parse_dates=True,
-            )
-        )
-        for ticker in tqdm(all_tickers, "Reading data")
+        ticker: read_from_csv(ticker) for ticker in tqdm(all_tickers, "Reading data")
     }
 
     # price / vol plot
