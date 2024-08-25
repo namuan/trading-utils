@@ -148,11 +148,8 @@ py report_by_query.py -o smooth_30 -t "AllRSI" -v -q "(day_0_rsi_2 < 10) and (da
 ```
 
 ```shell
-py report_by_query.py -o smooth_30 -t "RSI3 Dips" -v -q "(last_close > 100 and week_0_rsi_3 < 10)"
-```
-
-```shell
 py report_by_query.py -o smooth_30 -t "RSI3 Bounce" -v -q "last_close > 10 and week_1_rsi_3 < 5 and week_0_rsi_3 > 5 and week_0_rsi_3 < 10"
+py report_by_query.py -o smooth_30 -t "RSI4 Bounce" -v -q "last_close > 10 and day_2_rsi_4 < 15 and day_1_rsi_4 > 15 and day_0_rsi_4 > 15"
 ```
 
 ```shell
