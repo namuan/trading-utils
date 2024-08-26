@@ -220,7 +220,7 @@ def main():
         start_date,
         end_date,
         show_plot=args.show_plot,
-        animation_duration=20,
+        animation_duration=60,
         fps=30,
         font_name="Verdana",
     )
