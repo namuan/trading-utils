@@ -17,7 +17,6 @@ Usage:
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -66,51 +65,53 @@ def parse_args():
     return parser.parse_args()
 
 
-def calc_gamma_ex(S, K, vol, T, r, q, optType, OI):
-    if T == 0 or vol == 0:
+def calc_gamma_ex(s, k, vol, t, r, q, opt_type, oi):
+    """Calculate gamma exposure for an option."""
+    if t == 0 or vol == 0:
         return 0
 
-    dp = (np.log(S / K) + (r - q + 0.5 * vol**2) * T) / (vol * np.sqrt(T))
-    dm = dp - vol * np.sqrt(T)
+    dp = (np.log(s / k) + (r - q + 0.5 * vol**2) * t) / (vol * np.sqrt(t))
+    dm = dp - vol * np.sqrt(t)
 
-    if optType == "call":
-        gamma = np.exp(-q * T) * norm.pdf(dp) / (S * vol * np.sqrt(T))
-        return OI * 100 * S * S * 0.01 * gamma
+    if opt_type == "call":
+        gamma = np.exp(-q * t) * norm.pdf(dp) / (s * vol * np.sqrt(t))
+        return oi * 100 * s * s * 0.01 * gamma
     else:  # Gamma is same for calls and puts. This is just to cross-check
-        gamma = K * np.exp(-r * T) * norm.pdf(dm) / (S * S * vol * np.sqrt(T))
-        return OI * 100 * S * S * 0.01 * gamma
+        gamma = k * np.exp(-r * t) * norm.pdf(dm) / (s * s * vol * np.sqrt(t))
+        return oi * 100 * s * s * 0.01 * gamma
 
 
 def is_third_friday(d):
+    """Check if a given date is the third Friday of the month."""
     return d.weekday() == 4 and 15 <= d.day <= 21
 
 
 def load_and_process_data(file_path):
+    """Load and pre-process the options data from the CSV file."""
     logging.info(f"Loading data from {file_path}")
-    optionsFile = open(file_path)
-    optionsFileData = optionsFile.readlines()
-    optionsFile.close()
+    with open(file_path, "r") as options_file:
+        options_file_data = options_file.readlines()
 
-    spotLine = optionsFileData[1]
-    spotPrice = float(spotLine.split("Last:")[1].split(",")[0])
-    logging.debug(f"Spot price: {spotPrice}")
+    spot_line = options_file_data[1]
+    spot_price = float(spot_line.split("Last:")[1].split(",")[0])
+    logging.debug(f"Spot price: {spot_price}")
 
-    dateLine = optionsFileData[2]
-    todayDate = dateLine.split("Date: ")[1].split(",")
-    monthDay = todayDate[0].split(" ")
+    date_line = options_file_data[2]
+    today_date = date_line.split("Date: ")[1].split(",")
+    month_day = today_date[0].split(" ")
 
-    if len(monthDay) == 2:
-        year = int(todayDate[1])
-        month = monthDay[0]
-        day = int(monthDay[1])
+    if len(month_day) == 2:
+        year = int(today_date[1])
+        month = month_day[0]
+        day = int(month_day[1])
     else:
-        year = int(monthDay[2])
-        month = monthDay[1]
-        day = int(monthDay[0])
+        year = int(month_day[2])
+        month = month_day[1]
+        day = int(month_day[0])
 
-    todayDate = datetime.strptime(month, "%B")
-    todayDate = todayDate.replace(day=day, year=year)
-    logging.debug(f"Today's date: {todayDate}")
+    today_date = datetime.strptime(month, "%B")
+    today_date = today_date.replace(day=day, year=year)
+    logging.debug(f"Today's date: {today_date}")
 
     df = pd.read_csv(file_path, sep=",", header=None, skiprows=4)
     df.columns = [
@@ -148,41 +149,43 @@ def load_and_process_data(file_path):
     df["CallOpenInt"] = df["CallOpenInt"].astype(float)
     df["PutOpenInt"] = df["PutOpenInt"].astype(float)
 
-    return df, spotPrice, todayDate
+    return df, spot_price, today_date
 
 
-def calculate_gamma_exposure(df, spotPrice):
+def calculate_gamma_exposure(df, spot_price):
+    """Calculate gamma exposure for all options."""
     logging.info("Calculating gamma exposure")
     df["CallGEX"] = (
-        df["CallGamma"] * df["CallOpenInt"] * 100 * spotPrice * spotPrice * 0.01
+        df["CallGamma"] * df["CallOpenInt"] * 100 * spot_price * spot_price * 0.01
     )
     df["PutGEX"] = (
-        df["PutGamma"] * df["PutOpenInt"] * 100 * spotPrice * spotPrice * 0.01 * -1
+        df["PutGamma"] * df["PutOpenInt"] * 100 * spot_price * spot_price * 0.01 * -1
     )
     df["TotalGamma"] = (df.CallGEX + df.PutGEX) / 10**9
     return df
 
 
-def calculate_gamma_profile(df, spotPrice, fromStrike, toStrike, todayDate):
+def calculate_gamma_profile(df, spot_price, from_strike, to_strike, today_date):
+    """Calculate the gamma exposure profile for a range of spot prices."""
     logging.info("Calculating gamma profile")
-    levels = np.linspace(fromStrike, toStrike, 60)
+    levels = np.linspace(from_strike, to_strike, 60)
 
     df["daysTillExp"] = [
         1 / 262
-        if (np.busday_count(todayDate.date(), x.date())) == 0
-        else np.busday_count(todayDate.date(), x.date()) / 262
+        if (np.busday_count(today_date.date(), x.date())) == 0
+        else np.busday_count(today_date.date(), x.date()) / 262
         for x in df.ExpirationDate
     ]
 
-    nextExpiry = df["ExpirationDate"].min()
+    next_expiry = df["ExpirationDate"].min()
 
     df["IsThirdFriday"] = [is_third_friday(x) for x in df.ExpirationDate]
-    thirdFridays = df.loc[df["IsThirdFriday"] == True]
-    nextMonthlyExp = thirdFridays["ExpirationDate"].min()
+    third_fridays = df.loc[df["IsThirdFriday"] == True]
+    next_monthly_exp = third_fridays["ExpirationDate"].min()
 
-    totalGamma = []
-    totalGammaExNext = []
-    totalGammaExFri = []
+    total_gamma = []
+    total_gamma_ex_next = []
+    total_gamma_ex_fri = []
 
     for level in levels:
         df["callGammaEx"] = df.apply(
@@ -213,43 +216,43 @@ def calculate_gamma_profile(df, spotPrice, fromStrike, toStrike, todayDate):
             axis=1,
         )
 
-        totalGamma.append(df["callGammaEx"].sum() - df["putGammaEx"].sum())
+        total_gamma.append(df["callGammaEx"].sum() - df["putGammaEx"].sum())
 
-        exNxt = df.loc[df["ExpirationDate"] != nextExpiry]
-        totalGammaExNext.append(exNxt["callGammaEx"].sum() - exNxt["putGammaEx"].sum())
+        ex_nxt = df.loc[df["ExpirationDate"] != next_expiry]
+        total_gamma_ex_next.append(
+            ex_nxt["callGammaEx"].sum() - ex_nxt["putGammaEx"].sum()
+        )
 
-        exFri = df.loc[df["ExpirationDate"] != nextMonthlyExp]
-        totalGammaExFri.append(exFri["callGammaEx"].sum() - exFri["putGammaEx"].sum())
+        ex_fri = df.loc[df["ExpirationDate"] != next_monthly_exp]
+        total_gamma_ex_fri.append(
+            ex_fri["callGammaEx"].sum() - ex_fri["putGammaEx"].sum()
+        )
 
-    totalGamma = np.array(totalGamma) / 10**9
-    totalGammaExNext = np.array(totalGammaExNext) / 10**9
-    totalGammaExFri = np.array(totalGammaExFri) / 10**9
+    total_gamma = np.array(total_gamma) / 10**9
+    total_gamma_ex_next = np.array(total_gamma_ex_next) / 10**9
+    total_gamma_ex_fri = np.array(total_gamma_ex_fri) / 10**9
 
-    return levels, totalGamma, totalGammaExNext, totalGammaExFri
-
-
-import matplotlib.pyplot as plt
-import numpy as np
-
+    return levels, total_gamma, total_gamma_ex_next, total_gamma_ex_fri
 
 def plot_combined_gamma(
     df,
-    spotPrice,
-    fromStrike,
-    toStrike,
-    todayDate,
+    spot_price,
+    from_strike,
+    to_strike,
+    today_date,
     levels,
-    totalGamma,
-    totalGammaExNext,
-    totalGammaExFri,
+    total_gamma,
+    total_gamma_ex_next,
+    total_gamma_ex_fri,
 ):
+    """Generate and display the combined gamma analysis chart."""
     logging.info("Plotting combined gamma figure")
 
     fig, (ax1, ax2, ax3) = plt.subplots(
         3, 1, figsize=(12, 20), gridspec_kw={"hspace": 0.4}
     )
     fig.suptitle(
-        "SPX Gamma Analysis - " + todayDate.strftime("%d %b %Y"),
+        "SPX Gamma Analysis - " + today_date.strftime("%d %b %Y"),
         fontweight="bold",
         fontsize=12,
     )
@@ -261,19 +264,19 @@ def plot_combined_gamma(
     legend_fontsize = 6
 
     # Plot 1: Gamma Exposure
-    dfAgg = df.groupby(["StrikePrice"]).sum()
-    strikes = dfAgg.index.values
+    df_agg = df.groupby(["StrikePrice"]).sum()
+    strikes = df_agg.index.values
 
     ax1.grid(True)
     ax1.bar(
         strikes,
-        dfAgg["TotalGamma"].to_numpy(),
+        df_agg["TotalGamma"].to_numpy(),
         width=6,
         linewidth=0.1,
         edgecolor="k",
         label="Gamma Exposure",
     )
-    ax1.set_xlim([fromStrike, toStrike])
+    ax1.set_xlim([from_strike, to_strike])
     ax1.set_title(
         "Total Gamma: $"
         + str("{:.2f}".format(df["TotalGamma"].sum()))
@@ -283,56 +286,56 @@ def plot_combined_gamma(
     ax1.set_xlabel("Strike", fontsize=label_fontsize)
     ax1.set_ylabel("Spot Gamma Exposure ($ billions/1% move)", fontsize=label_fontsize)
     ax1.axvline(
-        x=spotPrice,
+        x=spot_price,
         color="r",
         lw=1,
-        label="SPX Spot: " + str("{:,.0f}".format(spotPrice)),
+        label="SPX Spot: " + str("{:,.0f}".format(spot_price)),
     )
     ax1.legend(fontsize=legend_fontsize)
     ax1.tick_params(axis="both", which="major", labelsize=tick_fontsize)
 
     # Plot 2: Gamma Profile
     ax2.grid(True)
-    ax2.plot(levels, totalGamma, label="All Expiries")
+    ax2.plot(levels, total_gamma, label="All Expiries")
     ax2.set_title("Gamma Exposure Profile", fontsize=title_fontsize)
     ax2.set_xlabel("Index Price", fontsize=label_fontsize)
     ax2.set_ylabel("Gamma Exposure ($ billions/1% move)", fontsize=label_fontsize)
     ax2.axvline(
-        x=spotPrice,
+        x=spot_price,
         color="r",
         lw=1,
-        label="SPX Spot: " + str("{:,.0f}".format(spotPrice)),
+        label="SPX Spot: " + str("{:,.0f}".format(spot_price)),
     )
     ax2.axhline(y=0, color="grey", lw=1)
-    ax2.set_xlim([fromStrike, toStrike])
+    ax2.set_xlim([from_strike, to_strike])
     ax2.legend(fontsize=legend_fontsize)
     ax2.tick_params(axis="both", which="major", labelsize=tick_fontsize)
 
     # Calculate zero gamma point
-    zeroCrossIdx = np.where(np.diff(np.sign(totalGamma)))[0]
-    if len(zeroCrossIdx) > 0:
-        negGamma = totalGamma[zeroCrossIdx[0]]
-        posGamma = totalGamma[zeroCrossIdx[0] + 1]
-        negStrike = levels[zeroCrossIdx[0]]
-        posStrike = levels[zeroCrossIdx[0] + 1]
-        zeroGamma = posStrike - (
-            (posStrike - negStrike) * posGamma / (posGamma - negGamma)
+    zero_cross_idx = np.where(np.diff(np.sign(total_gamma)))[0]
+    if len(zero_cross_idx) > 0:
+        neg_gamma = total_gamma[zero_cross_idx[0]]
+        pos_gamma = total_gamma[zero_cross_idx[0] + 1]
+        neg_strike = levels[zero_cross_idx[0]]
+        pos_strike = levels[zero_cross_idx[0] + 1]
+        zero_gamma = pos_strike - (
+            (pos_strike - neg_strike) * pos_gamma / (pos_gamma - neg_gamma)
         )
         ax2.axvline(
-            x=zeroGamma,
+            x=zero_gamma,
             color="g",
             lw=1,
-            label="Gamma Flip: " + str("{:,.0f}".format(zeroGamma)),
+            label="Gamma Flip: " + str("{:,.0f}".format(zero_gamma)),
         )
         ax2.fill_between(
-            [fromStrike, zeroGamma],
+            [from_strike, zero_gamma],
             ax2.get_ylim()[0],
             ax2.get_ylim()[1],
             facecolor="red",
             alpha=0.1,
         )
         ax2.fill_between(
-            [zeroGamma, toStrike],
+            [zero_gamma, to_strike],
             ax2.get_ylim()[0],
             ax2.get_ylim()[1],
             facecolor="green",
@@ -342,20 +345,20 @@ def plot_combined_gamma(
 
     # Plot 3: Gamma Profile with Ex-Next and Ex-Monthly
     ax3.grid(True)
-    ax3.plot(levels, totalGamma, label="All Expiries")
-    ax3.plot(levels, totalGammaExNext, label="Ex-Next Expiry")
-    ax3.plot(levels, totalGammaExFri, label="Ex-Next Monthly Expiry")
+    ax3.plot(levels, total_gamma, label="All Expiries")
+    ax3.plot(levels, total_gamma_ex_next, label="Ex-Next Expiry")
+    ax3.plot(levels, total_gamma_ex_fri, label="Ex-Next Monthly Expiry")
     ax3.set_title("Gamma Exposure Profile - Comparison", fontsize=title_fontsize)
     ax3.set_xlabel("Index Price", fontsize=label_fontsize)
     ax3.set_ylabel("Gamma Exposure ($ billions/1% move)", fontsize=label_fontsize)
     ax3.axvline(
-        x=spotPrice,
+        x=spot_price,
         color="r",
         lw=1,
-        label="SPX Spot: " + str("{:,.0f}".format(spotPrice)),
+        label="SPX Spot: " + str("{:,.0f}".format(spot_price)),
     )
     ax3.axhline(y=0, color="grey", lw=1)
-    ax3.set_xlim([fromStrike, toStrike])
+    ax3.set_xlim([from_strike, to_strike])
     ax3.legend(fontsize=legend_fontsize)
     ax3.tick_params(axis="both", which="major", labelsize=tick_fontsize)
 
@@ -365,27 +368,30 @@ def plot_combined_gamma(
 
 def main(args):
     file_path = args.file
-    df, spotPrice, todayDate = load_and_process_data(file_path)
+    df, spot_price, today_date = load_and_process_data(file_path)
 
-    fromStrike = 0.8 * spotPrice
-    toStrike = 1.2 * spotPrice
+    from_strike = 0.8 * spot_price
+    to_strike = 1.2 * spot_price
 
-    df = calculate_gamma_exposure(df, spotPrice)
+    df = calculate_gamma_exposure(df, spot_price)
 
-    levels, totalGamma, totalGammaExNext, totalGammaExFri = calculate_gamma_profile(
-        df, spotPrice, fromStrike, toStrike, todayDate
-    )
+    (
+        levels,
+        total_gamma,
+        total_gamma_ex_next,
+        total_gamma_ex_fri,
+    ) = calculate_gamma_profile(df, spot_price, from_strike, to_strike, today_date)
 
     plot_combined_gamma(
         df,
-        spotPrice,
-        fromStrike,
-        toStrike,
-        todayDate,
+        spot_price,
+        from_strike,
+        to_strike,
+        today_date,
         levels,
-        totalGamma,
-        totalGammaExNext,
-        totalGammaExFri,
+        total_gamma,
+        total_gamma_ex_next,
+        total_gamma_ex_fri,
     )
 
 
