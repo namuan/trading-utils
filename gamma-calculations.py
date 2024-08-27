@@ -234,6 +234,7 @@ def calculate_gamma_profile(df, spot_price, from_strike, to_strike, today_date):
 
     return levels, total_gamma, total_gamma_ex_next, total_gamma_ex_fri
 
+
 def plot_combined_gamma(
     df,
     spot_price,
