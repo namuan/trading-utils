@@ -240,28 +240,30 @@ class OptionPlot:
         )
 
         # Annotate downside max loss
-        self.ax.annotate(
-            f"Downside Max Loss: ${downside_max_loss:.2f}",
-            xy=(downside_max_loss_price, downside_max_loss),
-            xytext=(5, -5),
-            textcoords="offset points",
-            ha="left",
-            va="top",
-            fontsize=8,
-            color="red",
-        )
+        if downside_max_loss < 0:
+            self.ax.annotate(
+                f"Downside Max Loss: ${downside_max_loss:.2f}",
+                xy=(downside_max_loss_price, downside_max_loss),
+                xytext=(5, -5),
+                textcoords="offset points",
+                ha="left",
+                va="top",
+                fontsize=8,
+                color="red",
+            )
 
         # Annotate upside max loss
-        self.ax.annotate(
-            f"Upside Max Loss: ${upside_max_loss:.2f}",
-            xy=(upside_max_loss_price, upside_max_loss),
-            xytext=(5, -5),
-            textcoords="offset points",
-            ha="right",
-            va="top",
-            fontsize=8,
-            color="red",
-        )
+        if upside_max_loss < 0:
+            self.ax.annotate(
+                f"Upside Max Loss: ${upside_max_loss:.2f}",
+                xy=(upside_max_loss_price, upside_max_loss),
+                xytext=(5, -5),
+                textcoords="offset points",
+                ha="right",
+                va="top",
+                fontsize=8,
+                color="red",
+            )
 
     def calculate_combined_value(self, options):
         total_value = 0
