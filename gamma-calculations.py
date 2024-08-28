@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-SPX Gamma Calculations Script
+Gamma Calculations Script
 
-This script performs gamma calculations for SPX options and generates various charts.
+This script performs gamma calculations for options and generates various charts.
 
 Download CSV from https://www.cboe.com/delayed_quotes/spx/quote_table
 Options Range -> "All"
@@ -61,8 +61,8 @@ def parse_args():
     parser.add_argument(
         "-f",
         "--file",
-        default="spx_quotedata.csv",
-        help="Input CSV file name (default: spx_quotedata.csv)",
+        required=True,
+        help="Input CSV file name",
     )
     return parser.parse_args()
 
@@ -255,7 +255,7 @@ def plot_combined_gamma(
         3, 1, figsize=(12, 20), gridspec_kw={"hspace": 0.4}
     )
     fig.suptitle(
-        "SPX Gamma Analysis - " + today_date.strftime("%d %b %Y"),
+        "Gamma Analysis - " + today_date.strftime("%d %b %Y"),
         fontweight="bold",
         fontsize=12,
     )
@@ -283,7 +283,7 @@ def plot_combined_gamma(
     ax1.set_title(
         "Total Gamma: $"
         + str("{:.2f}".format(df["TotalGamma"].sum()))
-        + " Bn per 1% SPX Move",
+        + " Bn per 1% Move",
         fontsize=title_fontsize,
     )
     ax1.set_xlabel("Strike", fontsize=label_fontsize)
@@ -292,7 +292,7 @@ def plot_combined_gamma(
         x=spot_price,
         color="r",
         lw=1,
-        label="SPX Spot: " + str("{:,.0f}".format(spot_price)),
+        label="Spot: " + str("{:,.0f}".format(spot_price)),
     )
     ax1.legend(fontsize=legend_fontsize)
     ax1.tick_params(axis="both", which="major", labelsize=tick_fontsize)
@@ -307,7 +307,7 @@ def plot_combined_gamma(
         x=spot_price,
         color="r",
         lw=1,
-        label="SPX Spot: " + str("{:,.0f}".format(spot_price)),
+        label="Spot: " + str("{:,.0f}".format(spot_price)),
     )
     ax2.axhline(y=0, color="grey", lw=1)
     ax2.set_xlim([from_strike, to_strike])
@@ -358,7 +358,7 @@ def plot_combined_gamma(
         x=spot_price,
         color="r",
         lw=1,
-        label="SPX Spot: " + str("{:,.0f}".format(spot_price)),
+        label="Spot: " + str("{:,.0f}".format(spot_price)),
     )
     ax3.axhline(y=0, color="grey", lw=1)
     ax3.set_xlim([from_strike, to_strike])
