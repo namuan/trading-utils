@@ -272,7 +272,7 @@ def create_streamgraph():
         df.T,
         labels=df.columns,
         colors=cmap(np.linspace(0, 1, n_bins)),
-        baseline="sym",
+        baseline="zero",
     )
 
     # Customize the plot
