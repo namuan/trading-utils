@@ -378,7 +378,7 @@ def main(args):
     base_filename = os.path.basename(file_path)
     new_filename = f"{os.path.splitext(base_filename)[0]}-{current_date}.csv"
     new_file_path = os.path.join(output_dir, new_filename)
-    shutil.copy(file_path, new_file_path)
+    shutil.move(file_path, new_file_path)
 
     # Use the copied file for processing
     df, spot_price, today_date = load_and_process_data(new_file_path)
