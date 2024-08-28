@@ -10,9 +10,8 @@ Usage:
 """
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
-import numpy as np
+
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
 
 
@@ -47,12 +46,6 @@ def parse_args():
         help="Increase verbosity of logging output",
     )
     return parser.parse_args()
-
-
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
 
 
 def create_streamgraph():
@@ -252,54 +245,60 @@ def create_streamgraph():
     df = pd.DataFrame(data)
     df = df.set_index("Year")
 
-    # Create custom colormap
-    colors = [
-        "#A2A2A2",
-        "#00A4EF",
-        "#76B900",
-        "#EA4335",
-        "#FF9900",
-        "#4267B2",
-        "#CC0000",
-    ]
-    n_bins = len(colors)
-    cmap = LinearSegmentedColormap.from_list("custom", colors, N=n_bins)
+    # Create color dictionary
+    color_dict = {
+        "Apple": "#A2A2A2",
+        "Microsoft": "#00A4EF",
+        "NVIDIA": "#76B900",
+        "Alphabet": "#EA4335",
+        "Amazon": "#FF9900",
+        "Meta": "#4267B2",
+        "Tesla": "#CC0000",
+    }
+
+    # Sort columns by final year values (descending)
+    df = df.sort_values(by=2024, axis=1, ascending=False)
 
     # Create the streamgraph
     fig, ax = plt.subplots(figsize=(15, 10))
-    ax.stackplot(
+    areas = ax.stackplot(
         df.index,
         df.T,
         labels=df.columns,
-        colors=cmap(np.linspace(0, 1, n_bins)),
-        baseline="zero",
+        colors=[color_dict[company] for company in df.columns],
+        baseline="sym",
     )
 
     # Customize the plot
     ax.set_xlim(2000, 2024)
     max_value = df.sum(axis=1).max()
-    ax.set_ylim(-max_value / 2, max_value / 2)
+    ax.set_ylim(max_value / 2, -max_value / 2)  # Invert y-axis
     ax.set_facecolor("#1E1E1E")  # Dark background
     fig.patch.set_facecolor("#1E1E1E")
 
     # Remove axes
     ax.axis("off")
 
+    # Calculate label positions
+    label_positions = []
+    for area in areas:
+        path = area.get_paths()[-1]
+        vertices = path.vertices
+        y_vals = vertices[:, 1]
+        y_center = (y_vals.max() + y_vals.min()) / 1
+        label_positions.append(y_center)
+
     # Add labels for the final values
-    cumsum = df.iloc[-1].cumsum()
-    last_sum = 0
-    for i, (company, value) in enumerate(df.iloc[-1].items()):
-        if value > 0:
-            y_pos = last_sum + value / 2 - max_value / 2
-            ax.text(
-                2024.5,
-                y_pos,
-                f"{company}\n{value:.2f}T",
-                color=colors[i],
-                ha="left",
-                va="center",
-            )
-            last_sum += value
+    for y_pos, company in zip(label_positions, df.columns):
+        value = df.loc[2024, company]
+        ax.text(
+            2024.5,
+            y_pos,
+            f"{company}\n{value:.2f}T",
+            color=color_dict[company],
+            ha="left",
+            va="center",
+        )
 
     # Add title and market cap growth
     ax.text(
@@ -311,16 +310,6 @@ def create_streamgraph():
         transform=ax.transAxes,
         color="white",
         fontsize=16,
-    )
-    ax.text(
-        0.5,
-        0.9,
-        "25% CAGR",
-        ha="center",
-        va="top",
-        transform=ax.transAxes,
-        color="white",
-        fontsize=12,
     )
 
     # Add date and total market cap
