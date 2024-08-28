@@ -290,7 +290,7 @@ def create_streamgraph():
 
     # Add labels for the final values
     for y_pos, company in zip(label_positions, df.columns):
-        value = df.loc[2024, company]
+        value = df.loc[2024, company] / 1000  # Convert to trillions
         ax.text(
             2024.5,
             y_pos,
@@ -313,7 +313,7 @@ def create_streamgraph():
     )
 
     # Add date and total market cap
-    total_market_cap = df.iloc[-1].sum()
+    total_market_cap = df.iloc[-1].sum() / 1000  # Convert to trillions
     ax.text(
         0.95,
         0.95,
