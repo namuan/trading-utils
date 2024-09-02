@@ -75,7 +75,7 @@ class OptionPlot:
         self.annot.set_visible(False)
         min_strike = min(option.strike_price for option in self.options)
         max_strike = max(option.strike_price for option in self.options)
-        self.strike_range = np.arange(min_strike - 100, max_strike + 100, 1)
+        self.strike_range = np.arange(min_strike - 1000, max_strike + 1000, 1)
         payoffs = [option.payoff(self.strike_range) for option in self.options]
         total_payoff = np.sum(payoffs, axis=0)
         breakeven_points = self._plot_breakeven_points(total_payoff)

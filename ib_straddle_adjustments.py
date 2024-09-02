@@ -60,7 +60,7 @@ def main(args):
     contract = Future(
         "ES",
         exchange="CME",
-        lastTradeDateOrContractMonth="202409",
+        lastTradeDateOrContractMonth=get_next_futures_expiry(expiry_date),
     )
     [ticker] = ib.reqTickers(*[contract])
     spot_price = ticker.marketPrice()

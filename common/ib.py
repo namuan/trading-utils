@@ -15,7 +15,7 @@ Port 4001 is for connection to IB Gateway using real trading account
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import List
 
 import numpy as np
@@ -157,17 +157,36 @@ def open_contracts_for_expiry(ib, positions):
 
 
 def get_next_futures_expiry(last_trade_date: str) -> str:
-    current_date = datetime.strptime(last_trade_date, "%Y%m%d")
-    expiry_months = [3, 6, 9, 12]
+    def third_friday(year, month):
+        first_day = date(year, month, 1)
+        first_friday = first_day + timedelta(days=(4 - first_day.weekday() + 7) % 7)
+        return first_friday + timedelta(weeks=2)
+
+    def next_quarter_month(month):
+        expiry_months = [3, 6, 9, 12]
+        return next(m for m in expiry_months if m > month % 12) % 12 or 12
+
+    current_date = datetime.strptime(last_trade_date, "%Y%m%d").date()
     current_month = current_date.month
-    next_expiry_month = next(
-        month for month in expiry_months if month > current_month % 12
+    current_year = current_date.year
+
+    # Check if current month is a quarterly expiry month
+    if current_month in [3, 6, 9, 12]:
+        current_month_third_friday = third_friday(current_year, current_month)
+
+        # If it's before the third Friday of the current month, use current month
+        if current_date < current_month_third_friday:
+            return current_date.strftime("%Y%m")
+
+    # If we're past the third Friday or it's not a quarterly month, find next expiry
+    next_expiry_month = next_quarter_month(current_month)
+    next_expiry_year = (
+        current_year if next_expiry_month > current_month else current_year + 1
     )
-    next_expiry_year = current_date.year
-    if next_expiry_month <= current_month:
-        next_expiry_year += 1
-    next_expiry = datetime(next_expiry_year, next_expiry_month, 1) + timedelta(days=32)
+
+    next_expiry = date(next_expiry_year, next_expiry_month, 1) + timedelta(days=32)
     next_expiry = next_expiry.replace(day=1) - timedelta(days=1)
+
     return next_expiry.strftime("%Y%m")
 
 
