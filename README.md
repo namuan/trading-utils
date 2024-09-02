@@ -2,6 +2,12 @@
 
 Collection of scripts and utilities for stock market analysis, strategies etc
 
+## Online Tools
+
+[VIX Implied Move Calculator](https://namuan.github.io/bin-utils/vix-implied-move.html)
+
+[Loss Calculator](https://namuan.github.io/bin-utils/bet-loss-calculator.html)
+
 ## Setup virtual environment
 
 ```shell
