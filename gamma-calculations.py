@@ -25,25 +25,9 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
+from common.logger import setup_logging
+
 pd.options.display.float_format = "{:,.4f}".format
-
-
-def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
-    )
-    logging.captureWarnings(capture=True)
 
 
 def parse_args():

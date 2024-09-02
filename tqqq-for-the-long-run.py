@@ -20,26 +20,9 @@ from datetime import datetime, timedelta
 
 from stockstats import StockDataFrame
 
+from common.logger import setup_logging
 from common.market import download_ticker_data
 from common.tele_notifier import pushover_send_message
-
-
-def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
-    )
-    logging.captureWarnings(capture=True)
 
 
 def parse_args():

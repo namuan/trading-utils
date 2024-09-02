@@ -17,23 +17,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
-def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
-    )
-    logging.captureWarnings(capture=True)
+from common.logger import setup_logging
 
 
 def parse_args():
@@ -387,8 +371,8 @@ def create_animated_streamgraph(df, color_dict):
     anim = animation.FuncAnimation(fig, update, frames=25, interval=500, repeat=False)
 
     # Uncomment the next line to save the animation as a gif
-    output_file = Path("output") / 'big_tech_market_cap.gif'
-    anim.save(output_file.as_posix(), writer='pillow', fps=2)
+    output_file = Path("output") / "big_tech_market_cap.gif"
+    anim.save(output_file.as_posix(), writer="pillow", fps=2)
 
     plt.tight_layout()
     plt.show()

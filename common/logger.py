@@ -17,12 +17,19 @@ def setup_logging(verbosity):
     elif verbosity >= 2:
         logging_level = logging.DEBUG
 
+    # Clear existing handlers (if any) to avoid duplicate logs
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    # Set up the basic configuration for logging
     logging.basicConfig(
+        level=logging_level,
+        format="%(asctime)s - %(filename)s:%(lineno)d - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
             logging.StreamHandler(),
         ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
     )
-    logging.captureWarnings(capture=True)
+
+    # Capture warnings
+    logging.captureWarnings(True)
