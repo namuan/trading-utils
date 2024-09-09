@@ -89,25 +89,14 @@ def analyze_stock(symbol, start_date, end_date):
     df["Daily_Change"] = df["Close"].pct_change() * 100
     df["Year"] = df.index.year
 
-    buckets = {
-        "0.2%": (-0.2, 0.2),
-        "0.5%": (-0.5, 0.5),
-        "0.7%": (-0.7, 0.7),
-        "1%": (-1, 1),
-        "2%": (-2, 2),
-        "3%": (-3, 3),
-    }
+    buckets = [0.2, 0.5, 0.7, 1, 2, 3]
 
     results = {}
     for year in df["Year"].unique():
         results[year] = {}
-        for bucket, (lower, upper) in buckets.items():
-            count = (
-                    (df["Year"] == year) &
-                    (df["Daily_Change"].abs() >= lower) &
-                    (df["Daily_Change"].abs() < upper)
-            ).sum()
-            results[year][bucket] = count
+        for bucket in buckets:
+            count = ((df["Year"] == year) & (df["Daily_Change"].abs() <= bucket)).sum()
+            results[year][f"{bucket}%"] = count
 
     return results, df, len(df)
 
@@ -115,60 +104,51 @@ def analyze_stock(symbol, start_date, end_date):
 def visualize_distribution(symbol, df, results):
     logging.info(f"Generating distribution plots for {symbol}")
 
-    buckets = [
-        (0, 0.2, "0-0.2%"),
-        (0.2, 0.5, "0.2-0.5%"),
-        (0.5, 0.7, "0.5-0.7%"),
-        (0.7, 1, "0.7-1%"),
-        (1, 2, "1-2%"),
-        (2, 3, "2-3%")
-    ]
-    highlight_color = '#A9A9FF'  # Dark grey
+    buckets = [0.2, 0.5, 0.7, 1, 2, 3]
+    highlight_colors = ['#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFFFBA', '#FFDFBA', '#E0BBE4']
 
     # Create overall histogram
     plt.figure(figsize=(15, 8))
-    n, bins, patches = plt.hist(df["Daily_Change"], bins=100, edgecolor="black", alpha=0.7, color=highlight_color)
+    n, bins, patches = plt.hist(df["Daily_Change"], bins=100, edgecolor="black", alpha=0.7)
     plt.title(f"Distribution of Daily Price Changes for {symbol}")
     plt.xlabel("Daily Price Change (%)")
     plt.ylabel("Frequency")
 
-    for lower, upper, _ in buckets:
-        plt.axvline(-upper, color='red', linestyle='--', alpha=0.5)
-        plt.axvline(-lower, color='red', linestyle='--', alpha=0.5)
-        plt.axvline(lower, color='red', linestyle='--', alpha=0.5)
-        plt.axvline(upper, color='red', linestyle='--', alpha=0.5)
+    for i, bucket in enumerate(buckets):
+        plt.axvline(-bucket, color=highlight_colors[i], linestyle='--', alpha=0.5)
+        plt.axvline(bucket, color=highlight_colors[i], linestyle='--', alpha=0.5)
 
-        count = sum(year_results.get(f"{upper}%", 0) for year_results in results.values())
-        plt.text(upper, plt.ylim()[1], f"{upper}%: {count}",
-                 rotation=90, va='top', ha='right', color='red')
+        count = sum(year_results.get(f"{bucket}%", 0) for year_results in results.values())
+        plt.text(bucket, plt.ylim()[1], f"{bucket}%: {count}",
+                 rotation=90, va='top', ha='right', color=highlight_colors[i])
 
     plt.tight_layout()
     plt.show()
 
     # Create individual plots for each bucket
-    for lower, upper, label in buckets:
+    for i, bucket in enumerate(buckets):
         fig, ax = plt.subplots(figsize=(15, 8))
         ax.plot(df.index, df['Close'], color='black', linewidth=1)
-        ax.set_title(f"Close Prices for {symbol} - Highlighting {label} Daily Changes")
+        ax.set_title(f"Close Prices for {symbol} - Highlighting ±{bucket}% Daily Changes")
         ax.set_xlabel("Date")
         ax.set_ylabel("Close Price")
 
-        mask = (df['Daily_Change'].abs() >= lower) & (df['Daily_Change'].abs() < upper)
+        mask = df['Daily_Change'].abs() <= bucket
 
         # Highlight background for days in the bucket
         for idx, in_bucket in df[mask].index.to_series().groupby((df[mask].index.to_series().diff() != pd.Timedelta('1D')).cumsum()):
-            ax.axvspan(in_bucket.index[0], in_bucket.index[-1], facecolor=highlight_color, alpha=0.3)
+            ax.axvspan(in_bucket.index[0], in_bucket.index[-1], facecolor=highlight_colors[i], alpha=0.3)
 
         # Add scatter points for days in the bucket
-        ax.scatter(df.index[mask], df['Close'][mask], color=highlight_color, s=20, zorder=3)
+        ax.scatter(df.index[mask], df['Close'][mask], color=highlight_colors[i], s=20, zorder=3)
 
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         ax.xaxis.set_major_locator(mdates.YearLocator())
 
-        count = sum(year_results.get(f"{upper}%", 0) for year_results in results.values())
+        count = sum(year_results.get(f"{bucket}%", 0) for year_results in results.values())
         total_days = len(df)
         percentage = (count / total_days) * 100
-        ax.text(0.02, 0.98, f"Days in {label} range: {count} ({percentage:.2f}%)",
+        ax.text(0.02, 0.98, f"Days within ±{bucket}% range: {count} ({percentage:.2f}%)",
                 transform=ax.transAxes, verticalalignment='top')
 
         plt.tight_layout()
@@ -197,7 +177,7 @@ def main(args):
         for bucket, count in year_results.items():
             year_total = df[df["Year"] == year].shape[0]
             percentage = (count / year_total) * 100
-            print(f"  Closed within {bucket}: {count} times ({percentage:.2f}%)")
+            print(f"  Closed within ±{bucket}: {count} times ({percentage:.2f}%)")
 
     print(f"\nTotal trading days: {total_days}")
 
