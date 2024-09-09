@@ -18,7 +18,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime, timedelta
-from common.market import download_ticker_data
+from common.market import get_cached_data
 
 
 def setup_logging(verbosity):
@@ -84,9 +84,10 @@ def analyze_stock(symbol, start_date, end_date):
     logging.info(f"Analysis period: {start_date} to {end_date}")
 
     logging.debug(f"Downloading data for {symbol} from {start_date} to {end_date}")
-    df = download_ticker_data(symbol, start=start_date, end=end_date)
+    df = get_cached_data(symbol, start=start_date, end=end_date)
 
     df["Daily_Change"] = df["Close"].pct_change() * 100
+    df["Year"] = df.index.year
 
     buckets = {
         "0.2%": (-0.2, 0.2),
@@ -98,11 +99,15 @@ def analyze_stock(symbol, start_date, end_date):
     }
 
     results = {}
-    for bucket, (lower, upper) in buckets.items():
-        count = (
-            (df["Daily_Change"].abs() >= lower) & (df["Daily_Change"].abs() < upper)
-        ).sum()
-        results[bucket] = count
+    for year in df["Year"].unique():
+        results[year] = {}
+        for bucket, (lower, upper) in buckets.items():
+            count = (
+                    (df["Year"] == year) &
+                    (df["Daily_Change"].abs() >= lower) &
+                    (df["Daily_Change"].abs() < upper)
+            ).sum()
+            results[year][bucket] = count
 
     return results, df, len(df)
 
@@ -118,7 +123,7 @@ def visualize_distribution(symbol, df, results):
         (1, 2, "1-2%"),
         (2, 3, "2-3%")
     ]
-    highlight_color = '#A9A9A9'  # Dark grey
+    highlight_color = '#A9A9FF'  # Dark grey
 
     # Create overall histogram
     plt.figure(figsize=(15, 8))
@@ -133,7 +138,7 @@ def visualize_distribution(symbol, df, results):
         plt.axvline(lower, color='red', linestyle='--', alpha=0.5)
         plt.axvline(upper, color='red', linestyle='--', alpha=0.5)
 
-        count = results.get(f"{upper}%", 0)
+        count = sum(year_results.get(f"{upper}%", 0) for year_results in results.values())
         plt.text(upper, plt.ylim()[1], f"{upper}%: {count}",
                  rotation=90, va='top', ha='right', color='red')
 
@@ -160,7 +165,7 @@ def visualize_distribution(symbol, df, results):
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
         ax.xaxis.set_major_locator(mdates.YearLocator())
 
-        count = results.get(f"{upper}%", 0)
+        count = sum(year_results.get(f"{upper}%", 0) for year_results in results.values())
         total_days = len(df)
         percentage = (count / total_days) * 100
         ax.text(0.02, 0.98, f"Days in {label} range: {count} ({percentage:.2f}%)",
@@ -182,14 +187,17 @@ def main(args):
     elif args.year:
         start_date = datetime(args.year, 1, 1).date()
     else:
-        start_date = end_date - timedelta(days=10 * 365)  # Default to 10 years ago
+        start_date = end_date - timedelta(days=20 * 365)  # Default to 20 years ago
 
     results, df, total_days = analyze_stock(args.symbol, start_date, end_date)
 
     print(f"\nResults for {args.symbol} from {start_date} to {end_date}:")
-    for bucket, count in results.items():
-        percentage = (count / total_days) * 100
-        print(f"Closed within {bucket}: {count} times ({percentage:.2f}%)")
+    for year, year_results in results.items():
+        print(f"\nYear {year}:")
+        for bucket, count in year_results.items():
+            year_total = df[df["Year"] == year].shape[0]
+            percentage = (count / year_total) * 100
+            print(f"  Closed within {bucket}: {count} times ({percentage:.2f}%)")
 
     print(f"\nTotal trading days: {total_days}")
 

@@ -1,4 +1,5 @@
 import logging
+import os
 
 import pandas as pd
 import yfinance as yf
@@ -56,6 +57,21 @@ def download_ticker_data(ticker, start, end):
     except:
         print(f"Unable to fetch data for ticker: {ticker}")
         return pd.DataFrame()
+
+
+def get_cached_data(symbol, start, end, force_download=False):
+    output_dir = "output"
+    os.makedirs(output_dir, exist_ok=True)
+    cache_file = os.path.join(output_dir, f"{symbol}_{start}_{end}.csv")
+
+    if os.path.exists(cache_file) and not force_download:
+        logging.info(f"Loading cached data for {symbol} from {cache_file}")
+        return pd.read_csv(cache_file, index_col=0, parse_dates=True)
+    else:
+        logging.info(f"Downloading fresh data for {symbol}")
+        df = download_ticker_data(symbol, start=start, end=end)
+        df.to_csv(cache_file)
+        return df
 
 
 def download_tickers_data(tickers, start, end):
