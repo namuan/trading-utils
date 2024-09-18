@@ -2,3 +2,4 @@
 black
 dtale
 bpython
+pre-commit

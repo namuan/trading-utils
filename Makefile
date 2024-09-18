@@ -10,10 +10,18 @@ setup: ## Setup Virtual Env
 	./venv/bin/pip3 install -r requirements/dev.txt
 
 deps: ## Install dependencies
-	./venv/bin/pip3 install -r requirements/dev.txt
+	./venv/bin/pip3 install --upgrade -r requirements/dev.txt
+	./venv/bin/python3 -m pip install --upgrade pip
 
 lint: ## Run black for code formatting
 	./venv/bin/black . --exclude venv
+
+pre-commit: ## Manually run all precommit hooks
+	./venv/bin/pre-commit install
+	./venv/bin/pre-commit run --all-files
+
+pre-commit-tool: ## Manually run a single pre-commit hook
+	./venv/bin/pre-commit run $(TOOL) --all-files
 
 clean: ## Clean package
 	find . -type d -name '__pycache__' | xargs rm -rf

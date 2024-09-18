@@ -1,0 +1,46 @@
+fail_fast: false
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+      - id: check-ast
+      - id: check-builtin-literals
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-json
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: check-shebang-scripts-are-executable
+      - id: check-symlinks
+      - id: debug-statements
+      - id: detect-private-key
+      - id: trailing-whitespace
+        exclude: '^docs/'
+      - id: mixed-line-ending
+  - repo: https://github.com/asottile/reorder-python-imports
+    rev: v3.13.0
+    hooks:
+      - id: reorder-python-imports
+#  - repo: https://github.com/astral-sh/ruff-pre-commit
+#    rev: v0.6.4
+#    hooks:
+#      - id: ruff # linter
+#        types_or: [ python, pyi, jupyter, toml ]
+#        args: [ --fix ]
+#      - id: ruff-format # formatter
+#        types_or: [ python, pyi, jupyter, toml ]
+  - repo: local
+    hooks:
+      - id: autoflake
+        name: autoflake
+        entry: autoflake -r -i --remove-all-unused-imports --remove-unused-variables
+        language: system
+        types: [ python ]
+      - id: pyupgrade
+        name: pyupgrade
+        entry: pyupgrade --py37-plus
+        language: system
+        types: [ python ]
