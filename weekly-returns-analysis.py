@@ -97,26 +97,26 @@ def print_analysis_results(
     print("\nWeekly Summary:")
     print(weekly_summary)
 
-    print(f"\nOverall Statistics:")
+    print("\nOverall Statistics:")
     print(f"Mean Daily Return: {overall_stats['mean_daily_return']:.4f}")
     print(f"Daily Return Standard Deviation: {overall_stats['std_daily_return']:.4f}")
     print(f"Mean Weekly Return: {overall_stats['mean_weekly_return']:.4f}")
     print(f"Weekly Return Standard Deviation: {overall_stats['std_weekly_return']:.4f}")
     print(f"Overall Maximum Drawdown: {overall_max_drawdown:.4f}")
 
-    print(f"\nAnnualized Metrics:")
+    print("\nAnnualized Metrics:")
     print(f"Annualized Return: {annualized_metrics[0]:.4f}")
     print(f"Annualized Volatility: {annualized_metrics[1]:.4f}")
     print(f"Sharpe Ratio: {annualized_metrics[2]:.4f}")
 
-    print(f"\nBest and Worst Periods:")
+    print("\nBest and Worst Periods:")
     print(f"Best Day Return: {best_worst_periods['best_day']:.4f}")
     print(f"Worst Day Return: {best_worst_periods['worst_day']:.4f}")
     print(f"Best Week Return: {best_worst_periods['best_week']:.4f}")
     print(f"Worst Week Return: {best_worst_periods['worst_week']:.4f}")
     print(f"Worst Weekly Drawdown: {best_worst_periods['worst_drawdown_week']:.4f}")
 
-    print(f"\nConsecutive Down Weeks:")
+    print("\nConsecutive Down Weeks:")
     print(f"Maximum Number of Consecutive Down Weeks: {max_consecutive_down_weeks}")
 
 

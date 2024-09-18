@@ -207,7 +207,7 @@ def plot_bear_markets_comparison(symbol, bear_markets):
         )
 
     ax.set_title(
-        f"Bear Markets Comparison",
+        "Bear Markets Comparison",
         fontsize=14,
         fontweight="bold",
         pad=10,

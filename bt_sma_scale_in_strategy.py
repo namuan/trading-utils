@@ -147,7 +147,7 @@ def pretty_print(format, *args):
 
 def exists(object, *properties):
     for property in properties:
-        if not property in object:
+        if property not in object:
             return False
         object = object.get(property)
     return True

@@ -33,18 +33,11 @@ repos:
     hooks:
       - id: autoflake
         entry: autoflake -r -i --remove-all-unused-imports --remove-unused-variables
-#  - repo: https://github.com/astral-sh/ruff-pre-commit
-#    rev: v0.6.4
-#    hooks:
-#      - id: ruff # linter
-#        types_or: [ python, pyi, jupyter, toml ]
-#        args: [ --fix ]
-#      - id: ruff-format # formatter
-#        types_or: [ python, pyi, jupyter, toml ]
-#  - repo: local
-#    hooks:
-#      - id: autoflake
-#        name: autoflake
-#        entry: autoflake -r -i --remove-all-unused-imports --remove-unused-variables
-#        language: system
-#        types: [ python ]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.4
+    hooks:
+      - id: ruff # linter
+        types_or: [ python, pyi, jupyter, toml ]
+        args: [ --fix ]
+      - id: ruff-format # formatter
+        types_or: [ python, pyi, jupyter, toml ]

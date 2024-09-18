@@ -409,7 +409,7 @@ def main():
 
     # Plot initial position
     initial_pos = OptionPlot(initial_position, spot_price)
-    initial_pos.plot(f"Initial Position", show_plot=True)
+    initial_pos.plot("Initial Position", show_plot=True)
 
     current_position = initial_position.copy()
 

@@ -51,14 +51,14 @@ def resample_candles(shorter_tf_candles, longer_tf):
 def last_close(close_data, days=-1):
     try:
         return close_data.iloc[days]
-    except:
+    except:  # noqa E722
         return "N/A"
 
 
 def candle_for(ticker_data, loc=-1):
     try:
         return ticker_data.iloc[loc]
-    except:
+    except:  # noqa E722
         return {}
 
 
@@ -192,7 +192,7 @@ def power_of_3(ticker_candles):
             and price_increase
             and volume_increase
         )
-    except:
+    except:  # noqa E722
         return "N/A"
 
 
@@ -237,7 +237,7 @@ def compare_range_with_prev_days(ticker_df, last_trading_day, prev_days):
         )
         last_range = abs(last_trading_day["high"] - last_trading_day["low"])
         return bool(last_range > prev_days_max)
-    except:
+    except:  # noqa E722
         return "N/A"
 
 
@@ -289,15 +289,15 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
                     period=bb_period,
                     std_multiplier=bb_std,
                 )
-                data_row[
-                    f"day_{prev_day}_boll_{bb_period}_{bb_std}"
-                ] = additional_bbands["BB_MIDDLE"].iloc[-1]
-                data_row[
-                    f"day_{prev_day}_boll_{bb_period}_{bb_std}_ub"
-                ] = additional_bbands["BB_UPPER"].iloc[-1]
-                data_row[
-                    f"day_{prev_day}_boll_{bb_period}_{bb_std}_lb"
-                ] = additional_bbands["BB_LOWER"].iloc[-1]
+                data_row[f"day_{prev_day}_boll_{bb_period}_{bb_std}"] = (
+                    additional_bbands["BB_MIDDLE"].iloc[-1]
+                )
+                data_row[f"day_{prev_day}_boll_{bb_period}_{bb_std}_ub"] = (
+                    additional_bbands["BB_UPPER"].iloc[-1]
+                )
+                data_row[f"day_{prev_day}_boll_{bb_period}_{bb_std}_lb"] = (
+                    additional_bbands["BB_LOWER"].iloc[-1]
+                )
 
     # Position Sizing with Risk Management
     recent_volatility = ticker_df["atr_20"].iloc[-1]
@@ -338,18 +338,18 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # Keltner Channel
     kc_bands = TA.KC(ticker_df, kc_mult=1)
-    data_row[f"kc_ub"] = kc_bands["KC_UPPER"].iloc[-1]
-    data_row[f"kc_lb"] = kc_bands["KC_LOWER"].iloc[-1]
+    data_row["kc_ub"] = kc_bands["KC_UPPER"].iloc[-1]
+    data_row["kc_lb"] = kc_bands["KC_LOWER"].iloc[-1]
 
     # Donchian Channel
     dc_bands = TA.DO(ticker_df)
-    data_row[f"dc_middle"] = dc_bands["MIDDLE"].iloc[-1]
-    data_row[f"dc_ub"] = dc_bands["UPPER"].iloc[-1]
-    data_row[f"dc_lb"] = dc_bands["LOWER"].iloc[-1]
+    data_row["dc_middle"] = dc_bands["MIDDLE"].iloc[-1]
+    data_row["dc_ub"] = dc_bands["UPPER"].iloc[-1]
+    data_row["dc_lb"] = dc_bands["LOWER"].iloc[-1]
 
     # Stoch CrossOver
-    data_row[f"stoch_kdjk_3_xu_kdjd_3"] = ticker_df["kdjj_3_xu_kdjd_3"].iloc[-1]
-    data_row[f"stoch_d"] = TA.STOCHD(ticker_df, 3).iloc[-1]
+    data_row["stoch_kdjk_3_xu_kdjd_3"] = ticker_df["kdjj_3_xu_kdjd_3"].iloc[-1]
+    data_row["stoch_d"] = TA.STOCHD(ticker_df, 3).iloc[-1]
 
     # Monthly gains
     for mg in [1, 2, 3, 6, 9]:
@@ -377,9 +377,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
     # Check if todays range is better than prev n days
     for prev_days in [9, 13]:
-        data_row[
-            f"range_better_than_{prev_days}_prev_days"
-        ] = compare_range_with_prev_days(ticker_df, last_trading_day, prev_days)
+        data_row[f"range_better_than_{prev_days}_prev_days"] = (
+            compare_range_with_prev_days(ticker_df, last_trading_day, prev_days)
+        )
 
     # Trend smoothness
     for mo in [30, 60, 90, 180]:
@@ -415,9 +415,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
             # Weekly Close change delta
             for ccr in [1, 3, 7, 22]:
-                data_row[
-                    f"week_{week}_close_change_delta_{ccr}"
-                ] = weekly_ticker_candles["close_-{}_r".format(ccr)].iloc[-1]
+                data_row[f"week_{week}_close_change_delta_{ccr}"] = (
+                    weekly_ticker_candles["close_-{}_r".format(ccr)].iloc[-1]
+                )
 
             weekly_strat, weekly_strat_candle = calculate_strat(weekly_ticker_candles)
             data_row[f"week_{week}_strat"] = weekly_strat
@@ -460,9 +460,9 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
 
         # Monthly Close change delta
         for ccr in [1, 3, 7]:
-            data_row[
-                f"month_{month}_close_change_delta_{ccr}"
-            ] = monthly_ticker_candles["close_-{}_r".format(ccr)].iloc[-1]
+            data_row[f"month_{month}_close_change_delta_{ccr}"] = (
+                monthly_ticker_candles["close_-{}_r".format(ccr)].iloc[-1]
+            )
 
         monthly_strat, monthly_strat_candle = calculate_strat(monthly_ticker_candles)
         data_row[f"month_{month}_strat"] = monthly_strat

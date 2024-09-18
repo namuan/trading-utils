@@ -142,7 +142,7 @@ def process_symbol(symbol, db_name="trades.db"):
             options_df,
             todays_expiry,
             option_type="call",
-            additional_filters=f"(greeks_delta > 0.5)",
+            additional_filters="(greeks_delta > 0.5)",
             sort_criteria=dict(by="greeks_delta", ascending=True),
             fetch_limit=1,
         )
@@ -150,7 +150,7 @@ def process_symbol(symbol, db_name="trades.db"):
             options_df,
             todays_expiry,
             option_type="put",
-            additional_filters=f"(greeks_delta > -0.5)",
+            additional_filters="(greeks_delta > -0.5)",
             sort_criteria=dict(by="greeks_delta", ascending=True),
             fetch_limit=1,
         )

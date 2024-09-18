@@ -19,6 +19,7 @@ from argparse import RawDescriptionHelpFormatter
 from datetime import datetime
 from datetime import timedelta
 
+import pandas as pd
 from stockstats import StockDataFrame
 
 from common.logger import setup_logging
@@ -39,9 +40,6 @@ def parse_args():
         help="Increase verbosity of logging output",
     )
     return parser.parse_args()
-
-
-import pandas as pd
 
 
 def current_price(df):
@@ -137,7 +135,7 @@ def rebalance():
 def main():
     rebalance_frequency = "daily"
     portfolio = rebalance()
-    print(f"TQQQ For The Long Term")
+    print("TQQQ For The Long Term")
     print(f"Re-balance frequency: {rebalance_frequency}")
     print("Portfolio allocation:")
     for asset, weight in portfolio.items():
