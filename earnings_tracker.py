@@ -14,7 +14,7 @@ OFFSET_STEP = 100
 
 
 def scrape_earnings_on(date_str, offset=0):
-    dated_url = "{0}?day={1}&offset={2}&size={3}".format(
+    dated_url = "{}?day={}&offset={}&size={}".format(
         BASE_URL, date_str, offset, OFFSET_STEP
     )
     headers = {

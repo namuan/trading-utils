@@ -22,7 +22,7 @@ class ReSampleData:
         context["hourly_df"] = resample_candles(df, "1H")
 
 
-class CalculateIndicators(object):
+class CalculateIndicators:
     def _gmma(self, ohlcv_df, ma_range):
         try:
             values = [ohlcv_df[f"close_{a}_ema"].iloc[-1] for a in ma_range]
@@ -77,7 +77,7 @@ class GenerateChart:
         fig.savefig(save["fname"])
 
 
-class IdentifyBuySellSignal(object):
+class IdentifyBuySellSignal:
     def run(self, context):
         indicators = context["indicators"]
         fast_ema = indicators["fast_ema"]

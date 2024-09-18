@@ -74,7 +74,7 @@ def create_bar_chart(df, final_close_date, output_folder):
 
 def get_dates_from_csv(csv_file):
     dates = []
-    with open(csv_file, "r") as f:
+    with open(csv_file) as f:
         reader = csv.reader(f)
         next(reader)  # skip the header row
         for row in reader:

@@ -20,7 +20,7 @@ class ReSampleData:
         context["hourly_df"] = resample_candles(df, "1H")
 
 
-class CalculateIndicators(object):
+class CalculateIndicators:
     def run(self, context):
         df = context["hourly_df"]
         context["close"] = df["close"].iloc[-1]
@@ -66,7 +66,7 @@ class GenerateChart:
         fig.savefig(save["fname"])
 
 
-class IdentifyBuySellSignal(object):
+class IdentifyBuySellSignal:
     def _if_hit_target(self, actual_order_price, close_price, target_pct):
         if actual_order_price < 0:
             return False

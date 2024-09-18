@@ -30,7 +30,7 @@ class ReSampleData:
             context[rk] = resample_candles(df, rv)
 
 
-class CalculateIndicators(object):
+class CalculateIndicators:
     @staticmethod
     def calc_strat_n(first_candle, second_candle):
         strat_n = "0"
@@ -98,7 +98,7 @@ class CalculateIndicators(object):
         logging.info(f"Close {context['close']} -> Indicators => {indicators}")
 
 
-class IdentifyBuySellSignal(object):
+class IdentifyBuySellSignal:
     def run(self, context):
         indicators = context["indicators"]
         strat_60m: str = indicators["strat_1H"]

@@ -20,6 +20,10 @@ repos:
       - id: trailing-whitespace
         exclude: '^docs/'
       - id: mixed-line-ending
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.17.0
+    hooks:
+      - id: pyupgrade
   - repo: https://github.com/asottile/reorder-python-imports
     rev: v3.13.0
     hooks:
@@ -37,10 +41,5 @@ repos:
 #      - id: autoflake
 #        name: autoflake
 #        entry: autoflake -r -i --remove-all-unused-imports --remove-unused-variables
-#        language: system
-#        types: [ python ]
-#      - id: pyupgrade
-#        name: pyupgrade
-#        entry: pyupgrade --py37-plus
 #        language: system
 #        types: [ python ]

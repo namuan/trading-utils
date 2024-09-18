@@ -88,7 +88,7 @@ class TradeSignal(Enum):
     NO_SIGNAL = "NO_SIGNAL"
 
 
-class SetupDatabase(object):
+class SetupDatabase:
     def run(self, context):
         home_dir = os.getenv("HOME")
         args = context["args"]
@@ -107,7 +107,7 @@ class SetupDatabase(object):
         )
 
 
-class ReadConfiguration(object):
+class ReadConfiguration:
     def run(self, context):
         args = context["args"]
         market = f"{args.coin}/{args.stable_coin}"
@@ -116,7 +116,7 @@ class ReadConfiguration(object):
         context["market"] = market
 
 
-class FetchDataFromExchange(object):
+class FetchDataFromExchange:
     def run(self, context):
         exchange_id = context["exchange"]
         candle_tf = context["candle_tf"]
@@ -127,7 +127,7 @@ class FetchDataFromExchange(object):
         context["candle_data"] = candle_data
 
 
-class LoadDataInDataFrame(object):
+class LoadDataInDataFrame:
     def run(self, context):
         candle_data = context["candle_data"]
         df = pd.DataFrame.from_records(
@@ -140,7 +140,7 @@ class LoadDataInDataFrame(object):
         context["df"] = StockDataFrame.retype(df)
 
 
-class FetchAccountInfoFromExchange(object):
+class FetchAccountInfoFromExchange:
     def run(self, context):
         args = context["args"]
         exchange_id = context["exchange"]
@@ -152,7 +152,7 @@ class FetchAccountInfoFromExchange(object):
         context["COIN_BALANCE"] = account_balance.get(args.coin)
 
 
-class LoadLastTransactionFromDatabase(object):
+class LoadLastTransactionFromDatabase:
     def run(self, context):
         db_table: Table = context["db_table"]
         last_transaction = db_table.find_one(_limit=1, order_by="-trade_dt")
@@ -313,7 +313,7 @@ class CollectInformationAboutOrder:
                     break
 
 
-class RecordTransactionInDatabase(object):
+class RecordTransactionInDatabase:
     def run(self, context):
         trade_done = context.get("trade_done", False)
         if trade_done:
@@ -340,7 +340,7 @@ class RecordTransactionInDatabase(object):
             logging.info(f"Updated database: {flatten_entry_row}")
 
 
-class PublishTransactionOnTelegram(object):
+class PublishTransactionOnTelegram:
     def run(self, context):
         trade_done = context.get("trade_done", False)
         if trade_done:
@@ -384,7 +384,7 @@ class PublishStrategyChartOnTelegram:
             open_file(chart_file_path)
 
 
-class PrintContext(object):
+class PrintContext:
     def run(self, context):
         data = {}
         if "data" in context:

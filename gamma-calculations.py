@@ -77,7 +77,7 @@ def is_third_friday(d):
 def load_and_process_data(file_path):
     """Load and pre-process the options data from the CSV file."""
     logging.info(f"Loading data from {file_path}")
-    with open(file_path, "r") as options_file:
+    with open(file_path) as options_file:
         options_file_data = options_file.readlines()
 
     spot_line = options_file_data[1]

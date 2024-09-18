@@ -28,7 +28,7 @@ def download_ftp_files(filenames):
 def combine_list(filenames, all_listed):
     all_listed.write("Symbol,Description\n")
     for filename, filepath in filenames.items():
-        with open(filepath, "r") as file_reader:
+        with open(filepath) as file_reader:
             for i, line in enumerate(file_reader, 0):
                 if i == 0:
                     continue
