@@ -3,11 +3,17 @@ import math
 from abc import ABC
 from abc import abstractmethod
 from datetime import datetime
-from datetime import timedelta
 from typing import Dict
 from typing import List
 
-from ib_async import *
+from ib_async import Contract
+from ib_async import Future
+from ib_async import FuturesOption
+from ib_async import Index
+from ib_async import Option
+from ib_async import Position
+from ib_async import Stock
+from ib_async import Ticker
 
 from common.ib import get_next_futures_expiry
 from common.ib import setup_ib

@@ -14,7 +14,6 @@ BSV →  IDTG
 Usage:
 ./tqqq-for-the-long-run.py
 """
-import logging
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
 from datetime import datetime

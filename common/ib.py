@@ -21,7 +21,11 @@ from typing import List
 
 import numpy as np
 import yaml
-from ib_async import *
+from ib_async import FuturesOption
+from ib_async import IB
+from ib_async import Option
+from ib_async import Position
+from ib_async import Ticker
 
 from common.options import get_mid_price
 

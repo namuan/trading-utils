@@ -5,7 +5,6 @@ Calculates optimal portfolio position sizes using volatility weighting strategy.
 Usage:
 ./portfolio-sizing -h
 """
-import logging
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
 

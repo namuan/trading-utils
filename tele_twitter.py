@@ -6,7 +6,12 @@ import os
 import time
 from argparse import ArgumentParser
 
-from peewee import *
+from peewee import BigIntegerField
+from peewee import CharField
+from peewee import DateTimeField
+from peewee import Model
+from peewee import SqliteDatabase
+from peewee import UUIDField
 
 from common import uuid_gen
 from common.environment import GROUP_CHAT_ID

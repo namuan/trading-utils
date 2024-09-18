@@ -28,6 +28,11 @@ repos:
     rev: v3.13.0
     hooks:
       - id: reorder-python-imports
+  - repo: https://github.com/pycqa/autoflake
+    rev: v2.3.1
+    hooks:
+      - id: autoflake
+        entry: autoflake -r -i --remove-all-unused-imports --remove-unused-variables
 #  - repo: https://github.com/astral-sh/ruff-pre-commit
 #    rev: v0.6.4
 #    hooks:

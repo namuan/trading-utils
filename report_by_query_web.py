@@ -141,8 +141,8 @@ def home_page():
 
 
 def main(cli_args):
-    select_top = cli_args.count
-    sort_by = cli_args.sort_by.split(",")
+    cli_args.count
+    cli_args.sort_by.split(",")
 
 
 if __name__ == "__main__":

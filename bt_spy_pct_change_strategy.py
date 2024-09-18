@@ -7,7 +7,6 @@ To test over a range and find the best parameters:
 $ py bt_spy_pct_change_strategy.py
 """
 import argparse
-import datetime
 import os
 import subprocess
 from pathlib import Path

@@ -16,11 +16,9 @@ Usage:
 """
 import argparse
 import os
-import random
 import sqlite3
 import time
 from datetime import datetime
-from datetime import timedelta
 
 import pandas as pd
 import schedule

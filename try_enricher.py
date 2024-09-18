@@ -6,14 +6,12 @@ Usage:
 $ ./try_enricher.py --help
 $ ./try_enricher.py --symbol TSLA
 """
-import logging
 from argparse import ArgumentParser
 from argparse import RawDescriptionHelpFormatter
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from common.analyst import fetch_data_from_cache
 from common.analyst import fetch_data_on_demand
 from common.logger import setup_logging
 

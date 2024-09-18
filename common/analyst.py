@@ -366,7 +366,6 @@ def enrich_data(ticker_symbol, ticker_df, earnings_date=None, is_etf=False):
     # ADX
     for adx_period in [9, 14, 21]:
         data_row[f"pdi_{adx_period}"] = ticker_df[f"pdi_{adx_period}"].iloc[-1]
-        data_row[f"mdi_{adx_period}"] = ticker_df[f"mdi_{adx_period}"].iloc[-1]
         data_row[f"dx_{adx_period}"] = ticker_df[f"dx_{adx_period}"].iloc[-1]
         data_row[f"adx_{adx_period}"] = ticker_df[f"dx_{adx_period}_ema"].iloc[-1]
 

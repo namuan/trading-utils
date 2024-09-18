@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import pandas as pd
 
 from common.market import download_ticker_data
 

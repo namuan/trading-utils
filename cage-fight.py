@@ -21,7 +21,6 @@ from datetime import timedelta
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 from matplotlib.dates import DateFormatter
 

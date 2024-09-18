@@ -1,7 +1,5 @@
 import argparse
 from datetime import datetime
-from datetime import timedelta
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -34,7 +32,7 @@ def main():
     initial_investment = 500
     yearly_contribution = 10000
     total_investment = initial_investment
-    portfolio_values = [initial_investment]
+    [initial_investment]
 
     # Buy at the closing price of the first available date
     shares = initial_investment / ticker_data.iloc[0]["Close"]

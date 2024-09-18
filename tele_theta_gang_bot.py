@@ -28,10 +28,8 @@ from telegram.ext import Updater
 from common.bot_wrapper import help_command
 from common.bot_wrapper import start
 from common.environment import TELEGRAM_THETA_GANG_BOT
-from common.external_charts import build_chart_link
 from common.logger import setup_logging
 from common.options import combined_options_df
-from common.reporting import build_links_in_markdown
 
 
 def select_strikes_for(

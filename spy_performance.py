@@ -87,7 +87,7 @@ def main(directory, start_date, end_date):
             stock_data = load_data(filepath, start_date, end_date)
             stock_performance = calculate_performance(stock_data)
             stock_performances[symbol] = stock_performance
-        except Exception as e:
+        except Exception:
             print(f"❌ Error loading data for {symbol}")
 
     stock_performances.pop("SPY", None)
