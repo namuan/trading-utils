@@ -1,7 +1,7 @@
 ### Sample Reports
 
 > Risk Warning: We do not guarantee accuracy and will not accept liability for any loss or damage which arise directly or indirectly from use of or reliance on information contained within these reports. We may provide general commentary which is not intended as investment advice and must not be construed as such. Trading/Investments carries a risk of losses in excess of your deposited funds and may not be suitable for all investors. Please ensure that you fully understand the risks involved.
- 
+
 #### S&P500 companies with most daily gains
 
 ```shell
@@ -136,7 +136,7 @@ py report_by_query.py -t "9 Days Down in a row" -o natr_30 -v -q "(day_2_low < d
 
 ```shell
 # Parabolic moves
-py report_by_query.py -t "Month Change" -o month_1_close_change_delta_1 -v -q "(month_1_close_change_delta_1 > 50)" 
+py report_by_query.py -t "Month Change" -o month_1_close_change_delta_1 -v -q "(month_1_close_change_delta_1 > 50)"
 ```
 
 ```shell

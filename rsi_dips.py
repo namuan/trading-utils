@@ -15,10 +15,11 @@ Optional arguments:
 --higher <value>        Set the higher RSI threshold (default: 80)
 --rsi-period <value>    Set the RSI period (default: 3)
 """
-
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime, timedelta
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
+from datetime import datetime
+from datetime import timedelta
 
 from finta import TA
 from rich.console import Console

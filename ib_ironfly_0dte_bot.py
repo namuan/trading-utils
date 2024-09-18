@@ -10,12 +10,15 @@ Port 4001 is for connection to IB Gateway using real trading account
 """
 # pip install ib_insync
 # https://ib-insync.readthedocs.io/recipes.html
+from datetime import date
+from datetime import datetime
+from datetime import time
+from datetime import timedelta
 
-from ib_async import *
 import ib_async
+from ib_async import *
 
 from common.ib import setup_ib
-from datetime import date, datetime, time, timedelta
 
 # util.startLoop()  # uncomment this line when in a notebook
 # util.logToConsole("DEBUG")

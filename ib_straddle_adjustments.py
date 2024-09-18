@@ -8,15 +8,14 @@ $ python3 ib_straddle_adjustments.py --expiry-date 20240816  --plot
 """
 from ib_async import *
 
-from common.ib import (
-    find_options_for_expiry,
-    open_contracts_for_expiry,
-    get_next_futures_expiry,
-    calculate_total_premium,
-    calculate_breakeven_on_each_side,
-    setup_ib,
-)
-from common.options import get_mid_price, calculate_nearest_strike
+from common.ib import calculate_breakeven_on_each_side
+from common.ib import calculate_total_premium
+from common.ib import find_options_for_expiry
+from common.ib import get_next_futures_expiry
+from common.ib import open_contracts_for_expiry
+from common.ib import setup_ib
+from common.options import calculate_nearest_strike
+from common.options import get_mid_price
 from options_payoff import *
 
 

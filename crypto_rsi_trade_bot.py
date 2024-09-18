@@ -7,11 +7,9 @@ import mplfinance as mpf
 
 from common.analyst import resample_candles
 from common.logger import init_logging
-from common.steps import (
-    TradeSignal,
-    parse_args,
-    procedure,
-)
+from common.steps import parse_args
+from common.steps import procedure
+from common.steps import TradeSignal
 from common.steps_runner import run_forever_with
 
 

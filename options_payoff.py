@@ -41,7 +41,8 @@ initial_position:
 
 adjustment: []
 """
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
 
 import matplotlib.pyplot as plt
 import numpy as np

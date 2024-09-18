@@ -12,12 +12,12 @@ Usage:
 
 If start_date and end_date are not provided, the script defaults to the start of the current year and today, respectively.
 """
-
 import argparse
-from datetime import datetime
-import pandas as pd
 import os
+from datetime import datetime
+
 import matplotlib.pyplot as plt
+import pandas as pd
 
 
 def load_data(filepath, start_date, end_date):

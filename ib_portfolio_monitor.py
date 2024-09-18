@@ -1,12 +1,16 @@
 import argparse
 import math
-from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
-from typing import List, Dict
+from abc import ABC
+from abc import abstractmethod
+from datetime import datetime
+from datetime import timedelta
+from typing import Dict
+from typing import List
 
 from ib_async import *
 
-from common.ib import setup_ib, get_next_futures_expiry
+from common.ib import get_next_futures_expiry
+from common.ib import setup_ib
 
 ib = setup_ib()
 ib.reqMarketDataType(2)

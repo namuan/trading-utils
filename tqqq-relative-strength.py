@@ -8,8 +8,10 @@ https://www.invesco.com/us/financial-products/etfs/holdings?audienceType=Investo
 # Specify a custom CSV file for QQQ holdings
 python tqqq-relative-strength.py --qqq-csv path/to/qqq_holdings.csv
 """
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime, timedelta
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
+from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd

@@ -12,10 +12,11 @@ Example:
 To install required packages:
     pip install pandas yfinance matplotlib seaborn
 """
-
 import colorsys
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime, timedelta
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
+from datetime import datetime
+from datetime import timedelta
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt

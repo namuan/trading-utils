@@ -10,7 +10,8 @@ from stockstats import StockDataFrame
 from tqdm import tqdm
 
 from common.filesystem import output_dir
-from common.reporting import generate_report, convert_to_html
+from common.reporting import convert_to_html
+from common.reporting import generate_report
 from common.symbols import macro_etfs
 
 

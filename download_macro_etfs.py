@@ -1,7 +1,6 @@
 """
 Download open, close, high, low and volume data for all available ETFs.
 """
-
 from argparse import ArgumentParser
 from datetime import datetime
 

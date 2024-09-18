@@ -6,7 +6,8 @@ Usage:
 ./portfolio-sizing -h
 """
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
 
 from common.logger import setup_logging
 from common.market import download_ticker_data

@@ -123,7 +123,7 @@ py tele_links
 
 #### Spy analysis
 
-Send quick analysis on SPY during market hours. 
+Send quick analysis on SPY during market hours.
 See `outside_trading_hours()` in [trading_hours](common/trading_hours.py) for changing schedule.
 
 ![SPY Bot](docs/images/telegram-spy-bot.png)
@@ -168,8 +168,8 @@ py twitter_furus.py
 Make sure you define a few variables before starting up these bots
 
 ```shell
-export EXCHANGE_API_KEY = 
-export EXCHANGE_API_SECRET = 
+export EXCHANGE_API_KEY =
+export EXCHANGE_API_SECRET =
 export EXCHANGE = ""
 ```
 
@@ -178,7 +178,7 @@ See [crypto_ma_trade_bot.py](crypto_ma_trade_bot.py) for an example.
 ## Options
 
 Uses [Tradier](https://developer.tradier.com/) for fetching data.
-Make sure you signup and have the following variables set in environment. 
+Make sure you signup and have the following variables set in environment.
 See `.env.example` for more details.
 
 ```shell

@@ -8,4 +8,3 @@ SCREEN_NAME=$1
 
 screen -X -S "${SCREEN_NAME}" stuff "^C"
 screen -X -S "${SCREEN_NAME}" quit
-

@@ -19,11 +19,11 @@ Sort By: {{ stocks["sort_by"] }}
 | 🔢 Position Size (based on ~1% risk along with SL below) | {{ '%0.2f' % stock['position_size'] }} |
 | 💸 Purchase Price | {{ '%0.2f' % (stock['position_size']|float * stock['last_close']|float) }} |
 | **1 ATR(20)** | |
-| ▶️ Trailing Stop Loss | {{ '%0.2f' % stock['atr_20'] }} | 
+| ▶️ Trailing Stop Loss | {{ '%0.2f' % stock['atr_20'] }} |
 | ▶️ Fixed Stop Loss | {{ '%0.2f' % (stock['last_close']|float - stock['atr_20']|float) }} |
 | ▶️ Max Loss (Based on buy at last close) | {{ '%0.2f' % ((stock['last_close']|float - stock['atr_20']|float) * stock['position_size']|float - (stock['position_size']|float * stock['last_close']|float)) }} |
 | **2 ATR(20)** | |
-| ▶️ Trailing Stop Loss | {{ '%0.2f' % (2 * stock['atr_20']|float) }} | 
+| ▶️ Trailing Stop Loss | {{ '%0.2f' % (2 * stock['atr_20']|float) }} |
 | ▶️ Fixed Stop Loss | {{ '%0.2f' % (stock['last_close']|float - (2 * stock['atr_20']|float)) }} |
 | ▶️ Max Loss (Based on buy at last close) | {{ '%0.2f' % ((stock['last_close']|float - (2 * stock['atr_20']|float)) * stock['position_size']|float - (stock['position_size']|float * stock['last_close']|float)) }} |
 

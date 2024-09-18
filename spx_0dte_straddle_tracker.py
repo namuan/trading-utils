@@ -15,16 +15,19 @@ Usage:
 ./spx_0dte_straddle_tracker.py -s SYMBOL [-v] [-vv]
 """
 import argparse
-import sqlite3
-import random
-import time
-from datetime import datetime, timedelta
 import os
-import schedule
+import random
+import sqlite3
+import time
+from datetime import datetime
+from datetime import timedelta
 
 import pandas as pd
+import schedule
 
-from common.options import option_expirations, option_chain, process_options_data
+from common.options import option_chain
+from common.options import option_expirations
+from common.options import process_options_data
 
 DB_NAME = "spx_straddle.db"
 

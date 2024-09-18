@@ -32,15 +32,15 @@ repos:
 #        args: [ --fix ]
 #      - id: ruff-format # formatter
 #        types_or: [ python, pyi, jupyter, toml ]
-  - repo: local
-    hooks:
-      - id: autoflake
-        name: autoflake
-        entry: autoflake -r -i --remove-all-unused-imports --remove-unused-variables
-        language: system
-        types: [ python ]
-      - id: pyupgrade
-        name: pyupgrade
-        entry: pyupgrade --py37-plus
-        language: system
-        types: [ python ]
+#  - repo: local
+#    hooks:
+#      - id: autoflake
+#        name: autoflake
+#        entry: autoflake -r -i --remove-all-unused-imports --remove-unused-variables
+#        language: system
+#        types: [ python ]
+#      - id: pyupgrade
+#        name: pyupgrade
+#        entry: pyupgrade --py37-plus
+#        language: system
+#        types: [ python ]

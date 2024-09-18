@@ -10,9 +10,8 @@ Port 4001 is for connection to IB Gateway using real trading account
 """
 # pip install ib_insync
 # https://ib-insync.readthedocs.io/recipes.html
-
-from ib_async import *
 import ib_async
+from ib_async import *
 
 from common.ib import setup_ib
 

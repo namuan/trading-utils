@@ -23,7 +23,8 @@ To install required packages:
     pip install pandas yfinance finta
 """
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 import pandas as pd
 from finta import TA

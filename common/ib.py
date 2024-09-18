@@ -13,9 +13,10 @@ Port 4001 is for connection to IB Gateway using real trading account
 # https://ib-insync.readthedocs.io/recipes.html
 # util.logToConsole("DEBUG")
 """
-
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date
+from datetime import datetime
+from datetime import timedelta
 from typing import List
 
 import numpy as np

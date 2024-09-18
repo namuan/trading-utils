@@ -17,8 +17,10 @@ Usage:
 import logging
 import os
 import shutil
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime, timedelta
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
+from datetime import datetime
+from datetime import timedelta
 
 import matplotlib.pyplot as plt
 import numpy as np

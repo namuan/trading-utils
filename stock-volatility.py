@@ -13,11 +13,15 @@ Usage:
 ./stock-volatility.py -s AAPL -sd 2020-01-01 -ed 2022-12-31 # To analyze a specific date range
 """
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-import pandas as pd
-import matplotlib.pyplot as plt
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
+from datetime import datetime
+from datetime import timedelta
+
 import matplotlib.dates as mdates
-from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import pandas as pd
+
 from common.market import get_cached_data
 
 

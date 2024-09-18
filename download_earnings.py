@@ -1,6 +1,7 @@
 import json
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from common.filesystem import earnings_file_path
 from common.market import download_earnings_between

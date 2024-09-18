@@ -14,19 +14,19 @@ $ python3 tele_theta_gang_bot.py -b
 """
 import logging
 import os
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
 from datetime import datetime
 
 from telegram import Update
-from telegram.ext import (
-    Updater,
-    CommandHandler,
-    MessageHandler,
-    Filters,
-    CallbackContext,
-)
+from telegram.ext import CallbackContext
+from telegram.ext import CommandHandler
+from telegram.ext import Filters
+from telegram.ext import MessageHandler
+from telegram.ext import Updater
 
-from common.bot_wrapper import start, help_command
+from common.bot_wrapper import help_command
+from common.bot_wrapper import start
 from common.environment import TELEGRAM_THETA_GANG_BOT
 from common.external_charts import build_chart_link
 from common.logger import setup_logging

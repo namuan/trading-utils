@@ -1,5 +1,6 @@
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 import pandas as pd
 import yfinance as yf

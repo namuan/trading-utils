@@ -4,7 +4,8 @@ Generate volatility report for SPY and send to telegram
 """
 import logging
 import time
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
 from datetime import datetime
 
 import schedule
@@ -13,7 +14,8 @@ from common.analyst import fetch_data_on_demand
 from common.external_charts import build_chart_link
 from common.logger import setup_logging
 from common.plotting import plot_intraday
-from common.tele_notifier import send_message_to_telegram, send_file_to_telegram
+from common.tele_notifier import send_file_to_telegram
+from common.tele_notifier import send_message_to_telegram
 from common.trading_hours import after_hour_during_trading_day
 
 
@@ -41,7 +43,7 @@ def parse_args():
 def compile_report(spy_data):
     heading = f"""
 *Last Close* ({'%0.2f' % spy_data["last_close"]})
-RSI2 ({'%0.2f' % spy_data['day_0_rsi_2']}), RSI4 ({'%0.2f' % spy_data['day_0_rsi_4']}), RSI9 ({'%0.2f' % spy_data['day_0_rsi_9']}), RSI14 ({'%0.2f' % spy_data['day_0_rsi_14']})        
+RSI2 ({'%0.2f' % spy_data['day_0_rsi_2']}), RSI4 ({'%0.2f' % spy_data['day_0_rsi_4']}), RSI9 ({'%0.2f' % spy_data['day_0_rsi_9']}), RSI14 ({'%0.2f' % spy_data['day_0_rsi_14']})
         """
     reports = [
         "------------ *{}*  ------------".format(

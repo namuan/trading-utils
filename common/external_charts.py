@@ -1,6 +1,7 @@
 import random
 import time
-from enum import Enum, auto
+from enum import auto
+from enum import Enum
 from urllib.parse import urlencode
 
 

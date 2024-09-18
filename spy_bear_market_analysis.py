@@ -11,11 +11,14 @@ Usage:
 """
 import logging
 import os
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
+from datetime import datetime
+from datetime import timedelta
+
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-import seaborn as sns
 import pandas as pd
+import seaborn as sns
 
 from common.logger import setup_logging
 from common.market import download_ticker_data

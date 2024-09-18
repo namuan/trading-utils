@@ -10,9 +10,9 @@ To install required packages:
     or
     pip install pandas yfinance stockstats
 """
-
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd

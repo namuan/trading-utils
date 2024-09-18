@@ -2,7 +2,6 @@
 """
 Download list of SP500 companies from Wikipedia
 """
-
 from argparse import ArgumentParser
 
 import pandas as pd

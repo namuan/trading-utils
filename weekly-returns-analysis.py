@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 Stock Weekly Returns Script
 
@@ -14,7 +13,6 @@ Usage:
 Example:
     $ python3 weekly-returns-analysis.py --symbol AAPL --start_date 2011-01-01 --end_date 2024-01-01
 """
-
 import argparse
 from datetime import datetime
 

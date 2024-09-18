@@ -7,15 +7,13 @@ import mplfinance as mpf
 
 from common.analyst import resample_candles
 from common.logger import init_logging
-from common.steps import (
-    SetupDatabase,
-    ReadConfiguration,
-    FetchDataFromExchange,
-    LoadDataInDataFrame,
-    TradeSignal,
-    parse_args,
-    PublishStrategyChartOnTelegram,
-)
+from common.steps import FetchDataFromExchange
+from common.steps import LoadDataInDataFrame
+from common.steps import parse_args
+from common.steps import PublishStrategyChartOnTelegram
+from common.steps import ReadConfiguration
+from common.steps import SetupDatabase
+from common.steps import TradeSignal
 from common.steps_runner import run_forever_with
 
 

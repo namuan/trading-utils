@@ -10,7 +10,8 @@ Usage:
 ./streamgraph_chart.py --animate # To generate an animated chart
 """
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
 from pathlib import Path
 
 import matplotlib.animation as animation

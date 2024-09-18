@@ -1,6 +1,7 @@
 import time
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 import requests

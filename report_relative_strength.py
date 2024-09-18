@@ -2,14 +2,15 @@
 Plot best and worst performing stocks against a base ticker.
 By default it compares the whole market against SPY
 """
+import itertools
 from argparse import ArgumentParser
 from datetime import datetime
 
-import itertools
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from common.analyst import load_ticker_df, DAYS_IN_MONTH
+from common.analyst import DAYS_IN_MONTH
+from common.analyst import load_ticker_df
 from common.market import load_all_tickers
 from common.plotting import save_and_open_plt_fig
 

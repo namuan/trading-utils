@@ -1,9 +1,9 @@
 import argparse
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
-import matplotlib.pyplot as plt
 
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", None)

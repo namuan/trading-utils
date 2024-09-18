@@ -1,7 +1,6 @@
 """
 Downloads stocks from finviz selected using a scanner
 """
-
 from argparse import ArgumentParser
 
 from finvizfinance.screener.overview import Overview

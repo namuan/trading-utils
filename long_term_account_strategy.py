@@ -3,7 +3,8 @@ Long term account strategy
 
 https://app.composer.trade/symphony/iptXKvpNqUuYcUwH8mIB
 """
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from stockstats import StockDataFrame
 

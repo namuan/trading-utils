@@ -40,4 +40,3 @@ bb_lower = ma_series3 - bb_stdev
 
 bgcolor((close > bb_upper) ? color.new(color.orange, 90) : na, title="Overbought")
 bgcolor((close < bb_lower) ? color.new(color.orange, 90) : na, title="Oversold")
-

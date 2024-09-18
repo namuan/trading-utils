@@ -10,9 +10,9 @@ Example:
 To install required packages:
     pip install pandas yfinance
 """
-
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd

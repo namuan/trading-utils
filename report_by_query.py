@@ -1,12 +1,14 @@
 import argparse
-from datetime import datetime
 import logging
+from datetime import datetime
 
 import pandas as pd
 
 from common.filesystem import output_dir
 from common.logger import init_logging
-from common.reporting import add_reporting_data, generate_report, convert_to_html
+from common.reporting import add_reporting_data
+from common.reporting import convert_to_html
+from common.reporting import generate_report
 
 
 def parse_args():

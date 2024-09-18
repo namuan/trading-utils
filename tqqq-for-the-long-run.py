@@ -15,8 +15,10 @@ Usage:
 ./tqqq-for-the-long-run.py
 """
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime, timedelta
+from argparse import ArgumentParser
+from argparse import RawDescriptionHelpFormatter
+from datetime import datetime
+from datetime import timedelta
 
 from stockstats import StockDataFrame
 
