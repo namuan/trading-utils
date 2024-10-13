@@ -8,6 +8,8 @@ Collection of scripts and utilities for stock market analysis, strategies etc
 
 [Loss Calculator](https://namuan.github.io/bin-utils/bet-loss-calculator.html)
 
+[Profit Take](https://namuan.github.io/bin-utils/profit-take.html)
+
 ## Setup virtual environment
 
 ```shell
