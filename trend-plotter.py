@@ -160,17 +160,18 @@ def parse_args() -> ArgOptions:
         help=f"Stock symbol to analyze (default: {DEFAULT_SYMBOL})",
     )
     parser.add_argument("-y", "--year", type=int, help="Starting year for analysis")
+
     parser.add_argument(
         "-sd",
         "--start_date",
         type=str,
-        help=f"Start date for analysis (format: {DATE_FORMAT})",
+        help="Start date for analysis (format: YYYY-MM-DD)",
     )
     parser.add_argument(
         "-ed",
         "--end_date",
         type=str,
-        help=f"End date for analysis (format: {DATE_FORMAT}, default: today)",
+        help="End date for analysis (format: YYYY-MM-DD, default: today)",
     )
     parser.add_argument(
         "-p",
