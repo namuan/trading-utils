@@ -8,11 +8,12 @@ Port 7496 is for connection to TWS using real trading account
 Port 4002 is for connection to IB Gateway using paper trading account
 Port 4001 is for connection to IB Gateway using real trading account
 """
+
 # pip install ib_insync
 # https://ib-insync.readthedocs.io/recipes.html
 from datetime import date
 
-from ib_async import Index
+from ib_async import Index, Option
 
 from common.ib import setup_ib
 
@@ -58,7 +59,39 @@ TNX = TNX_data.close / 1000
 print(f"{TNX=}")
 
 print(
-    f"running live.\nMarket price: {market_price}; VIX: {VIX} \nDate: {formatted_date}"
+    f"running live.\nMarket price: {market_price}; VIX: {VIX}; Treasury: {TNX} \nDate: {formatted_date}"
 )
 
-ib.run()
+strike_price_range = 120
+min_strike_price = market_price - strike_price_range
+max_strike_price = market_price + strike_price_range
+
+
+put_strikes = [s for s in range(market_price, min_strike_price, 5)]
+
+# Build Call Contracts
+call_strikes = [s for s in range(market_price, max_strike_price, 5)]
+
+today = date.today()
+date_today = today.strftime("%Y%m%d")
+
+call_contracts = [
+    Option(
+        "SPX",
+        date_today,
+        strike,
+        "C",
+        "SMART",
+        "100",
+        "USD",
+        tradingClass="SPXW",
+    )
+    for strike in call_strikes
+]
+qualified_call_contracts = ib.qualifyContracts(*call_contracts)
+ib.reqMarketDataType(2)
+call_contract_tickers = [ib.ticker(c) for c in qualified_call_contracts]
+
+print(call_contract_tickers)
+
+ib.disconnect()
