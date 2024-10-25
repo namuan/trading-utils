@@ -14,6 +14,7 @@ Usage:
 ./spx_0dte_straddle_tracker.py -h
 ./spx_0dte_straddle_tracker.py -s SYMBOL [-v] [-vv]
 """
+
 import argparse
 import os
 import sqlite3
@@ -23,9 +24,7 @@ from datetime import datetime
 import pandas as pd
 import schedule
 
-from common.options import option_chain
-from common.options import option_expirations
-from common.options import process_options_data
+from common.options import option_chain, option_expirations, process_options_data
 
 DB_NAME = "spx_straddle.db"
 
@@ -99,10 +98,6 @@ def process_symbol(symbol, db_name="trades.db"):
     pd.set_option("display.float_format", "{:.2f}".format)
 
     options_df = process_options_data(options_data)
-    # print(options_df[['description', 'strike', 'greeks_delta', 'option_type']])
-    # total_premium = call_strike_record.get("bid") + put_strike_record.get("bid")
-    # print(f"Total premium received: {total_premium}")
-
     conn = sqlite3.connect(f"output/{db_name}")
     cursor = conn.cursor()
 
