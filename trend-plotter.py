@@ -19,8 +19,9 @@ Examples:
 import logging
 import sys
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Tuple
+from typing import Optional, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -91,12 +92,54 @@ def validate_dates(start_date: datetime.date, end_date: datetime.date) -> bool:
     return True
 
 
-def parse_args() -> ArgumentParser:
+@dataclass
+class ArgOptions:
+    """Class to hold command line argument options."""
+
+    verbose: int
+    symbol: str
+    year: Optional[int]
+    start_date: Optional[str]
+    end_date: Optional[str]
+    period: int
+    output: Optional[str]
+    show: bool
+
+    def validate(self) -> bool:
+        """
+        Validate the argument options.
+
+        Returns:
+            bool: True if all validations pass, False otherwise
+        """
+        if self.period <= 0:
+            logging.error("Period must be a positive integer")
+            return False
+
+        if self.start_date and self.end_date:
+            try:
+                start = datetime.strptime(self.start_date, DATE_FORMAT).date()
+                end = datetime.strptime(self.end_date, DATE_FORMAT).date()
+                if start > end:
+                    logging.error("Start date must be before end date")
+                    return False
+            except ValueError as e:
+                logging.error(f"Invalid date format: {str(e)}")
+                return False
+
+        if not self.output and not self.show:
+            logging.error("Either --output or --show (or both) must be specified")
+            return False
+
+        return True
+
+
+def parse_args() -> ArgOptions:
     """
     Parse and validate command-line arguments.
 
     Returns:
-        ArgumentParser: Parsed command line arguments
+        ArgOptions: Validated command line arguments
     """
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
@@ -150,10 +193,21 @@ def parse_args() -> ArgumentParser:
 
     args = parser.parse_args()
 
-    if args.period <= 0:
-        parser.error("Period must be a positive integer")
+    options = ArgOptions(
+        verbose=args.verbose,
+        symbol=args.symbol,
+        year=args.year,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        period=args.period,
+        output=args.output,
+        show=args.show,
+    )
 
-    return args
+    if not options.validate():
+        sys.exit(1)
+
+    return options
 
 
 def fetch_stock_data(
@@ -181,12 +235,12 @@ def fetch_stock_data(
         return pd.DataFrame()
 
 
-def handle_dates(args: ArgumentParser) -> Tuple[datetime.date, datetime.date]:
+def handle_dates(args: ArgOptions) -> Tuple[datetime.date, datetime.date]:
     """
     Handle the date parsing for start and end dates.
 
     Args:
-        args: Parsed command line arguments
+        args: Command line arguments
 
     Returns:
         Tuple[datetime.date, datetime.date]: Start and end dates
@@ -302,12 +356,12 @@ def calculate_moving_averages(df: DataFrame) -> DataFrame:
     return df
 
 
-def main(args: ArgumentParser) -> None:
+def main(args: ArgOptions) -> None:
     """
     Main function to handle stock analysis and visualization.
 
     Args:
-        args: Parsed command line arguments
+        args: Validated command line arguments
     """
     logging.info(f"Starting analysis with verbosity level: {args.verbose}")
     logging.debug("Debug logging is enabled")
