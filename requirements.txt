@@ -1,6 +1,6 @@
-yfinance>=0.1.62
+yfinance
 pandas
-numpy>=1.16.5
+numpy
 tqdm
 yahoo-finance
 requests
@@ -32,3 +32,4 @@ quantstats
 ib_insync
 pandasai
 gradio
+seaborn
