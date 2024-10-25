@@ -24,10 +24,6 @@ repos:
     rev: v3.17.0
     hooks:
       - id: pyupgrade
-  - repo: https://github.com/asottile/reorder-python-imports
-    rev: v3.13.0
-    hooks:
-      - id: reorder-python-imports
   - repo: https://github.com/pycqa/autoflake
     rev: v2.3.1
     hooks:
@@ -38,6 +34,6 @@ repos:
     hooks:
       - id: ruff # linter
         types_or: [ python, pyi, jupyter, toml ]
-        args: [ --fix ]
+        args: ['--select', 'I', '--fix' ]
       - id: ruff-format # formatter
         types_or: [ python, pyi, jupyter, toml ]
