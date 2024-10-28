@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Analyse what happened the next day when a stock price has changed by more than the given%
+Analyse what happened in the next N days when a stock price has changed by more than the given%
 
 Example:
-    $ python3 stock-pct-change.py --symbol SPY --pct-change 2
+    $ python3 stock-pct-change.py --symbol SPY --pct-change 2 --next-days 5
 
 To install required packages:
     pip install -r requirements.txt
     or
     pip install pandas yfinance stockstats
 """
+
 import argparse
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -46,6 +46,12 @@ def parse_arguments():
         default=1,
         help="Percent change (default: 1)",
     )
+    parser.add_argument(
+        "--next-days",
+        type=int,
+        default=1,
+        help="Number of days to analyze after the change (default: 1)",
+    )
     return parser.parse_args()
 
 
@@ -70,6 +76,24 @@ def load_from_file(file_path):
         return pd.DataFrame()
 
 
+def calculate_cumulative_returns(df, days):
+    """Calculate cumulative returns for the next N days"""
+    cumulative = pd.Series(index=df.index, dtype="float64")
+
+    for i in range(len(df)):
+        if i + days >= len(df):
+            cumulative.iloc[i] = None
+            continue
+
+        cum_return = 1.0
+        for j in range(1, days + 1):
+            daily_return = df["close"].iloc[i + j] / df["close"].iloc[i + j - 1] - 1
+            cum_return *= 1 + daily_return
+        cumulative.iloc[i] = (cum_return - 1) * 100
+
+    return cumulative
+
+
 def main():
     pd.set_option("display.max_columns", None)
     pd.set_option("display.max_rows", None)
@@ -79,6 +103,7 @@ def main():
     pct_change = args.pct_change
     from_date = args.from_date
     to_date = args.to_date
+    next_days = args.next_days
 
     file_path = OUTPUT_FOLDER.joinpath(
         f"{args.symbol}_{args.from_date}_{args.to_date}.csv"
@@ -87,14 +112,15 @@ def main():
     if df.empty:
         df = download_stock_data(args.symbol, args.from_date, args.to_date)
         save_to_file(file_path, df)
+
     df.init_all()
     df["delta_1"] = df["close_-1_r"]
     df["jump_day"] = df["delta_1"] > pct_change
-    df["next_day_after_jump"] = df["jump_day"].shift(1)
 
-    jump_days_df = df[(df["next_day_after_jump"] == True) | (df["jump_day"] == True)]
+    # Calculate cumulative returns for next N days
+    df["next_days_returns"] = calculate_cumulative_returns(df, next_days)
 
-    jump_days_df["next_day_gains"] = jump_days_df["delta_1"].shift(-1)
+    jump_days_df = df[df["jump_day"] == True].copy()
 
     total_rows = len(df.index)
     jump_days = df["jump_day"].sum()
@@ -105,13 +131,19 @@ def main():
         f"Between {from_date} and {to_date}, {percentage:.2f}% of days where change is greater than: {pct_change}%"
     )
 
-    print("|Date| Gain| NextDay| RSI")
-    print("|---| ---| ---| ---")
-    jump_days_df[jump_days_df["jump_day"] == True].apply(
+    print(f"|Date| Jump Day Gain| Next {next_days} Days Return|")
+    print("|---| ---| ---|")
+    jump_days_df.apply(
         lambda row: print(
-            f"|{row.name} | {row['delta_1']:.2f} | {row['next_day_gains']:.2f} | {row['rsi_14']:.2f} |"
+            f"|{row.name} | {row['delta_1']:.2f}% | {row['next_days_returns']:.2f}% |"
         ),
         axis=1,
+    )
+
+    # Calculate average return
+    avg_return = jump_days_df["next_days_returns"].mean()
+    print(
+        f"\nAverage {next_days}-day return after {pct_change}% jump: {avg_return:.2f}%"
     )
 
 
