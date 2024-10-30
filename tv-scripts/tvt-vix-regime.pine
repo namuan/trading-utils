@@ -1,0 +1,48 @@
+//@version=5
+indicator(title="[TVT] VIX Term Structure", shorttitle="[TVT] VIX-TS", overlay=false)
+
+// Input parameters
+ma_length = input.int(3, title="MA Length", minval=1)
+ma_type = input.string("EMA", title="MA Type", options=["EMA", "SMA"])
+
+// Plot toggles
+show_ma_1d = input.bool(true, title="Show MA VIX1D")
+show_ma_9d = input.bool(true, title="Show MA VIX9D")
+show_ma_vix = input.bool(true, title="Show MA VIX")
+show_ma_3m = input.bool(true, title="Show MA VIX3M")
+show_ma_6m = input.bool(true, title="Show MA VIX6M")
+
+// Fetch VIX data using chart's timeframe
+vix1d = request.security("VIX1D", timeframe.period, close)
+vix9d = request.security("VIX9D", timeframe.period, close)
+vix = request.security("VIX", timeframe.period, close)
+vix3m = request.security("VIX3M", timeframe.period, close)
+vix6m = request.security("VIX6M", timeframe.period, close)
+
+// Function to calculate MA based on type
+calcMA(source, length) =>
+    ma_type == "EMA" ? ta.ema(source, length) : ta.sma(source, length)
+
+// Calculate MAs
+ma1d = calcMA(vix1d, ma_length)
+ma9d = calcMA(vix9d, ma_length)
+maVix = calcMA(vix, ma_length)
+ma3m = calcMA(vix3m, ma_length)
+ma6m = calcMA(vix6m, ma_length)
+
+// Define colors with transparency
+fuchsia_transp = color.new(color.fuchsia, 50)
+purple_transp = color.new(color.purple, 50)
+blue_transp = color.new(color.blue, 50)
+green_transp = color.new(color.green, 50)
+orange_transp = color.new(color.orange, 50)
+
+yellow_transp = color.new(color.yellow, 50)
+red_transp = color.new(color.red, 50)
+
+// Plot either raw VIX or MA based on toggles
+plot(show_ma_1d ? ma1d : vix1d, title="VIX1D", color=fuchsia_transp, style=plot.style_line, linewidth=2)
+plot(show_ma_9d ? ma9d : vix9d, title="VIX9D", color=purple_transp, style=plot.style_line, linewidth=2)
+plot(show_ma_vix ? maVix : vix, title="VIX", color=blue_transp, style=plot.style_line, linewidth=2)
+plot(show_ma_3m ? ma3m : vix3m, title="VIX3M", color=green_transp, style=plot.style_line, linewidth=2)
+plot(show_ma_6m ? ma6m : vix6m, title="VIX6M", color=orange_transp, style=plot.style_line, linewidth=2)
