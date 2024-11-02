@@ -1,0 +1,148 @@
+// https://www.tradingview.com/script/8UKvXuyX-vol-cone/
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © voided
+
+//@version=5
+indicator("vol_cone", overlay = true, max_lines_count = 500)
+
+stdevs          = input.float(title = "stdevs", defval = 1.0)
+stdevs_2        = input.float(title = "stdevs_2", defval = 2.0)
+pp              = input.int(title = "periods to project", defval = 30)
+window          = input.int(title = "window", defval = 21)
+ppy             = input.int(title = "periods per year", defval = 252)
+history         = input.bool(title = "show history", defval = false)
+rate            = input.float(title = "interest rate", defval = 3.0) / 100
+lags            = input.int(title = "lags", defval = 0)
+show_stdevs_2   = input.bool(title = "show_stdevs_2", defval = true)
+anchor          = input.bool(title = "anchor_to_session_start", defval = false)
+
+var rvs = array.new_float()
+
+squared_returns     = math.pow(math.log(close / close[1]), 2.0)
+smoothed_returns    = ta.ema(squared_returns, window)
+rv                  = math.sqrt(smoothed_returns * ppy)
+
+array.push(rvs, rv)
+
+upper   = close * (1 + rv * stdevs * math.sqrt(pp / ppy))
+lower   = close * (1 - rv * stdevs * math.sqrt(pp / ppy))
+
+var fcst    = array.new_int()
+
+array.push(fcst, close <= upper[pp] and close >= lower[pp] ? 1 : 0)
+
+hist_transp = history ? 0 : 100
+
+hist_upper = close > upper[pp] ? color.new(color.red, hist_transp) : color.new(color.blue, hist_transp)
+hist_lower = close < lower[pp] ? color.new(color.red, hist_transp) : color.new(color.blue, hist_transp)
+
+plot(upper[pp], title = "upper bound", color = hist_upper, style = plot.style_stepline)
+plot(lower[pp], title = "upper bound", color = hist_lower, style = plot.style_stepline)
+
+one_year_ms = 252 * 24 * 60 * 60 * 1000
+res         = 100
+var lns_up      = array.new_line()
+var lns_dn      = array.new_line()
+var lns_up_2    = array.new_line()
+var lns_dn_2    = array.new_line()
+
+while array.size(lns_up) < pp
+
+    for i = 0 to pp - 1
+
+        array.push(lns_up, line.new(x1 = 0, x2 = 0, y1 = 0, y2 = 0, xloc = xloc.bar_index))
+        array.push(lns_dn, line.new(x1 = 0, x2 = 0, y1 = 0, y2 = 0, xloc = xloc.bar_index))
+        array.push(lns_up_2, line.new(x1 = 0, x2 = 0, y1 = 0, y2 = 0, xloc = xloc.bar_index, color = color.red))
+        array.push(lns_dn_2, line.new(x1 = 0, x2 = 0, y1 = 0, y2 = 0, xloc = xloc.bar_index, color = color.red))
+
+if barstate.islast
+
+    pct_rnk = array.percentrank(rvs, array.indexof(rvs, rv))
+    acc     = array.avg(fcst) * 100
+
+    if anchor and timeframe.isintraday
+
+        for i = 0 to 5000
+
+            if time[i + 1] - time[i + 2] != time[i + 2] - time[i + 3]
+
+                lags := i + 2
+
+                break
+
+    x0      = bar_index[lags]
+    y0_up   = close[lags]
+    y0_up_2 = close[lags]
+    y0_dn   = close[lags]
+    y0_dn_2 = close[lags]
+    dy_up   = 0.0
+    dy_up_2 = 0.0
+    dy_dn   = 0.0
+    dy_dn_2 = 0.0
+    fp      = 0.0
+
+    for i = 0 to pp - 1
+
+        fp      := close[lags] * math.exp(rate * (i + 1) * 1 / ppy)
+
+        dy_up   := fp * math.exp(rv * stdevs * math.sqrt((i + 1) * 1 / ppy)) - y0_up
+        dy_dn   := y0_dn - fp / math.exp(rv * stdevs * math.sqrt((i + 1) * 1 / ppy))
+
+        dy_up_2 := fp * math.exp(rv * stdevs_2 * math.sqrt((i + 1) * 1 / ppy)) - y0_up_2
+        dy_dn_2 := y0_dn_2 - fp / math.exp(rv * stdevs_2 * math.sqrt((i + 1) * 1 / ppy))
+
+        up_ln = array.get(lns_up, i)
+        dn_ln = array.get(lns_dn, i)
+
+        line.set_x1(up_ln, x0)
+        line.set_x2(up_ln, x0 + 1)
+        line.set_y1(up_ln, y0_up)
+        line.set_y2(up_ln, y0_up + dy_up)
+
+        line.set_x1(dn_ln, x0)
+        line.set_x2(dn_ln, x0 + 1)
+        line.set_y1(dn_ln, y0_dn)
+        line.set_y2(dn_ln, y0_dn - dy_dn)
+
+        if show_stdevs_2
+
+            up_ln_2 = array.get(lns_up_2, i)
+            dn_ln_2 = array.get(lns_dn_2, i)
+
+            line.set_x1(up_ln_2, x0)
+            line.set_x2(up_ln_2, x0 + 1)
+            line.set_y1(up_ln_2, y0_up_2)
+            line.set_y2(up_ln_2, y0_up_2 + dy_up_2)
+
+            line.set_x1(dn_ln_2, x0)
+            line.set_x2(dn_ln_2, x0 + 1)
+            line.set_y1(dn_ln_2, y0_dn_2)
+            line.set_y2(dn_ln_2, y0_dn_2 - dy_dn_2)
+
+
+        x0      := x0 + 1
+        y0_up   := y0_up + dy_up
+        y0_dn   := y0_dn - dy_dn
+        y0_up_2 := y0_up_2 + dy_up_2
+        y0_dn_2 := y0_dn_2 - dy_dn_2
+
+    var t = table.new(position = position.top_right, columns = 2, rows = 7)
+
+    table.cell(t, 0, 0, text = "rv")
+    table.cell(t, 0, 1, text = "rnk")
+    table.cell(t, 0, 2, text = "acc")
+    table.cell(t, 0, 3, text = "up")
+    table.cell(t, 0, 4, text = "dn")
+
+    table.cell(t, 1, 0, text = str.format("{0, number, #.#}", rv * 100))
+    table.cell(t, 1, 1, text = str.format("{0, number, #.#}", pct_rnk))
+    table.cell(t, 1, 2, text = str.format("{0, number, #.#}", acc))
+    table.cell(t, 1, 3, text = str.format("{0, number, #.####}", y0_up + dy_up))
+    table.cell(t, 1, 4, text = str.format("{0, number, #.####}", y0_dn - dy_dn))
+
+    if show_stdevs_2
+
+        table.cell(t, 0, 5, text = "up_2")
+        table.cell(t, 0, 6, text = "dn_2")
+        table.cell(t, 1, 5, text = str.format("{0, number, #.####}", y0_up_2 + dy_up_2))
+        table.cell(t, 1, 6, text = str.format("{0, number, #.####}", y0_dn_2 - dy_dn_2))

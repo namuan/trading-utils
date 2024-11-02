@@ -1,0 +1,481 @@
+// https://www.tradingview.com/script/AkO2PSKg-pricing-table/
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © voided
+
+// USAGE
+//
+// 1. Select days until a contract of interest expires. These should be
+//      CALENDAR days. The script will convert to these to business days for
+//      forecasting and valuation, as trading in most contracts occurs over
+//      ~250 business days per year.
+// 2. Adjust any other variables as desired:
+//      - model: the volatility forecasting model
+//      - window: the number of periods for a lagged model (e.g. hv)
+//      - filter: a filter to remove forecasts from the sample
+//      - filter type:
+//          + "none": do not use the filter
+//          + "less than": keep forecasts when filter < volatility
+//          + "greater than": keep forecasts when filter > volatility
+//      - filter value: a whole number percentage. see example below
+//      - discount rate: to discount the expected value to present value
+//      - precision: number of decimals in output
+//      - trim outliers: omit upper N % of (generally itm) contracts
+//
+//  The theoretical values are based on history. For example, suppose days
+//  to expiration is 30. On every bar, the 30 days ago N deviation forecast
+//  value is compared to the present price. If the price is above the forecast
+//  value, the contract has expired in the money; otherwise, it has expired
+//  worthless. The theoretical value is the average of every such sample. The
+//  itm probabilities are calculated the same way.
+//
+//  The default (and only) volatility model is a 20 period EWMA derived
+//  historical (realized) volatility. Feel free to extend the script by adding
+//  your own.
+//
+//  The filter parameters can be used to remove some forecasts from the sample.
+//  For example:
+//
+//      A:
+//          filter:         <any>
+//          filter type:    none
+//          filter value:   <any>
+//
+//          Default: the filter is not used; all forecasts are included in the
+//          the sample.
+//
+//      B:
+//          filter:         model
+//          filter type:    less than
+//          filter value:   50
+//
+//          If the model is "hv", this will remove all forecasts when the
+//          historical volatility is greater than fifty
+//
+//      C:
+//          filter:         rank
+//          filter type:    greater than
+//          filter value:   75
+//
+//          If the model volatility is in the top 25% of the previous year's
+//          range, the forecast will be included in the sample
+//
+// Apart from "model" there are some common volatility indexes to choose from,
+// such as Nasdaq (VXN), crude oil (OVX), emerging markets (VXFXI), S&P (VIX)
+// etc.
+//
+// Refer to the middle-right table to see the current forecast value, its
+// rank among the last 252 days, and the number of business days until
+// expiration.
+//
+// Use the "range" parameters to display more or fewer calculations. By default,
+// the script will show the maximum four standard deviations of data.
+//
+// This script is meant for the daily chart only.
+
+// @version=4
+study("pricing_table", overlay = true)
+
+// INPUTS
+
+dte = input(title = "days to expiration", type = input.integer, defval = -1, group = "model")
+model = input(title = "model", options = [ "hv" ], defval = "hv", group = "model")
+window = input(title = "window", type = input.integer, defval = 20, group = "model")
+
+fn = input(title = "filter", options = [ "model", "rank", "vix", "vxn", "vxd", "rvx", "ovx", "gvx", "vxeem", "vxfxi" ], defval = "model", group = "filter")
+ft = input(title = "filter type", options = [ "none", "greater than", "less than" ], defval = "none", group = "filter")
+fv = input(title = "filter value", type = input.float, defval = 20, group = "filter")
+trp = input(title = "trim outliers (%)", type = input.float, defval = 0.0, group = "filter") / 100
+
+stdevs = input(title = "stdevs", options = [ 0, 1, 2, 3, 4 ], defval = 4, group = "range")
+halves = input(title = "halves", type = input.bool, defval = true, group = "range")
+
+precision = input(title = "value precision", options = [ 2, 3, 4, 5, 6, 7 ], defval = 3, group = "etc.")
+dr = input(title = "discount rate", type = input.float, defval = 0.01, group = "etc.")
+
+// VARIABLES
+
+vix = security("VIX", "D", close)
+vxn = security("VXN", "D", close)
+rvx = security("RVX", "D", close)
+vxd = security("VXD", "D", close)
+vxeem = security("VXEEM", "D", close)
+vxfxi = security("VXFXI", "D", close)
+ovx = security("OVX", "D", close)
+gvx = security("GVX", "D", close)
+
+c_bg = color.white
+c_00 = color.new(color.red, 0)
+c_10 = color.new(color.red, 25)
+c_15 = color.new(color.red, 50)
+c_20 = color.new(color.red, 75)
+c_25 = color.new(color.blue, 75)
+c_30 = color.new(color.blue, 50)
+c_35 = color.new(color.blue, 25)
+c_40 = color.new(color.blue, 0)
+
+c_it = color.new(color.green, 70)
+
+string pct_fmt = "#.##"
+string val_fmt = na
+
+if precision == 7
+    val_fmt := "#.#######"
+else if precision == 6
+    val_fmt := "#.######"
+else if precision == 5
+    val_fmt := "#.#####"
+else if precision == 4
+    val_fmt := "#.####"
+else if precision == 3
+    val_fmt := "#.###"
+else if precision == 2
+    val_fmt := "#.##"
+
+// FUNCTIONS
+
+discount(x, d) =>
+    x / (1 + dr * d)
+
+fcst(type, p, sd, v, t) =>
+    if type == "calls"
+        p * (1 + sd * v * t)
+    else
+        p * (1 - sd * v * t)
+
+val(type, p, f, bdte) =>
+    if type == "calls"
+        p > f[bdte] ? abs(close / f[bdte] - 1) : 0
+    else
+        p < f[bdte] ? abs(1 - close / f[bdte]) : 0
+
+summarize(a, pct) =>
+    array.sort(a)
+    itm_beg = array.lastindexof(a, 0) + 1
+    num_itm = array.size(a) - itm_beg
+    new_len = round(array.size(a) - (pct * num_itm))
+    a_trm = array.slice(a, 0, new_len)
+    total = array.size(a_trm)
+    pct_itm = num_itm / array.size(a_trm) * 100
+    avg = array.avg(a_trm)
+    [avg, pct_itm, num_itm, total]
+
+make_table(dt, t, type, f_0, f_1, f_2, f_3, f_4, f_5, f_6, f_7, avg_0, avg_1, avg_2, avg_3, avg_4, avg_5, avg_6, avg_7, pct_0, pct_1, pct_2, pct_3, pct_4, pct_5, pct_6, pct_7, itm_0, itm_1, itm_2, itm_3, itm_4, itm_5, itm_6, itm_7, tot_0, tot_1, tot_2, tot_3, tot_4, tot_5, tot_6, tot_7, c_0, c_1, c_2, c_3, c_4, c_5, c_6, c_7) =>
+    var int a = 0
+    var int b = 0
+    var int c = 0
+    var int d = 0
+    var int e = 0
+    var int f = 0
+    var int g = 0
+    var int h = 0
+
+    if type == "calls"
+        a := 8
+        b := 7
+        c := 6
+        d := 5
+        e := 4
+        f := 3
+        g := 2
+        h := 1
+    else
+        a := 1
+        b := 2
+        c := 3
+        d := 4
+        e := 5
+        f := 6
+        g := 7
+        h := 8
+
+    // stdev col
+    table.cell(dt, 0, a, tostring(0), bgcolor = c_0)
+
+    if stdevs >= 1
+        table.cell(dt, 0, b, tostring(1), bgcolor = c_1)
+
+    if stdevs >= 2 and halves
+        table.cell(dt, 0, c, tostring(1.5), bgcolor = c_2)
+
+    if stdevs >= 2
+        table.cell(dt, 0, d, tostring(2), bgcolor = c_3)
+
+    if stdevs >= 3 and halves
+        table.cell(dt, 0, e, tostring(2.5), bgcolor = c_4)
+
+    if stdevs >= 3
+        table.cell(dt, 0, f, tostring(3), bgcolor = c_5)
+
+    if stdevs >= 4 and halves
+        table.cell(dt, 0, g, tostring(3.5), bgcolor = c_6)
+
+    if stdevs >= 4
+        table.cell(dt, 0, h, tostring(4), bgcolor = c_7)
+
+    // strike col
+    table.cell(dt, 1, a, tostring(f_0, val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 1
+        table.cell(dt, 1, b, tostring(f_1, val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 2 and halves
+        table.cell(dt, 1, c, tostring(f_2, val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 2
+        table.cell(dt, 1, d, tostring(f_3, val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 3 and halves
+        table.cell(dt, 1, e, tostring(f_4, val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 3
+        table.cell(dt, 1, f, tostring(f_5, val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 4 and halves
+        table.cell(dt, 1, g, tostring(f_6, val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 4
+        table.cell(dt, 1, h, tostring(f_7, val_fmt), bgcolor = c_bg)
+
+    // theo val col
+    table.cell(dt, 2, a, tostring(discount(avg_0 * close, t), val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 1
+        table.cell(dt, 2, b, tostring(discount(avg_1 * close, t), val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 2 and halves
+        table.cell(dt, 2, c, tostring(discount(avg_2 * close, t), val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 2
+        table.cell(dt, 2, d, tostring(discount(avg_3 * close, t), val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 3 and halves
+        table.cell(dt, 2, e, tostring(discount(avg_4 * close, t), val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 3
+        table.cell(dt, 2, f, tostring(discount(avg_5 * close, t), val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 4 and halves
+        table.cell(dt, 2, g, tostring(discount(avg_6 * close, t), val_fmt), bgcolor = c_bg)
+
+    if stdevs >= 4
+        table.cell(dt, 2, h, tostring(discount(avg_7 * close, t), val_fmt), bgcolor = c_bg)
+
+    // itm % col
+    table.cell(dt, 3, a, tostring(pct_0, pct_fmt), bgcolor = c_bg)
+
+    if stdevs >= 1
+        table.cell(dt, 3, b, tostring(pct_1, pct_fmt), bgcolor = c_bg)
+
+    if stdevs >= 2 and halves
+        table.cell(dt, 3, c, tostring(pct_2, pct_fmt), bgcolor = c_bg)
+
+    if stdevs >= 2
+        table.cell(dt, 3, d, tostring(pct_3, pct_fmt), bgcolor = c_bg)
+
+    if stdevs >= 3 and halves
+        table.cell(dt, 3, e, tostring(pct_4, pct_fmt), bgcolor = c_bg)
+
+    if stdevs >= 3
+        table.cell(dt, 3, f, tostring(pct_5, pct_fmt), bgcolor = c_bg)
+
+    if stdevs >= 4 and halves
+        table.cell(dt, 3, g, tostring(pct_6, pct_fmt), bgcolor = c_bg)
+
+    if stdevs >= 4
+        table.cell(dt, 3, h, tostring(pct_7, pct_fmt), bgcolor = c_bg)
+
+    // itm total col
+    table.cell(dt, 4, a, tostring(itm_0) + "/" + tostring(tot_0))
+
+    if stdevs >= 1
+        table.cell(dt, 4, b, tostring(itm_1) + "/" + tostring(tot_1))
+
+    if stdevs >= 2 and halves
+        table.cell(dt, 4, c, tostring(itm_2) + "/" + tostring(tot_2))
+
+    if stdevs >= 2
+        table.cell(dt, 4, d, tostring(itm_3) + "/" + tostring(tot_3))
+
+    if stdevs >= 3 and halves
+        table.cell(dt, 4, e, tostring(itm_4) + "/" + tostring(tot_4))
+
+    if stdevs >= 3
+        table.cell(dt, 4, f, tostring(itm_5) + "/" + tostring(tot_5))
+
+    if stdevs >= 4 and halves
+        table.cell(dt, 4, g, tostring(itm_6) + "/" + tostring(tot_6))
+
+    if stdevs >= 4
+        table.cell(dt, 4, h, tostring(itm_7) + "/" + tostring(tot_7))
+
+fnc(type) =>
+    // TIME
+    dpy = 252
+    one_day = 24 * 60 * 60 * 1000
+    bdte = 0
+
+    for i = 0 to dte
+        dow = dayofweek(time + one_day * i)
+
+        if dow >= 1 and dow <= 5
+            bdte := bdte + 1
+
+    t = sqrt(bdte / dpy)
+
+    // VOLATILITY
+
+    float v = na
+
+    if model == "hv"
+        v := sqrt(ema(pow(log(close / close[1]), 2), window) * dpy)
+    // else if ...
+        // define other volatility models here
+
+    rnk = percentrank(v, dpy)
+
+    // FORECASTING
+
+    var float[] a_00 = array.new_float()
+    var float[] a_10 = array.new_float()
+    var float[] a_15 = array.new_float()
+    var float[] a_20 = array.new_float()
+    var float[] a_25 = array.new_float()
+    var float[] a_30 = array.new_float()
+    var float[] a_35 = array.new_float()
+    var float[] a_40 = array.new_float()
+
+    f_00 = fcst(type, close, 0.0, v, t)
+    f_10 = fcst(type, close, 1.0, v, t)
+    f_15 = fcst(type, close, 1.5, v, t)
+    f_20 = fcst(type, close, 2.0, v, t)
+    f_25 = fcst(type, close, 2.5, v, t)
+    f_30 = fcst(type, close, 3.0, v, t)
+    f_35 = fcst(type, close, 3.5, v, t)
+    f_40 = fcst(type, close, 4.0, v, t)
+
+    v_00 = val(type, close, f_00, bdte)
+    v_10 = val(type, close, f_10, bdte)
+    v_15 = val(type, close, f_15, bdte)
+    v_20 = val(type, close, f_20, bdte)
+    v_25 = val(type, close, f_25, bdte)
+    v_30 = val(type, close, f_30, bdte)
+    v_35 = val(type, close, f_35, bdte)
+    v_40 = val(type, close, f_40, bdte)
+
+    // FILTERING
+    // all filter values are given in whole number percentage
+    f = if fn == "model"
+        v[bdte] * 100
+    else if fn == "rank"
+        rnk[bdte]
+    else if fn == "vix"
+        vix[bdte]
+    else if fn == "vxn"
+        vxn[bdte]
+    else if fn == "rvx"
+        rvx[bdte]
+    else if fn == "vxd"
+        vxd[bdte]
+    else if fn == "vxeem"
+        vxeem[bdte]
+    else if fn == "vxfxi"
+        vxfxi[bdte]
+    else if fn == "ovx"
+        ovx[bdte]
+    else if fn == "gvx"
+        gvx[bdte]
+
+    if ft == "greater than"
+        if (f > fv)
+            array.push(a_00, v_00)
+            array.push(a_10, v_10)
+            array.push(a_15, v_15)
+            array.push(a_20, v_20)
+            array.push(a_25, v_25)
+            array.push(a_30, v_30)
+            array.push(a_35, v_35)
+            array.push(a_40, v_40)
+    else if ft == "less than"
+        if (f < fv)
+            array.push(a_00, v_00)
+            array.push(a_10, v_10)
+            array.push(a_15, v_15)
+            array.push(a_20, v_20)
+            array.push(a_25, v_25)
+            array.push(a_30, v_30)
+            array.push(a_35, v_35)
+            array.push(a_40, v_40)
+    else
+        array.push(a_00, v_00)
+        array.push(a_10, v_10)
+        array.push(a_15, v_15)
+        array.push(a_20, v_20)
+        array.push(a_25, v_25)
+        array.push(a_30, v_30)
+        array.push(a_35, v_35)
+        array.push(a_40, v_40)
+
+    // OUTPUT
+    if barstate.islast
+        it = table.new(position.middle_right, 2, 3, bgcolor = c_bg)
+
+        table.cell(it, 0, 0, model, bgcolor = c_it)
+        table.cell(it, 1, 0, tostring(v * 100, pct_fmt) + "%")
+        table.cell(it, 0, 1, "rank", bgcolor = c_it)
+        table.cell(it, 1, 1, tostring(rnk, pct_fmt) + "%")
+        table.cell(it, 0, 2, "business dte", bgcolor = c_it)
+        table.cell(it, 1, 2, tostring(bdte))
+
+        x = dte * one_day
+
+        [avg_00, pct_00, itm_00, tot_00] = summarize(a_00, trp)
+        [avg_10, pct_10, itm_10, tot_10] = summarize(a_10, trp)
+        [avg_15, pct_15, itm_15, tot_15] = summarize(a_15, trp)
+        [avg_20, pct_20, itm_20, tot_20] = summarize(a_20, trp)
+        [avg_25, pct_25, itm_25, tot_25] = summarize(a_25, trp)
+        [avg_30, pct_30, itm_30, tot_30] = summarize(a_30, trp)
+        [avg_35, pct_35, itm_35, tot_35] = summarize(a_35, trp)
+        [avg_40, pct_40, itm_40, tot_40] = summarize(a_40, trp)
+
+        pos = type == "calls" ? position.top_right : position.bottom_right
+
+        var dt = table.new(pos, 5, 9)
+
+        // header rows
+        table.cell(dt, 0, 0, "stdev")
+        table.cell(dt, 1, 0, "strike")
+        table.cell(dt, 2, 0, "theo val")
+        table.cell(dt, 3, 0, "itm (%)")
+        table.cell(dt, 4, 0, "itm (total)")
+
+        // forecast lines
+        l_00 = line.new(time, f_00, time + x, f_00, xloc = xloc.bar_time, color = c_00)
+
+        if stdevs >= 1
+            l_10 = line.new(time, f_10, time + x, f_10, xloc = xloc.bar_time, color = c_10)
+
+        if stdevs >= 2 and halves
+            l_15 = line.new(time, f_15, time + x, f_15, xloc = xloc.bar_time, color = c_15)
+
+        if stdevs >= 2
+            l_20 = line.new(time, f_20, time + x, f_20, xloc = xloc.bar_time, color = c_20)
+
+        if stdevs >= 3 and halves
+            l_25 = line.new(time, f_25, time + x, f_25, xloc = xloc.bar_time, color = c_25)
+
+        if stdevs >= 3
+            l_30 = line.new(time, f_30, time + x, f_30, xloc = xloc.bar_time, color = c_30)
+
+        if stdevs >= 4 and halves
+            l_35 = line.new(time, f_35, time + x, f_35, xloc = xloc.bar_time, color = c_35)
+
+        if stdevs >= 4
+            l_40 = line.new(time, f_40, time + x, f_40, xloc = xloc.bar_time, color = c_40)
+
+        make_table(dt, t, type, f_00, f_10, f_15, f_20, f_25, f_30, f_35, f_40, avg_00, avg_10, avg_15, avg_20, avg_25, avg_30, avg_35, avg_40, pct_00, pct_10, pct_15, pct_20, pct_25, pct_30, pct_35, pct_40, itm_00, itm_10, itm_15, itm_20, itm_25, itm_30, itm_35, itm_40, tot_00, tot_10, tot_15, tot_20, tot_25, tot_30, tot_35, tot_40, c_00, c_10, c_15, c_20, c_25, c_30, c_35, c_40)
+
+// PROGRAM
+
+if dte != -1
+    fnc("calls")
+    fnc("puts")

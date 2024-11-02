@@ -1,0 +1,49 @@
+// https://www.tradingview.com/script/xmcUc75j-vol-box/
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © voided
+
+//@version=5
+indicator("vol_box", overlay = true)
+
+stdevs  = input.float(title = "stdevs", defval = 1.0)
+pp      = input.int(title = "periods to project", defval = 1)
+window  = input.int(title = "window", defval = 20)
+ppy     = input.int(title = "periods per year", defval = 252)
+history = input.bool(title = "show history", defval = false)
+
+var rvs = array.new_float()
+
+squared_returns     = math.pow(math.log(close / close[1]), 2.0)
+smoothed_returns    = ta.ema(squared_returns, window)
+rv                  = math.sqrt(smoothed_returns * ppy)
+
+array.push(rvs, rv)
+
+upper   = close * (1 + rv * stdevs * math.sqrt(pp / ppy))
+lower   = close * (1 - rv * stdevs * math.sqrt(pp / ppy))
+
+var fcst    = array.new_int()
+
+array.push(fcst, close <= upper[pp] and close >= lower[pp] ? 1 : 0)
+
+hist_transp = history ? 0 : 100
+
+hist_upper = close > upper[pp] ? color.new(color.red, hist_transp) : color.new(color.blue, hist_transp)
+hist_lower = close < lower[pp] ? color.new(color.red, hist_transp) : color.new(color.blue, hist_transp)
+
+plot(upper[pp], title = "upper bound", color = hist_upper, style = plot.style_stepline)
+plot(lower[pp], title = "upper bound", color = hist_lower, style = plot.style_stepline)
+
+if barstate.islast
+
+    bgc = color.new(color.white, 100)
+    bc  = color.new(color.blue, 0)
+
+    pct_rnk = array.percentrank(rvs, array.indexof(rvs, rv))
+    acc     = array.avg(fcst) * 100
+
+    b_txt   = str.format("rv: {0,number,#.#}%\nrnk: {1, number, #.#}%\nacc: {2, number, #.#}%", rv * 100, pct_rnk, acc)
+
+    b = box.new(left = bar_index + 1, top = upper, bottom = lower, right = bar_index + pp, xloc = xloc.bar_index, bgcolor = bgc, border_color = bc, text = b_txt, text_color = bc, text_halign = text.align_left, text_valign = text.align_top, text_size = size.tiny)
+
+    box.delete(b[1])
