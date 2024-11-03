@@ -83,12 +83,15 @@ def option_chains(ticker):
     return chains
 
 
-def plot_volatility_surface(options, symbol):
-    logging.info("Creating volatility surface plot")
-    calls = options[options["optionType"] == "call"]
+def plot_volatility_surfaces(options, symbol):
+    logging.info("Creating volatility surface plots")
 
-    # pivot the dataframe
-    surface = (
+    # Create separate dataframes for calls and puts
+    calls = options[options["optionType"] == "call"]
+    puts = options[options["optionType"] == "put"]
+
+    # Pivot the dataframes
+    call_surface = (
         calls[["daysToExpiration", "strike", "impliedVolatility"]]
         .pivot_table(
             values="impliedVolatility", index="strike", columns="daysToExpiration"
@@ -96,41 +99,62 @@ def plot_volatility_surface(options, symbol):
         .dropna()
     )
 
-    # create the figure object
-    fig = plt.figure(figsize=(10, 8))
+    put_surface = (
+        puts[["daysToExpiration", "strike", "impliedVolatility"]]
+        .pivot_table(
+            values="impliedVolatility", index="strike", columns="daysToExpiration"
+        )
+        .dropna()
+    )
 
-    # add the subplot with projection argument
-    ax = fig.add_subplot(111, projection="3d")
+    # Create the figure object with two subplots
+    fig = plt.figure(figsize=(15, 8))
 
-    # get the 1d values from the pivoted dataframe
-    x, y, z = surface.columns.values, surface.index.values, surface.values
+    # Call surface plot
+    ax1 = fig.add_subplot(121, projection="3d")
+    x1, y1, z1 = (
+        call_surface.columns.values,
+        call_surface.index.values,
+        call_surface.values,
+    )
+    X1, Y1 = np.meshgrid(x1, y1)
 
-    # return coordinate matrices from coordinate vectors
-    X, Y = np.meshgrid(x, y)
+    surf1 = ax1.plot_surface(X1, Y1, z1, cmap="viridis", edgecolor="none")
+    ax1.set_xlabel("Days to expiration")
+    ax1.set_ylabel("Strike price")
+    ax1.set_zlabel("Implied volatility")
+    ax1.set_title(f"{symbol} Call Implied Volatility Surface")
+    fig.colorbar(surf1, ax=ax1, label="Implied Volatility")
+    ax1.view_init(elev=20, azim=45)
 
-    # set labels
-    ax.set_xlabel("Days to expiration")
-    ax.set_ylabel("Strike price")
-    ax.set_zlabel("Implied volatility")
-    ax.set_title(f"{symbol} Call Implied Volatility Surface")
+    # Put surface plot
+    ax2 = fig.add_subplot(122, projection="3d")
+    x2, y2, z2 = (
+        put_surface.columns.values,
+        put_surface.index.values,
+        put_surface.values,
+    )
+    X2, Y2 = np.meshgrid(x2, y2)
 
-    # plot with color gradient
-    surf = ax.plot_surface(X, Y, z, cmap="viridis", edgecolor="none")
+    surf2 = ax2.plot_surface(X2, Y2, z2, cmap="viridis", edgecolor="none")
+    ax2.set_xlabel("Days to expiration")
+    ax2.set_ylabel("Strike price")
+    ax2.set_zlabel("Implied volatility")
+    ax2.set_title(f"{symbol} Put Implied Volatility Surface")
+    fig.colorbar(surf2, ax=ax2, label="Implied Volatility")
+    ax2.view_init(elev=20, azim=45)
 
-    # add colorbar
-    fig.colorbar(surf, ax=ax, label="Implied Volatility")
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
 
-    # adjust the viewing angle for better visualization
-    ax.view_init(elev=20, azim=45)
-
-    logging.info("Displaying plot")
+    logging.info("Displaying plots")
     plt.show()
 
 
 def main(args):
     logging.info(f"Starting volatility surface analysis for {args.ticker}")
     options = option_chains(args.ticker)
-    plot_volatility_surface(options, args.ticker)
+    plot_volatility_surfaces(options, args.ticker)
 
 
 if __name__ == "__main__":
