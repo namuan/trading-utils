@@ -8,6 +8,7 @@ Usage:
 ./vol-surface.py -h
 ./vol-surface.py -v # To log INFO messages
 ./vol-surface.py -vv # To log DEBUG messages
+./vol-surface.py -d 60 # To analyze options expiring within 60 days
 """
 
 import datetime as dt
@@ -56,16 +57,31 @@ def parse_args():
         default="SPY",
         help="Ticker symbol to analyze (default: SPY)",
     )
+    parser.add_argument(
+        "-d",
+        "--days",
+        type=int,
+        default=30,
+        help="Maximum days to expiration to analyze (default: 30)",
+    )
     return parser.parse_args()
 
 
-def option_chains(ticker_data):
-    logging.info(f"Fetching option chains")
+def option_chains(ticker_data, max_days):
+    logging.info(f"Fetching option chains (max {max_days} days to expiration)")
     expirations = ticker_data.options
     chains = pd.DataFrame()
+    today = dt.datetime.today()
 
     for expiration in expirations:
-        logging.debug(f"Processing expiration date: {expiration}")
+        exp_date = pd.to_datetime(expiration)
+        days_to_exp = (exp_date - today).days
+
+        if days_to_exp > max_days:
+            logging.debug(f"Skipping expiration {expiration} ({days_to_exp} days)")
+            continue
+
+        logging.debug(f"Processing expiration date: {expiration} ({days_to_exp} days)")
         opt = ticker_data.option_chain(expiration)
         calls = opt.calls
         calls["optionType"] = "call"
@@ -78,92 +94,70 @@ def option_chains(ticker_data):
         )
         chains = pd.concat([chains, chain])
 
-    chains["daysToExpiration"] = (chains.expiration - dt.datetime.today()).dt.days + 1
+    if chains.empty:
+        raise ValueError(f"No options found within {max_days} days to expiration")
+
+    chains["daysToExpiration"] = (chains.expiration - today).dt.days + 1
     return chains
+
+
+def create_surface_plot(ax, surface_data, option_type, symbol, current_price):
+    x, y, z = (
+        surface_data.columns.values,
+        surface_data.index.values,
+        surface_data.values,
+    )
+    X, Y = np.meshgrid(x, y)
+
+    surf = ax.plot_surface(X, Y, z, cmap="viridis", edgecolor="none", alpha=0.8)
+
+    # Add vertical line at current price
+    z_max = np.max(z)
+    xx = np.full_like(np.linspace(0, z_max, 100), x[0])
+    yy = np.full_like(np.linspace(0, z_max, 100), current_price)
+    zz = np.linspace(0, z_max, 100)
+    ax.plot(xx, yy, zz, "r-", linewidth=2, label=f"Current Price: ${current_price:.2f}")
+
+    ax.set_xlabel("Days to expiration")
+    ax.set_ylabel("Strike price")
+    ax.set_zlabel("Implied volatility")
+    ax.set_title(f"{symbol} {option_type.capitalize()} Implied Volatility Surface")
+    plt.colorbar(surf, ax=ax, label="Implied Volatility")
+    ax.view_init(elev=20, azim=45)
+    ax.legend()
+
+    return surf
 
 
 def plot_volatility_surfaces(options, symbol, current_price):
     logging.info("Creating volatility surface plots")
 
     # Create separate dataframes for calls and puts
-    calls = options[options["optionType"] == "call"]
-    puts = options[options["optionType"] == "put"]
-
-    # Pivot the dataframes
-    call_surface = (
-        calls[["daysToExpiration", "strike", "impliedVolatility"]]
-        .pivot_table(
-            values="impliedVolatility", index="strike", columns="daysToExpiration"
+    surfaces = {}
+    for option_type in ["call", "put"]:
+        filtered_options = options[options["optionType"] == option_type]
+        surfaces[option_type] = (
+            filtered_options[["daysToExpiration", "strike", "impliedVolatility"]]
+            .pivot_table(
+                values="impliedVolatility", index="strike", columns="daysToExpiration"
+            )
+            .dropna()
         )
-        .dropna()
-    )
-
-    put_surface = (
-        puts[["daysToExpiration", "strike", "impliedVolatility"]]
-        .pivot_table(
-            values="impliedVolatility", index="strike", columns="daysToExpiration"
-        )
-        .dropna()
-    )
 
     # Create the figure object with two subplots
     fig = plt.figure(figsize=(15, 8))
 
-    # Call surface plot
-    ax1 = fig.add_subplot(121, projection="3d")
-    x1, y1, z1 = (
-        call_surface.columns.values,
-        call_surface.index.values,
-        call_surface.values,
-    )
-    X1, Y1 = np.meshgrid(x1, y1)
+    # Create subplots
+    axes = {
+        "call": fig.add_subplot(121, projection="3d"),
+        "put": fig.add_subplot(122, projection="3d"),
+    }
 
-    surf1 = ax1.plot_surface(X1, Y1, z1, cmap="viridis", edgecolor="none", alpha=0.8)
-
-    # Add vertical line at current price for calls
-    z_min, z_max = np.min(z1), np.max(z1)
-    xx = np.full_like(np.linspace(0, z_max, 100), x1[0])
-    yy = np.full_like(np.linspace(0, z_max, 100), current_price)
-    zz = np.linspace(0, z_max, 100)
-    ax1.plot(
-        xx, yy, zz, "r-", linewidth=2, label=f"Current Price: ${current_price:.2f}"
-    )
-
-    ax1.set_xlabel("Days to expiration")
-    ax1.set_ylabel("Strike price")
-    ax1.set_zlabel("Implied volatility")
-    ax1.set_title(f"{symbol} Call Implied Volatility Surface")
-    fig.colorbar(surf1, ax=ax1, label="Implied Volatility")
-    ax1.view_init(elev=20, azim=45)
-    ax1.legend()
-
-    # Put surface plot
-    ax2 = fig.add_subplot(122, projection="3d")
-    x2, y2, z2 = (
-        put_surface.columns.values,
-        put_surface.index.values,
-        put_surface.values,
-    )
-    X2, Y2 = np.meshgrid(x2, y2)
-
-    surf2 = ax2.plot_surface(X2, Y2, z2, cmap="viridis", edgecolor="none", alpha=0.8)
-
-    # Add vertical line at current price for puts
-    z_min, z_max = np.min(z2), np.max(z2)
-    xx = np.full_like(np.linspace(0, z_max, 100), x2[0])
-    yy = np.full_like(np.linspace(0, z_max, 100), current_price)
-    zz = np.linspace(0, z_max, 100)
-    ax2.plot(
-        xx, yy, zz, "r-", linewidth=2, label=f"Current Price: ${current_price:.2f}"
-    )
-
-    ax2.set_xlabel("Days to expiration")
-    ax2.set_ylabel("Strike price")
-    ax2.set_zlabel("Implied volatility")
-    ax2.set_title(f"{symbol} Put Implied Volatility Surface")
-    fig.colorbar(surf2, ax=ax2, label="Implied Volatility")
-    ax2.view_init(elev=20, azim=45)
-    ax2.legend()
+    # Plot surfaces
+    for option_type, ax in axes.items():
+        create_surface_plot(
+            ax, surfaces[option_type], option_type, symbol, current_price
+        )
 
     # Adjust layout to prevent overlap
     plt.tight_layout()
@@ -178,7 +172,7 @@ def main(args):
     asset = yf.Ticker(ticker)
     current_price = (asset.info["bid"] + asset.info["ask"]) / 2
     logging.info(f"Current price for {ticker}: ${current_price:.2f}")
-    options = option_chains(asset)
+    options = option_chains(asset, args.days)
     plot_volatility_surfaces(options, ticker, current_price)
 
 
