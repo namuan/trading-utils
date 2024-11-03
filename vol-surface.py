@@ -21,6 +21,22 @@ import pandas as pd
 import yfinance as yf
 from matplotlib.colors import LinearSegmentedColormap
 
+# Plot constants
+FIGURE_SIZE = (12, 8)
+PLOT_VIEW_ELEVATION = 20
+PLOT_VIEW_AZIMUTH = 45
+SURFACE_ALPHA = 0.7
+PRICE_PLANE_ALPHA = 0.2
+FOOTNOTE_FONTSIZE = 8
+
+# Color constants
+CALL_COLORS = ["lightgreen", "darkgreen"]
+PUT_COLORS = ["pink", "darkred"]
+PRICE_PLANE_COLOR = "blue"
+LEGEND_CALL_COLOR = "darkgreen"
+LEGEND_PUT_COLOR = "darkred"
+LEGEND_PRICE_COLOR = PRICE_PLANE_COLOR
+
 
 def setup_logging(verbosity):
     logging_level = logging.WARNING
@@ -118,12 +134,30 @@ def plot_volatility_surface(options, symbol, current_price):
         )
 
     # Create the figure with a single 3D subplot
-    fig = plt.figure(figsize=(12, 8))
+    fig = plt.figure(figsize=FIGURE_SIZE)
     ax = fig.add_subplot(111, projection="3d")
 
     # Create custom colormaps
-    call_colors = LinearSegmentedColormap.from_list("", ["lightgreen", "darkgreen"])
-    put_colors = LinearSegmentedColormap.from_list("", ["pink", "darkred"])
+    call_colors = LinearSegmentedColormap.from_list("", CALL_COLORS)
+    put_colors = LinearSegmentedColormap.from_list("", PUT_COLORS)
+
+    # Create proxy artists for the legend
+    legend_elements = [
+        plt.Rectangle(
+            (0, 0), 1, 1, fc=LEGEND_CALL_COLOR, alpha=SURFACE_ALPHA, label="Calls"
+        ),
+        plt.Rectangle(
+            (0, 0), 1, 1, fc=LEGEND_PUT_COLOR, alpha=SURFACE_ALPHA, label="Puts"
+        ),
+        plt.Rectangle(
+            (0, 0),
+            1,
+            1,
+            fc=LEGEND_PRICE_COLOR,
+            alpha=PRICE_PLANE_ALPHA,
+            label=f"Current Price (${current_price:.2f})",
+        ),
+    ]
 
     # Plot surfaces for both calls and puts
     for option_type, surface_data in surfaces.items():
@@ -133,39 +167,36 @@ def plot_volatility_surface(options, symbol, current_price):
         X, Y = np.meshgrid(x, y)
 
         cmap = call_colors if option_type == "call" else put_colors
-        surf = ax.plot_surface(
-            X,
-            Y,
-            z,
-            cmap=cmap,
-            edgecolor="none",
-            alpha=0.7,
-            label=f"{option_type.capitalize()}s",
-        )
+        ax.plot_surface(X, Y, z, cmap=cmap, edgecolor="none", alpha=SURFACE_ALPHA)
 
-    # Add vertical line at current price
+    # Get the common x and z ranges for the price line
+    x_min, x_max = min(x), max(x)
+    z_min = 0
     z_max = max(np.max(surfaces["call"].values), np.max(surfaces["put"].values))
-    xx = np.full_like(np.linspace(0, z_max, 100), x[0])
-    yy = np.full_like(np.linspace(0, z_max, 100), current_price)
-    zz = np.linspace(0, z_max, 100)
-    ax.plot(xx, yy, zz, "b-", linewidth=2, label=f"Current Price: ${current_price:.2f}")
+
+    # Create a semi-transparent plane at current price
+    xx, zz = np.meshgrid(np.array([x_min, x_max]), np.array([z_min, z_max]))
+    yy = np.full_like(xx, current_price)
+
+    # Plot the semi-transparent plane
+    ax.plot_surface(xx, yy, zz, color=PRICE_PLANE_COLOR, alpha=PRICE_PLANE_ALPHA)
 
     # Customize the plot
     ax.set_xlabel("Days to expiration")
     ax.set_ylabel("Strike price")
     ax.set_zlabel("Implied volatility")
-    ax.set_title(f"{symbol} Implied Volatility Surface\nGreen: Calls, Red: Puts")
-    ax.view_init(elev=20, azim=45)
+    ax.set_title(f"{symbol} Implied Volatility Surface")
+    ax.view_init(elev=PLOT_VIEW_ELEVATION, azim=PLOT_VIEW_AZIMUTH)
 
-    # Add legend
-    ax.legend()
+    # Add legend using proxy artists
+    ax.legend(handles=legend_elements, loc="upper right")
 
     # Add a note about the coloring
     plt.figtext(
         0.02,
         0.02,
         "Color intensity represents implied volatility level",
-        fontsize=8,
+        fontsize=FOOTNOTE_FONTSIZE,
         style="italic",
     )
 
