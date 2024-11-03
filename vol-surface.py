@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from matplotlib.colors import LinearSegmentedColormap
 
 
 def setup_logging(verbosity):
@@ -101,36 +102,8 @@ def option_chains(ticker_data, max_days):
     return chains
 
 
-def create_surface_plot(ax, surface_data, option_type, symbol, current_price):
-    x, y, z = (
-        surface_data.columns.values,
-        surface_data.index.values,
-        surface_data.values,
-    )
-    X, Y = np.meshgrid(x, y)
-
-    surf = ax.plot_surface(X, Y, z, cmap="viridis", edgecolor="none", alpha=0.8)
-
-    # Add vertical line at current price
-    z_max = np.max(z)
-    xx = np.full_like(np.linspace(0, z_max, 100), x[0])
-    yy = np.full_like(np.linspace(0, z_max, 100), current_price)
-    zz = np.linspace(0, z_max, 100)
-    ax.plot(xx, yy, zz, "r-", linewidth=2, label=f"Current Price: ${current_price:.2f}")
-
-    ax.set_xlabel("Days to expiration")
-    ax.set_ylabel("Strike price")
-    ax.set_zlabel("Implied volatility")
-    ax.set_title(f"{symbol} {option_type.capitalize()} Implied Volatility Surface")
-    plt.colorbar(surf, ax=ax, label="Implied Volatility")
-    ax.view_init(elev=20, azim=45)
-    ax.legend()
-
-    return surf
-
-
-def plot_volatility_surfaces(options, symbol, current_price):
-    logging.info("Creating volatility surface plots")
+def plot_volatility_surface(options, symbol, current_price):
+    logging.info("Creating volatility surface plot")
 
     # Create separate dataframes for calls and puts
     surfaces = {}
@@ -144,25 +117,62 @@ def plot_volatility_surfaces(options, symbol, current_price):
             .dropna()
         )
 
-    # Create the figure object with two subplots
-    fig = plt.figure(figsize=(15, 8))
+    # Create the figure with a single 3D subplot
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection="3d")
 
-    # Create subplots
-    axes = {
-        "call": fig.add_subplot(121, projection="3d"),
-        "put": fig.add_subplot(122, projection="3d"),
-    }
+    # Create custom colormaps
+    call_colors = LinearSegmentedColormap.from_list("", ["lightgreen", "darkgreen"])
+    put_colors = LinearSegmentedColormap.from_list("", ["pink", "darkred"])
 
-    # Plot surfaces
-    for option_type, ax in axes.items():
-        create_surface_plot(
-            ax, surfaces[option_type], option_type, symbol, current_price
+    # Plot surfaces for both calls and puts
+    for option_type, surface_data in surfaces.items():
+        x = surface_data.columns.values
+        y = surface_data.index.values
+        z = surface_data.values
+        X, Y = np.meshgrid(x, y)
+
+        cmap = call_colors if option_type == "call" else put_colors
+        surf = ax.plot_surface(
+            X,
+            Y,
+            z,
+            cmap=cmap,
+            edgecolor="none",
+            alpha=0.7,
+            label=f"{option_type.capitalize()}s",
         )
 
-    # Adjust layout to prevent overlap
+    # Add vertical line at current price
+    z_max = max(np.max(surfaces["call"].values), np.max(surfaces["put"].values))
+    xx = np.full_like(np.linspace(0, z_max, 100), x[0])
+    yy = np.full_like(np.linspace(0, z_max, 100), current_price)
+    zz = np.linspace(0, z_max, 100)
+    ax.plot(xx, yy, zz, "b-", linewidth=2, label=f"Current Price: ${current_price:.2f}")
+
+    # Customize the plot
+    ax.set_xlabel("Days to expiration")
+    ax.set_ylabel("Strike price")
+    ax.set_zlabel("Implied volatility")
+    ax.set_title(f"{symbol} Implied Volatility Surface\nGreen: Calls, Red: Puts")
+    ax.view_init(elev=20, azim=45)
+
+    # Add legend
+    ax.legend()
+
+    # Add a note about the coloring
+    plt.figtext(
+        0.02,
+        0.02,
+        "Color intensity represents implied volatility level",
+        fontsize=8,
+        style="italic",
+    )
+
+    # Adjust layout
     plt.tight_layout()
 
-    logging.info("Displaying plots")
+    logging.info("Displaying plot")
     plt.show()
 
 
@@ -173,7 +183,7 @@ def main(args):
     current_price = (asset.info["bid"] + asset.info["ask"]) / 2
     logging.info(f"Current price for {ticker}: ${current_price:.2f}")
     options = option_chains(asset, args.days)
-    plot_volatility_surfaces(options, ticker, current_price)
+    plot_volatility_surface(options, ticker, current_price)
 
 
 if __name__ == "__main__":
