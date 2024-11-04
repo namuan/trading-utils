@@ -5,15 +5,18 @@ $ python3 ib_straddle_adjustments.py --help
 
 Eg:
 $ python3 ib_straddle_adjustments.py --expiry-date 20240816  --plot
+$ python3 ib_straddle_adjustments.py --expiry-date 20240816 --plot --apply-adjustment
 """
+
 from ib_async import *
 
-from common.ib import find_options_for_expiry
-from common.ib import get_next_futures_expiry
-from common.ib import open_contracts_for_expiry
-from common.ib import setup_ib
-from common.options import calculate_nearest_strike
-from common.options import get_mid_price
+from common.ib import (
+    find_options_for_expiry,
+    get_next_futures_expiry,
+    open_contracts_for_expiry,
+    setup_ib,
+)
+from common.options import calculate_nearest_strike, get_mid_price
 from options_payoff import *
 
 
@@ -62,13 +65,14 @@ def main(args):
     [ticker] = ib.reqTickers(*[contract])
     spot_price = ticker.marketPrice()
 
-    # Apply ATM Straddle
-    straddle_adjustment = apply_straddle_adjustment(expiry_date, ib, spot_price)
-
     OptionPlot(open_contracts, spot_price).plot("Current Position", show_plot=args.plot)
-    OptionPlot(open_contracts + straddle_adjustment, spot_price).plot(
-        "ATM Straddle", show_plot=args.plot
-    )
+
+    if args.apply_adjustment:
+        # Apply ATM Straddle
+        straddle_adjustment = apply_straddle_adjustment(expiry_date, ib, spot_price)
+        OptionPlot(open_contracts + straddle_adjustment, spot_price).plot(
+            "ATM Straddle", show_plot=args.plot
+        )
 
     ib.disconnect()
 
@@ -90,6 +94,13 @@ def parse_args():
         action="store_true",
         default=False,
         help="Generate Plot for final position",
+    )
+    parser.add_argument(
+        "-a",
+        "--apply-adjustment",
+        action="store_true",
+        default=False,
+        help="Apply straddle adjustment to the position",
     )
     return parser.parse_args()
 
