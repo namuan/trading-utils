@@ -47,6 +47,7 @@ from datetime import datetime
 
 import pandas as pd
 import schedule
+from persistent_cache import PersistentCache
 
 from common.options import option_chain, option_expirations, process_options_data
 
@@ -109,12 +110,20 @@ def select_strikes_for(
 
 
 # Main process
-def process_symbol(symbol, db_name="trades.db"):
+@PersistentCache()
+def first_expiry(symbol, current_date):
+    print(f"Trying to find first expiry on {current_date}")
     expirations_output = option_expirations(symbol, include_expiration_type=True)
     [todays_expiry] = [
         datetime.strptime(x.date, "%Y-%m-%d").date()
         for x in expirations_output.expirations.expiration
     ][:1]
+    return todays_expiry
+
+
+def process_symbol(symbol, db_name="trades.db"):
+    current_date = datetime.now().date().isoformat()  # Convert date to string
+    todays_expiry = first_expiry(symbol, current_date)
     options_data = option_chain(symbol, todays_expiry)
     pd.set_option("display.max_rows", None)
     pd.set_option("display.max_columns", None)
@@ -125,9 +134,6 @@ def process_symbol(symbol, db_name="trades.db"):
     options_df = process_options_data(options_data)
     conn = sqlite3.connect(f"output/{db_name}")
     cursor = conn.cursor()
-
-    current_date = datetime.now().date().isoformat()  # Convert date to string
-
     cursor.execute(
         "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
         (current_date, symbol),
