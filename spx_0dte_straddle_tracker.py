@@ -109,7 +109,6 @@ def select_strikes_for(
     )
 
 
-# Main process
 @PersistentCache()
 def first_expiry(symbol, current_date):
     print(f"Trying to find first expiry on {current_date}")
