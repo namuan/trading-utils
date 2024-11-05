@@ -122,15 +122,11 @@ def first_expiry(symbol, current_date):
 
 def process_symbol(symbol, db_name="trades.db"):
     current_date = datetime.now().date().isoformat()  # Convert date to string
-    todays_expiry = first_expiry(symbol, current_date)
-    options_data = option_chain(symbol, todays_expiry)
     pd.set_option("display.max_rows", None)
     pd.set_option("display.max_columns", None)
     pd.set_option("display.width", None)
-
     pd.set_option("display.float_format", "{:.2f}".format)
 
-    options_df = process_options_data(options_data)
     conn = sqlite3.connect(f"output/{db_name}")
     cursor = conn.cursor()
     cursor.execute(
@@ -139,50 +135,20 @@ def process_symbol(symbol, db_name="trades.db"):
     )
     existing_trade = cursor.fetchone()
 
+    todays_expiry = first_expiry(symbol, current_date)
+    options_data = option_chain(symbol, todays_expiry)
+    options_df = process_options_data(options_data)
+
     if existing_trade:
         strike_price = existing_trade[3]
         print(f"Found existing trade. Strike price from database {strike_price}")
-        selected_call_strikes = select_strikes_for(
-            options_df,
-            todays_expiry,
-            option_type="call",
-            additional_filters=f"(strike == {strike_price})",
-            sort_criteria=dict(by="greeks_delta", ascending=False),
-            fetch_limit=1,
-        )
-        selected_put_strikes = select_strikes_for(
-            options_df,
-            todays_expiry,
-            option_type="put",
-            additional_filters=f"(strike == {strike_price})",
-            sort_criteria=dict(by="greeks_delta", ascending=False),
-            fetch_limit=1,
-        )
-        call_strike_record, put_strike_record = (
-            selected_call_strikes.iloc[0].to_dict(),
-            selected_put_strikes.iloc[0].to_dict(),
+        call_strike_record, put_strike_record = find_options_for(
+            options_df, strike_price, todays_expiry
         )
     else:
         print("No trades found in the database. Trying to locate ATM strike ...")
-        selected_call_strikes = select_strikes_for(
-            options_df,
-            todays_expiry,
-            option_type="call",
-            additional_filters="(greeks_delta > 0.5)",
-            sort_criteria=dict(by="greeks_delta", ascending=True),
-            fetch_limit=1,
-        )
-        selected_put_strikes = select_strikes_for(
-            options_df,
-            todays_expiry,
-            option_type="put",
-            additional_filters="(greeks_delta > -0.5)",
-            sort_criteria=dict(by="greeks_delta", ascending=True),
-            fetch_limit=1,
-        )
-        call_strike_record, put_strike_record = (
-            selected_call_strikes.iloc[0].to_dict(),
-            selected_put_strikes.iloc[0].to_dict(),
+        call_strike_record, put_strike_record = find_at_the_money_options(
+            options_df, todays_expiry
         )
         strike_price = call_strike_record.get("strike")
         print(f"Strike price around 50 Delta from Option Chain {strike_price}")
@@ -231,6 +197,52 @@ def process_symbol(symbol, db_name="trades.db"):
 
     conn.commit()
     conn.close()
+
+
+def find_options_for(options_df, strike_price, todays_expiry):
+    selected_call_strikes = select_strikes_for(
+        options_df,
+        todays_expiry,
+        option_type="call",
+        additional_filters=f"(strike == {strike_price})",
+        sort_criteria=dict(by="greeks_delta", ascending=False),
+        fetch_limit=1,
+    )
+    selected_put_strikes = select_strikes_for(
+        options_df,
+        todays_expiry,
+        option_type="put",
+        additional_filters=f"(strike == {strike_price})",
+        sort_criteria=dict(by="greeks_delta", ascending=False),
+        fetch_limit=1,
+    )
+    return (
+        selected_call_strikes.iloc[0].to_dict(),
+        selected_put_strikes.iloc[0].to_dict(),
+    )
+
+
+def find_at_the_money_options(options_df, expiry):
+    selected_call_strikes = select_strikes_for(
+        options_df,
+        expiry,
+        option_type="call",
+        additional_filters="(greeks_delta > 0.5)",
+        sort_criteria=dict(by="greeks_delta", ascending=True),
+        fetch_limit=1,
+    )
+    selected_put_strikes = select_strikes_for(
+        options_df,
+        expiry,
+        option_type="put",
+        additional_filters="(greeks_delta > -0.5)",
+        sort_criteria=dict(by="greeks_delta", ascending=True),
+        fetch_limit=1,
+    )
+    return (
+        selected_call_strikes.iloc[0].to_dict(),
+        selected_put_strikes.iloc[0].to_dict(),
+    )
 
 
 def run_script(symbol):
