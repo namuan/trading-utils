@@ -60,14 +60,6 @@ def setup_database(db_name):
 
     conn = sqlite3.connect(f"output/{db_name}")
     cursor = conn.cursor()
-
-    cursor.execute("PRAGMA module_list;")
-    modules = cursor.fetchall()
-    if ("json1",) not in modules:
-        print(
-            "JSON1 extension not available. Some SQLite versions might not support it."
-        )
-
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS Trades (
@@ -227,7 +219,7 @@ def process_symbol(symbol, db_name="trades.db"):
         f"Current difference between options prices({call_contract_price, put_contract_price}): "
         f"{price_diff}"
     )
-    if price_diff > 5:
+    if price_diff >= 5:
         print("We may need an adjustment. Review data first")
         print(call_strike_record)
         print(put_strike_record)
