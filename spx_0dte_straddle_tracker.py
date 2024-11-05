@@ -44,6 +44,7 @@ import os
 import sqlite3
 import time
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import schedule
@@ -51,15 +52,18 @@ from persistent_cache import PersistentCache
 
 from common.options import option_chain, option_expirations, process_options_data
 
-DB_NAME = "spx_straddle.db"
 
-
-# Setup database and tables
-def setup_database(db_name):
+def setup_database(symbol, date_for_suffix):
     if not os.path.exists("output"):
         os.makedirs("output")
 
-    conn = sqlite3.connect(f"output/{db_name}")
+    db_path = f"output/{symbol.lower()}_trades_{date_for_suffix}.db"
+    if Path.cwd().joinpath(db_path).exists():
+        print(f"Database exists: {db_path}")
+        return db_path
+
+    print(f"Setting up database {db_path}")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
         """
@@ -94,6 +98,8 @@ def setup_database(db_name):
     conn.commit()
     conn.close()
 
+    return db_path
+
 
 def select_strikes_for(
     options_df,
@@ -120,14 +126,16 @@ def first_expiry(symbol, current_date):
     return todays_expiry
 
 
-def process_symbol(symbol, db_name="trades.db"):
+def process_symbol(symbol):
     current_date = datetime.now().date().isoformat()  # Convert date to string
+
+    db_path = setup_database(symbol, current_date)
     pd.set_option("display.max_rows", None)
     pd.set_option("display.max_columns", None)
     pd.set_option("display.width", None)
     pd.set_option("display.float_format", "{:.2f}".format)
 
-    conn = sqlite3.connect(f"output/{db_name}")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
         "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
@@ -246,7 +254,7 @@ def find_at_the_money_options(options_df, expiry):
 
 
 def run_script(symbol):
-    process_symbol(symbol, db_name=DB_NAME)
+    process_symbol(symbol)
     print(f"Script ran at {datetime.now()}")
 
 
@@ -263,8 +271,6 @@ def main():
         help="Run the script once instead of on a schedule",
     )
     args = parser.parse_args()
-
-    setup_database(db_name=DB_NAME)
 
     if args.once:
         # Run once and exit
