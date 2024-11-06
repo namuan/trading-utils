@@ -1,0 +1,44 @@
+//@version=5
+indicator("Mojito v3 Strategy", overlay=false)
+
+// Color Constants
+const color LONG_REGIME_COLOR = color.new(color.green, 70)
+const color SHORT_REGIME_COLOR = color.new(color.red, 70)
+const color NEUTRAL_REGIME_COLOR = color.new(color.gray, 85)
+const color IVTS_COLOR = color.blue
+
+// Futures Contract Symbols
+shortTermFutures = request.security("VX1!", timeframe.period, close)
+midTermFutures = request.security("VX2!", timeframe.period, close)
+
+// IVTS Calculation with Validation
+ivts = na(shortTermFutures) or na(midTermFutures) ? na : shortTermFutures / midTermFutures
+
+// Median Filter with Configurable Length
+median_length = input.int(5, minval=1, title="Median Filter Length")
+median_ivts = ta.median(ivts, median_length)
+
+// Trading Conditions with Configurable Thresholds
+longThreshold = input.float(1.10, minval=1.0, title="Long Threshold")
+shortThreshold = input.float(0.91, maxval=1.0, title="Short Threshold")
+
+longCondition = median_ivts > longThreshold
+shortCondition = median_ivts < shortThreshold
+neutralCondition = median_ivts >= shortThreshold and median_ivts <= longThreshold
+
+// Plot Median IVTS
+plot(median_ivts, "Median IVTS", color=IVTS_COLOR, linewidth=2)
+
+// Dynamic Background Coloring
+bgcolor(longCondition ? LONG_REGIME_COLOR : shortCondition ? SHORT_REGIME_COLOR : NEUTRAL_REGIME_COLOR)
+
+// Threshold Level Lines
+hline(longThreshold, "Long Threshold", color=color.new(color.green, 0), linestyle=hline.style_dashed)
+hline(shortThreshold, "Short Threshold", color=color.new(color.red, 0), linestyle=hline.style_dashed)
+
+// Informative Table with Improved Formatting
+var table infoTable = table.new(position.top_right, 1, 4)  // Increased to 4 rows
+table.cell(infoTable, 0, 0, "IVTS: " + str.tostring(median_ivts, "#.##"))
+table.cell(infoTable, 0, 1, longCondition ? "Regime: Long" : shortCondition ? "Regime: Short" : "Regime: Neutral")
+table.cell(infoTable, 0, 2, "Position:")
+table.cell(infoTable, 0, 3, longCondition ? "60% long VXX" : shortCondition ? "60% short VXX" : "No Position")
