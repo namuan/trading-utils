@@ -13,12 +13,15 @@ Usage:
 Example:
     $ python3 weekly-returns-analysis.py --symbol AAPL --start_date 2011-01-01 --end_date 2024-01-01
 """
+
 import argparse
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
+
+from common.market import download_ticker_data
 
 
 def calculate_max_drawdown(prices):
@@ -182,7 +185,7 @@ def plot_weekly_prices(symbol, weekly_summary):
 
 
 def analyze_stock(symbol, start_date, end_date):
-    stock_data = fetch_stock_data(symbol, start_date, end_date)
+    stock_data = download_ticker_data(symbol, start=start_date, end=end_date)
 
     if stock_data.empty:
         print(f"No data available for {symbol} between {start_date} and {end_date}")
