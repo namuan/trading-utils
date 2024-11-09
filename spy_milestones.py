@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
@@ -29,21 +28,23 @@ def animate_spy_milestones(symbol="SPY"):
             if milestone not in milestone_dates and price >= milestone:
                 milestone_dates[milestone] = date
 
+    # Calculate time differences between milestones
+    time_to_milestone = {}
+    prev_milestone_date = weekly_data.index[0]  # Start from inception
+    for milestone in milestones:
+        if milestone in milestone_dates:
+            current_date = milestone_dates[milestone]
+            time_diff = current_date - prev_milestone_date
+            time_to_milestone[milestone] = time_diff
+            prev_milestone_date = current_date
+
     # Setup the figure
     fig, ax = plt.subplots(figsize=(15, 8))
-    (line,) = ax.plot([], [], "b-", label="SPY Price (Weekly)")
+    (line,) = ax.plot([], [], "b-")
 
-    # Configure the plot
-    ax.set_title("SPY Weekly Price History with Milestones", fontsize=12)
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Price ($)")
-
-    # Remove grid
+    # Remove grid, axes and labels
     ax.grid(False)
-
-    # Set the date formatter
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
-    plt.xticks(rotation=45)
+    ax.set_axis_off()
 
     # Set the y-axis limits with some padding
     ax.set_ylim(0, max(weekly_data["Close"]) * 1.1)
@@ -51,6 +52,16 @@ def animate_spy_milestones(symbol="SPY"):
 
     # Store annotations
     annotations = []
+
+    def format_timedelta(td):
+        years = td.days // 365
+        months = (td.days % 365) // 30
+        if years > 0 and months > 0:
+            return f"{years}y {months}m"
+        elif years > 0:
+            return f"{years}y"
+        else:
+            return f"{months}m"
 
     def animate(frame):
         # Clear previous annotations
@@ -69,11 +80,22 @@ def animate_spy_milestones(symbol="SPY"):
                 # Find the price at milestone
                 price = weekly_data.loc[date, "Close"]
 
-                # Add annotation with adjusted position (top-left)
+                # Format the duration
+                duration = format_timedelta(time_to_milestone[milestone])
+
+                # Create annotation text
+                if milestone == 100:
+                    time_text = f"$100\n{date.strftime('%Y-%m-%d')}"
+                else:
+                    time_text = (
+                        f"${milestone}\n{date.strftime('%Y-%m-%d')}\nTime: {duration}"
+                    )
+
+                # Add annotation with adjusted position
                 ann = ax.annotate(
-                    f'${milestone}\n{date.strftime("%Y-%m-%d")}',
+                    time_text,
                     xy=(date, price),
-                    xytext=(-40, 20),  # Adjusted to top-left
+                    xytext=(-60, 40),  # Moved further to top-left
                     textcoords="offset points",
                     bbox=dict(boxstyle="round,pad=0.5", fc="yellow", alpha=0.5),
                     arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0"),
@@ -93,7 +115,6 @@ def animate_spy_milestones(symbol="SPY"):
         repeat=False,
     )
 
-    plt.legend()
     plt.tight_layout()
     plt.show()
 
