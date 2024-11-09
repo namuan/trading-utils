@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.animation import FuncAnimation
 
 from common.market import download_ticker_data
@@ -20,13 +21,16 @@ def animate_spy_milestones(symbol="SPY"):
     # Milestones to track
     milestones = [100, 200, 300, 400, 500, 600]
     milestone_dates = {}
+    milestone_points = {}  # Store the actual price points for milestones
 
-    # Find milestone dates first
+    # Find milestone dates and prices
     for date, row in weekly_data.iterrows():
         price = row["Close"]
         for milestone in milestones:
             if milestone not in milestone_dates and price >= milestone:
                 milestone_dates[milestone] = date
+                milestone_points[milestone] = price
+                break
 
     # Calculate time differences between milestones
     time_to_milestone = {}
@@ -38,9 +42,17 @@ def animate_spy_milestones(symbol="SPY"):
             time_to_milestone[milestone] = time_diff
             prev_milestone_date = current_date
 
-    # Setup the figure
+    # Setup the figure with a dark background
+    plt.style.use("dark_background")
     fig, ax = plt.subplots(figsize=(15, 8))
-    (line,) = ax.plot([], [], "b-")
+    fig.patch.set_facecolor("#1C1C1C")
+    ax.set_facecolor("#1C1C1C")
+
+    # Create line with gradient color
+    (line,) = ax.plot([], [], color="#00BFD8", linewidth=2)
+
+    # Create scatter plot for milestone points
+    scatter = ax.scatter([], [], color="yellow", s=150, zorder=5)
 
     # Remove grid, axes and labels
     ax.grid(False)
@@ -50,8 +62,11 @@ def animate_spy_milestones(symbol="SPY"):
     ax.set_ylim(0, max(weekly_data["Close"]) * 1.1)
     ax.set_xlim(weekly_data.index[0], weekly_data.index[-1])
 
-    # Store annotations
+    # Store annotations and their fade states
     annotations = []
+    current_milestones = set()
+    fade_states = {}  # Store fade state for each milestone
+    FADE_IN_FRAMES = 15  # Number of frames for fade in
 
     def format_timedelta(td):
         years = td.days // 365
@@ -62,6 +77,19 @@ def animate_spy_milestones(symbol="SPY"):
             return f"{years}y"
         else:
             return f"{months}m"
+
+    def calculate_alpha(milestone, frame, milestone_frame):
+        if milestone not in fade_states:
+            fade_states[milestone] = {"start_frame": frame}
+
+        frames_elapsed = frame - fade_states[milestone]["start_frame"]
+
+        if frames_elapsed < FADE_IN_FRAMES:
+            # Fade in
+            return frames_elapsed / FADE_IN_FRAMES
+        else:
+            # Stay fully visible
+            return 1.0
 
     def animate(frame):
         # Clear previous annotations
@@ -74,35 +102,73 @@ def animate_spy_milestones(symbol="SPY"):
         mask = weekly_data.index <= current_date
         line.set_data(weekly_data.index[mask], weekly_data["Close"][mask])
 
-        # Add milestone annotations if reached
-        for milestone, date in milestone_dates.items():
-            if current_date >= date:
-                # Find the price at milestone
-                price = weekly_data.loc[date, "Close"]
+        # Update milestone points
+        scatter_points = []
+        current_price = weekly_data["Close"][frame]
 
-                # Format the duration
-                duration = format_timedelta(time_to_milestone[milestone])
+        # Check for new milestones reached in this frame
+        for milestone in milestones:
+            if milestone not in current_milestones:
+                if current_price >= milestone and milestone in milestone_dates:
+                    current_milestones.add(milestone)
 
-                # Create annotation text
-                if milestone == 100:
-                    time_text = f"$100\n{date.strftime('%Y-%m-%d')}"
-                else:
-                    time_text = (
-                        f"${milestone}\n{date.strftime('%Y-%m-%d')}\nTime: {duration}"
-                    )
+        # Add milestone annotations and points for all reached milestones
+        for milestone in current_milestones:
+            date = milestone_dates[milestone]
+            price = milestone_points[milestone]
+            milestone_frame = weekly_data.index.get_loc(date)
 
-                # Add annotation with adjusted position
-                ann = ax.annotate(
-                    time_text,
-                    xy=(date, price),
-                    xytext=(-60, 40),  # Moved further to top-left
-                    textcoords="offset points",
-                    bbox=dict(boxstyle="round,pad=0.5", fc="yellow", alpha=0.5),
-                    arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=0"),
+            # Calculate alpha for fade effect
+            alpha = calculate_alpha(milestone, frame, milestone_frame)
+
+            # Add point to scatter data
+            scatter_points.append([date, price])
+
+            # Format the duration
+            duration = format_timedelta(time_to_milestone[milestone])
+
+            # Create annotation text
+            if milestone == 100:
+                time_text = f"${milestone}\n{date.strftime('%Y-%m-%d')}"
+            else:
+                time_text = (
+                    f"${milestone}\n{date.strftime('%Y-%m-%d')}\nTime: {duration}"
                 )
-                annotations.append(ann)
 
-        return [line] + annotations
+            # Add annotation with adjusted position and style
+            ann = ax.annotate(
+                time_text,
+                xy=(date, price),
+                xytext=(-120, 40),
+                textcoords="offset points",
+                bbox=dict(
+                    boxstyle="round,pad=0.5",
+                    fc="#2C2C2C",
+                    ec="none",
+                    alpha=alpha * 0.8,  # Apply fade to box
+                ),
+                arrowprops=dict(
+                    arrowstyle="->",
+                    connectionstyle="arc3,rad=-0.3",
+                    color="#FF0000",
+                    alpha=alpha,  # Apply fade to arrow
+                ),
+                color="#FFFFFF",
+                fontfamily="sans-serif",
+                fontweight="bold",
+                fontsize=12,
+                alpha=alpha,  # Apply fade to text
+            )
+            annotations.append(ann)
+
+        # Update scatter data
+        if scatter_points:
+            scatter_points = np.array(scatter_points)
+            scatter.set_offsets(scatter_points)
+        else:
+            scatter.set_offsets(np.empty((0, 2)))
+
+        return [line, scatter] + annotations
 
     # Create animation
     frames = len(weekly_data)
@@ -110,7 +176,7 @@ def animate_spy_milestones(symbol="SPY"):
         fig,
         animate,
         frames=frames,
-        interval=20,  # Increased interval for smoother animation with weekly data
+        interval=20,
         blit=True,
         repeat=False,
     )
