@@ -30,7 +30,6 @@ import numpy as np
 import yfinance as yf
 from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 from persistent_cache import PersistentCache
-
 from common.logger import setup_logging
 
 
@@ -254,19 +253,28 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         )
         annotations.append(year_ann)
 
-        # # credit annotation
-        # figtext(
-        #     0.9,
-        #     0.1,
-        #     "Developed by <@namuan_twt>",
-        #     ha="right",
-        #     va="bottom",
-        #     fontsize=10,
-        #     font=FONT_FAMILY,
-        #     color="#FFFFFF",
-        #     highlight_textprops=[{"color": "lightblue"}],
-        #     fig=fig,
-        # )
+        # credit annotation
+        plt.figtext(
+            0.84,
+            0.1,
+            "Developed by ",
+            ha="right",
+            va="bottom",
+            fontsize=10,
+            fontfamily=FONT_FAMILY,
+            color="#FFFFFF"
+        )
+
+        plt.figtext(
+            0.9,
+            0.1,
+            "@namuan_twt",
+            ha="right",
+            va="bottom",
+            fontsize=10,
+            fontfamily=FONT_FAMILY,
+            color="lightblue"
+        )
 
         return [line, scatter] + annotations
 
