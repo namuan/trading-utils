@@ -5,6 +5,7 @@
 #   "numpy",
 #   "highlight_text",
 #   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 #!/usr/bin/env python3
@@ -26,10 +27,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import yfinance as yf
 from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
+from persistent_cache import PersistentCache
 
 from common.logger import setup_logging
-import yfinance as yf
+
 
 def parse_args():
     parser = ArgumentParser(
@@ -77,7 +80,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
     end_date = datetime.now().strftime("%Y-%m-%d")
 
     logging.info(f"Downloading data from {start_date} to {end_date}")
-    stock_data = yf.download(symbol, start=start_date, end=end_date)
+    stock_data = download_data(end_date, start_date, symbol)
 
     # Resample to weekly data
     weekly_data = stock_data.resample("W").last()
@@ -293,6 +296,12 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         plt.show()
 
     return milestone_dates
+
+
+@PersistentCache()
+def download_data(end_date, start_date, symbol):
+    stock_data = yf.download(symbol, start=start_date, end=end_date)
+    return stock_data
 
 
 def main(args):
