@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "highlight_text",
+#   "yfinance",
+# ]
+# ///
 #!/usr/bin/env python3
 """
 Animate SPY price milestones from inception to present
@@ -20,8 +29,7 @@ import numpy as np
 from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 
 from common.logger import setup_logging
-from common.market import download_ticker_data
-
+import yfinance as yf
 
 def parse_args():
     parser = ArgumentParser(
@@ -59,6 +67,7 @@ def format_timedelta(td):
     else:
         return f"{months}m"
 
+FONT_FAMILY="spot mono"
 
 def animate_spy_milestones(symbol="SPY", output_file=None):
     logging.info(f"Animating price milestones for {symbol}")
@@ -68,7 +77,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
     end_date = datetime.now().strftime("%Y-%m-%d")
 
     logging.info(f"Downloading data from {start_date} to {end_date}")
-    stock_data = download_ticker_data(symbol, start=start_date, end=end_date)
+    stock_data = yf.download(symbol, start=start_date, end=end_date)
 
     # Resample to weekly data
     weekly_data = stock_data.resample("W").last()
@@ -81,7 +90,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
     # Find milestone dates and prices
     for date, row in weekly_data.iterrows():
-        price = row["Close"]
+        price = float(row["Close"].iloc[0])
         for milestone in milestones:
             if milestone not in milestone_dates and price >= milestone:
                 milestone_dates[milestone] = date
@@ -115,23 +124,38 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
     ax.grid(False)
     ax.set_axis_off()
-    ax.set_ylim(0, max(weekly_data["Close"]) * 1.1)
-    ax.set_xlim(weekly_data.index[0], weekly_data.index[-1])
+
+
+    # Calculate padded limits
+    y_max = float(weekly_data["Close"].max()) * 1.1
+    y_min = float(weekly_data["Close"].min()) * 0.9
+    x_range = weekly_data.index[-1] - weekly_data.index[0]
+    x_padding = x_range * 0.1  # 5% padding
+    y_range = y_max - y_min
+    y_padding = y_range * 0.1  # 10% padding
+
+    # Set padded limits
+    ax.set_ylim(y_min - y_padding, y_max + y_padding)
+    ax.set_xlim(weekly_data.index[0] - x_padding, weekly_data.index[-1] + x_padding)
+
+    # ax.set_ylim(0, float(weekly_data["Close"].max()) * 1.1)
+    # ax.set_xlim(weekly_data.index[0], weekly_data.index[-1])
 
     annotations = []
     current_milestones = set()
     fade_states = {}
-    FADE_IN_FRAMES = 15
+    fade_in_frames = 15
 
     def calculate_alpha(milestone, frame, milestone_frame):
         if milestone not in fade_states:
             fade_states[milestone] = {"start_frame": frame}
         frames_elapsed = frame - fade_states[milestone]["start_frame"]
-        return min(frames_elapsed / FADE_IN_FRAMES, 1.0)
+        return min(frames_elapsed / fade_in_frames, 1.0)
 
     def animate(frame):
         for ann in annotations:
             ann.remove()
+
         annotations.clear()
 
         current_date = weekly_data.index[frame]
@@ -139,7 +163,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         line.set_data(weekly_data.index[mask], weekly_data["Close"][mask])
 
         scatter_points = []
-        current_price = weekly_data["Close"][frame]
+        current_price = float(weekly_data["Close"].iloc[frame])
 
         for milestone in milestones:
             if milestone not in current_milestones:
@@ -175,7 +199,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
                     alpha=alpha,
                 ),
                 color="#FFFFFF",
-                fontfamily="sans-serif",
+                fontfamily=FONT_FAMILY,
                 fontweight="bold",
                 fontsize=12,
                 alpha=alpha,
@@ -185,13 +209,72 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         scatter.set_offsets(
             np.array(scatter_points) if scatter_points else np.empty((0, 2))
         )
+
+        # Add last price annotation if we have data
+        # if len(weekly_data["Close"][mask]) > 0:
+        #     last_price = weekly_data["Close"][mask].iloc[-1]
+        #     last_date = weekly_data.index[mask][-1]
+        #
+        #     last_price_ann = ax.annotate(
+        #         f"${last_price:.2f}",
+        #         xy=(last_date, last_price),
+        #         xytext=(10, 0),
+        #         textcoords='offset points',
+        #         color="#00BFD8",
+        #         fontfamily=FONT_FAMILY,
+        #         fontsize=12,
+        #         fontweight='bold',
+        #         ha='left',
+        #         va='center'
+        #     )
+        #     annotations.append(last_price_ann)
+
+        # Add title in top left
+        title_ann = ax.annotate(
+            "$SPY - Journey towards 600",
+            xy=(0.15, 0.8),  # Position in axes coordinates
+            xycoords="axes fraction",
+            color="#FFFFFF",
+            fontfamily=FONT_FAMILY,
+            fontsize=40,
+            alpha=0.8,
+        )
+        annotations.append(title_ann)
+
+        # Add year display in top left
+        year_ann = ax.annotate(
+            f"{current_date.year}",
+            xy=(0.15, 0.7),  # Position in axes coordinates
+            xycoords="axes fraction",
+            color="#666666",  # Grey color
+            fontfamily=FONT_FAMILY,
+            fontsize=60,
+            fontweight="bold",
+            alpha=0.8,
+        )
+        annotations.append(year_ann)
+
+        # # credit annotation
+        # figtext(
+        #     0.9,
+        #     0.1,
+        #     "Developed by <@namuan_twt>",
+        #     ha="right",
+        #     va="bottom",
+        #     fontsize=10,
+        #     font=FONT_FAMILY,
+        #     color="#FFFFFF",
+        #     highlight_textprops=[{"color": "lightblue"}],
+        #     fig=fig,
+        # )
+
         return [line, scatter] + annotations
 
     frames = len(weekly_data)
     logging.info(f"Creating animation with {frames} frames")
 
     anim = FuncAnimation(
-        fig, animate, frames=frames, interval=20, blit=True, repeat=False
+        fig, animate, frames=frames, interval=10, blit=True, repeat=False
     )
 
     if output_file:
