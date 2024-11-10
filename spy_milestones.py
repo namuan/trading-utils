@@ -90,7 +90,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
     # Find milestone dates and prices
     for date, row in weekly_data.iterrows():
-        price = float(row["Close"].iloc[0])
+        price = row["Close"].iloc[0]
         for milestone in milestones:
             if milestone not in milestone_dates and price >= milestone:
                 milestone_dates[milestone] = date
@@ -127,8 +127,8 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
 
     # Calculate padded limits
-    y_max = float(weekly_data["Close"].max()) * 1.1
-    y_min = float(weekly_data["Close"].min()) * 0.9
+    y_max = weekly_data["Close"].max().iloc[0] * 1.1
+    y_min = weekly_data["Close"].min().iloc[0] * 0.9
     x_range = weekly_data.index[-1] - weekly_data.index[0]
     x_padding = x_range * 0.1  # 5% padding
     y_range = y_max - y_min
@@ -137,9 +137,6 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
     # Set padded limits
     ax.set_ylim(y_min - y_padding, y_max + y_padding)
     ax.set_xlim(weekly_data.index[0] - x_padding, weekly_data.index[-1] + x_padding)
-
-    # ax.set_ylim(0, float(weekly_data["Close"].max()) * 1.1)
-    # ax.set_xlim(weekly_data.index[0], weekly_data.index[-1])
 
     annotations = []
     current_milestones = set()
@@ -163,7 +160,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         line.set_data(weekly_data.index[mask], weekly_data["Close"][mask])
 
         scatter_points = []
-        current_price = float(weekly_data["Close"].iloc[frame])
+        current_price = weekly_data["Close"].iloc[frame].iloc[0]
 
         for milestone in milestones:
             if milestone not in current_milestones:
