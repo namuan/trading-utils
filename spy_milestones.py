@@ -30,6 +30,7 @@ import numpy as np
 import yfinance as yf
 from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 from persistent_cache import PersistentCache
+
 from common.logger import setup_logging
 
 
@@ -69,7 +70,9 @@ def format_timedelta(td):
     else:
         return f"{months}m"
 
-FONT_FAMILY="spot mono"
+
+FONT_FAMILY = "spot mono"
+
 
 def animate_spy_milestones(symbol="SPY", output_file=None):
     logging.info(f"Animating price milestones for {symbol}")
@@ -92,7 +95,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
     # Find milestone dates and prices
     for date, row in weekly_data.iterrows():
-        price = row["Close"].iloc[0]
+        price = row["Close"].item()
         for milestone in milestones:
             if milestone not in milestone_dates and price >= milestone:
                 milestone_dates[milestone] = date
@@ -115,7 +118,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
             )
             prev_milestone_date = current_date
 
-    # Setup the figure
+    # Set up the figure
     plt.style.use("dark_background")
     fig, ax = plt.subplots(figsize=(15, 8))
     fig.patch.set_facecolor("#1C1C1C")
@@ -127,10 +130,9 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
     ax.grid(False)
     ax.set_axis_off()
 
-
     # Calculate padded limits
-    y_max = weekly_data["Close"].max().iloc[0] * 1.1
-    y_min = weekly_data["Close"].min().iloc[0] * 0.9
+    y_max = weekly_data["Close"].max().item() * 1.1
+    y_min = weekly_data["Close"].min().item() * 0.9
     x_range = weekly_data.index[-1] - weekly_data.index[0]
     x_padding = x_range * 0.1  # 5% padding
     y_range = y_max - y_min
@@ -162,7 +164,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         line.set_data(weekly_data.index[mask], weekly_data["Close"][mask])
 
         scatter_points = []
-        current_price = int(weekly_data["Close"].iloc[frame].iloc[0])
+        current_price = int(weekly_data["Close"].iloc[frame].item())
 
         for milestone in milestones:
             if milestone not in current_milestones:
@@ -210,20 +212,20 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         )
 
         # Add last price annotation if we have data
-        last_price = weekly_data["Close"][mask].iloc[-1]
+        last_price = weekly_data["Close"][mask].iloc[-1].item()
         last_date = weekly_data.index[mask][-1]
 
         last_price_ann = ax.annotate(
             current_price,
             xy=(last_date, last_price),
             xytext=(10, 0),
-            textcoords='offset points',
+            textcoords="offset points",
             color="#00BFD8",
             fontfamily=FONT_FAMILY,
             fontsize=12,
-            fontweight='bold',
-            ha='left',
-            va='center'
+            fontweight="bold",
+            ha="left",
+            va="center",
         )
         annotations.append(last_price_ann)
 
@@ -261,7 +263,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
             va="bottom",
             fontsize=10,
             fontfamily=FONT_FAMILY,
-            color="#FFFFFF"
+            color="#FFFFFF",
         )
 
         plt.figtext(
@@ -272,7 +274,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
             va="bottom",
             fontsize=10,
             fontfamily=FONT_FAMILY,
-            color="lightblue"
+            color="lightblue",
         )
 
         return [line, scatter] + annotations
