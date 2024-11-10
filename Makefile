@@ -1,47 +1,42 @@
 export PROJECTNAME=$(shell basename "$(PWD)")
-PY=./venv/bin/python3
+VENV_PATH=./.venv/bin
 DTALE=./venv/bin/dtale
 
 .SILENT: ;               # no need for @
 
 setup: ## Setup Virtual Env
-	python3.10 -m venv venv
-	$(PY) -m pip install --upgrade pip
-	./venv/bin/pip3 install -r requirements/dev.txt
+	python3.12 -m venv venv
+	$(VENV_PATH)/python3 -m pip install --upgrade pip
+	$(PIP) install -r requirements/dev.txt
 
 deps: ## Install dependencies
-	./venv/bin/pip3 install --upgrade -r requirements/dev.txt
-	./venv/bin/python3 -m pip install --upgrade pip
-
-lint: ## Run black for code formatting
-	./venv/bin/black . --exclude venv
+	uv tool install pre-commit
 
 pre-commit: ## Manually run all precommit hooks
-	./venv/bin/pre-commit install
-	./venv/bin/pre-commit run --all-files
+	uv tool run pre-commit
 
 pre-commit-tool: ## Manually run a single pre-commit hook
-	./venv/bin/pre-commit run $(TOOL) --all-files
+	$(VENV_PATH)/pre-commit run $(TOOL) --all-files
 
 clean: ## Clean package
 	find . -type d -name '__pycache__' | xargs rm -rf
 	rm -rf build dist
 
 bpython: ## Run bpython
-	./venv/bin/bpython
+	$(VENV_PATH)/bpython
 
 ftplist: ## Download stocks from Nasdaq FTP Server
-	$(PY) download_stocklist.py
+	$(VENV_PATH)/python3 download_stocklist.py
 
 stocksohlcv: ## Download OHLCV of all available stocks
-	$(PY) download_stocks_ohlcv.py
+	$(VENV_PATH)/python3 download_stocks_ohlcv.py
 
 etfsohlcv: ## Download OHLCV of all Macro ETFs
-	$(PY) download_macro_etfs.py
+	$(VENV_PATH)/python3 download_macro_etfs.py
 
 enrich: ## Enrich data and calculate indicators
-	$(PY) stocks_data_enricher.py
-	$(PY) tele_message.py -m "Completed data enrichment"
+	$(VENV_PATH)/python3 stocks_data_enricher.py
+	$(VENV_PATH)/python3 tele_message.py -m "Completed data enrichment"
 
 dtale: ## Open DTale
 	$(DTALE) --open-browser --csv-path $(csvpath)
