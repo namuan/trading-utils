@@ -162,7 +162,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         line.set_data(weekly_data.index[mask], weekly_data["Close"][mask])
 
         scatter_points = []
-        current_price = weekly_data["Close"].iloc[frame].iloc[0]
+        current_price = int(weekly_data["Close"].iloc[frame].iloc[0])
 
         for milestone in milestones:
             if milestone not in current_milestones:
@@ -210,23 +210,22 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         )
 
         # Add last price annotation if we have data
-        # if len(weekly_data["Close"][mask]) > 0:
-        #     last_price = weekly_data["Close"][mask].iloc[-1]
-        #     last_date = weekly_data.index[mask][-1]
-        #
-        #     last_price_ann = ax.annotate(
-        #         f"${last_price:.2f}",
-        #         xy=(last_date, last_price),
-        #         xytext=(10, 0),
-        #         textcoords='offset points',
-        #         color="#00BFD8",
-        #         fontfamily=FONT_FAMILY,
-        #         fontsize=12,
-        #         fontweight='bold',
-        #         ha='left',
-        #         va='center'
-        #     )
-        #     annotations.append(last_price_ann)
+        last_price = weekly_data["Close"][mask].iloc[-1]
+        last_date = weekly_data.index[mask][-1]
+
+        last_price_ann = ax.annotate(
+            current_price,
+            xy=(last_date, last_price),
+            xytext=(10, 0),
+            textcoords='offset points',
+            color="#00BFD8",
+            fontfamily=FONT_FAMILY,
+            fontsize=12,
+            fontweight='bold',
+            ha='left',
+            va='center'
+        )
+        annotations.append(last_price_ann)
 
         # Add title in top left
         title_ann = ax.annotate(
