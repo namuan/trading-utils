@@ -11,6 +11,7 @@ setup: ## Setup Virtual Env
 
 deps: ## Install dependencies
 	uv tool install pre-commit
+	uv pip install -r requirements.txt
 
 pre-commit: ## Manually run all precommit hooks
 	uv tool run pre-commit

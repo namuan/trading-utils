@@ -33,3 +33,4 @@ ib_insync
 pandasai
 gradio
 seaborn
+git+https://github.com/namuan/persistent-cache
