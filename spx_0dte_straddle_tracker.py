@@ -263,7 +263,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("-s", "--symbol", default="XSP", help="Symbol to process")
+    parser.add_argument("-s", "--symbol", default="SPX", help="Symbol to process")
     parser.add_argument(
         "-o",
         "--once",
