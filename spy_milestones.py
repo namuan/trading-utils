@@ -1,3 +1,4 @@
+#!uv run
 # /// script
 # dependencies = [
 #   "pandas",
@@ -8,7 +9,6 @@
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
-#!/usr/bin/env python3
 """
 Animate SPY price milestones from inception to present
 
