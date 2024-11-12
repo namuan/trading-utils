@@ -1,3 +1,17 @@
+#!uv run
+# /// script
+# dependencies = [
+#   "ib_async",
+#   "pyyaml",
+#   "pandas",
+#   "requests",
+#   "dotmap",
+#   "flatten-dict",
+#   "python-dotenv",
+#   "matplotlib",
+#   "seaborn",
+# ]
+# ///
 """
 Simulate adjusting a Straddle position by adding another Straddle
 
