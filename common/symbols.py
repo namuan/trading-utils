@@ -32,6 +32,8 @@ macro_etfs = {
     "EWZ": "Brazil",
     "EWY": "Korea",
     "FXI": "China",
+    "INDA": "iShares MSCI India ETF",
+    "PAK": "Global X MSCI Pakistan ETF",
     "BKF": "BRIC (Brazil, Russia, India, China)",
     "EWG": "Germany",
     "EWU": "United Kingdom",
