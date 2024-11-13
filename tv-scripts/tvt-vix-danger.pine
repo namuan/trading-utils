@@ -35,8 +35,10 @@ long_ma_6m = calcMA(vix6m, long_ma_length)
 // Define colors with transparency
 purple_transp = color.new(color.red, 40)
 orange_transp = color.new(color.orange, 50)
-green_transp = color.new(color.green, 90)
-red_transp = color.new(color.red, 90)
+
+// Adjust background colors based on short_ma_9d vs short_ma_3m comparison
+green_transp = short_ma_9d < short_ma_3m ? color.new(color.green, 80) : color.new(color.green, 90)
+red_transp = short_ma_9d > short_ma_3m ? color.new(color.red, 80) : color.new(color.red, 90)
 
 // Get current short and long MA values based on selection
 current_short_ma = switch vix_option
