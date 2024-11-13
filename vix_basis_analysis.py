@@ -8,87 +8,76 @@ from common.market import download_ticker_data
 end_date = datetime.today()
 start_date = end_date - timedelta(days=180)
 
-# Convert dates to string format for downloading
-start_date_str = start_date.strftime("%Y-%m-%d")
-end_date_str = end_date.strftime("%Y-%m-%d")
-
 # Download VIX and VXF data
-vix_data = download_ticker_data("^VIX1D", start=start_date, end=end_date)
-vxf_data = download_ticker_data("^VIX9D", start=start_date, end=end_date)
+vix_data = download_ticker_data("^VIX", start=start_date, end=end_date)
+vxf_data = download_ticker_data("^VIX3M", start=start_date, end=end_date)
 
-print(vix_data.head())
-
-# Ensure the data has the correct format
+# Prepare data
 vix_data["close_vix"] = vix_data["Close"]
 vxf_data["close_vxf"] = vxf_data["Close"]
-
-# Reset index to make Date a regular column
 vix_data = vix_data.reset_index()
 vxf_data = vxf_data.reset_index()
 
-# Merge the data on the date
+# Merge the data
 merged_data = pd.merge(vix_data, vxf_data, on="Date", suffixes=("_vix", "_vxf"))
-
-# Calculate the basis
 merged_data["basis"] = merged_data["close_vxf"] - merged_data["close_vix"]
 
-# Calculate mean and standard deviation of the basis
-mean_basis = merged_data["basis"].mean()
-std_basis = merged_data["basis"].std()
+# Initialize lists to store crossover dates
+dates_crossed_below = []
+dates_crossed_above = []
 
-# Calculate Z-score
-merged_data["z_score"] = (merged_data["basis"] - mean_basis) / std_basis
+for i in range(1, len(merged_data)):
+    # Crossing below 0
+    if merged_data["basis"].iloc[i - 1] >= 0 and merged_data["basis"].iloc[i] < 0:
+        dates_crossed_below.append(merged_data["Date"].iloc[i])
+    # Crossing above 0
+    elif merged_data["basis"].iloc[i - 1] <= 0 and merged_data["basis"].iloc[i] > 0:
+        dates_crossed_above.append(merged_data["Date"].iloc[i])
 
-# Set threshold for significant contango
-z_score_threshold = 1  # You can adjust this threshold
-merged_data["significant_contango"] = merged_data["z_score"] > z_score_threshold
+# Print the lists
+print("\nDates crossed below 0:")
+print(dates_crossed_below)
+print("\nDates crossed above 0:")
+print(dates_crossed_above)
 
-# Print useful information
-print(f"Mean Basis: {mean_basis:.2f}")
-print(f"Standard Deviation of Basis: {std_basis:.2f}")
-print(f"Threshold for Significant Contango (Z-score): {z_score_threshold}")
-print("Significant Contango Days:")
-print(
-    merged_data[merged_data["significant_contango"]][
-        ["Date", "close_vix", "close_vxf", "basis", "z_score"]
-    ]
-)
-
-# Visualization
+# Rest of the visualization code remains the same
 plt.figure(figsize=(12, 6))
-
-# Plotting basis
-plt.subplot(2, 1, 1)
 plt.plot(
     merged_data["Date"], merged_data["basis"], label="Basis (VXF - VIX)", color="blue"
 )
-plt.axhline(y=mean_basis, color="green", linestyle="--", label="Mean Basis")
-plt.axhline(
-    y=mean_basis + std_basis, color="orange", linestyle="--", label="Mean + 1 Std Dev"
-)
-plt.axhline(
-    y=mean_basis - std_basis, color="red", linestyle="--", label="Mean - 1 Std Dev"
-)
+plt.axhline(y=0, color="red", linestyle="--", label="Zero Line")
+
+# Plot crossover points using the new date lists
+if dates_crossed_below:
+    plt.scatter(
+        dates_crossed_below,
+        [
+            merged_data.loc[merged_data["Date"] == date, "basis"].iloc[0]
+            for date in dates_crossed_below
+        ],
+        color="red",
+        marker="v",
+        s=100,
+        label="Crosses Below 0",
+    )
+if dates_crossed_above:
+    plt.scatter(
+        dates_crossed_above,
+        [
+            merged_data.loc[merged_data["Date"] == date, "basis"].iloc[0]
+            for date in dates_crossed_above
+        ],
+        color="green",
+        marker="^",
+        s=100,
+        label="Crosses Above 0",
+    )
+
 plt.title("Basis of VXF - VIX Over Time")
 plt.xlabel("Date")
 plt.ylabel("Basis")
 plt.legend()
-plt.grid()
-
-# Plotting Z-score
-plt.subplot(2, 1, 2)
-plt.plot(merged_data["Date"], merged_data["z_score"], label="Z-Score", color="purple")
-plt.axhline(
-    y=z_score_threshold, color="orange", linestyle="--", label="Z-Score Threshold"
-)
-plt.axhline(
-    y=-z_score_threshold, color="red", linestyle="--", label="-Z-Score Threshold"
-)
-plt.title("Z-Score of Basis Over Time")
-plt.xlabel("Date")
-plt.ylabel("Z-Score")
-plt.legend()
-plt.grid()
-
+plt.grid(True)
+plt.xticks(rotation=45)
 plt.tight_layout()
 plt.show()
