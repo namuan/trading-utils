@@ -1,0 +1,68 @@
+//@version=5
+indicator(title="[TVT] VIX Short Term Danger", shorttitle="[TVT] VIX-RISK", overlay=false)
+
+// Input parameters
+short_ma_length = input.int(3, title="Short MA Length", minval=1)
+long_ma_length = input.int(8, title="Long MA Length", minval=1)
+ma_type = input.string("EMA", title="MA Type", options=["EMA", "SMA"])
+
+// Single selection for VIX timeframe
+vix_option = input.string("VIX9D", title="Select VIX", options=["VIX9D", "VIX", "VIX3M", "VIX6M"])
+
+// Fetch VIX data using chart's timeframe
+vix9d = request.security("VIX9D", timeframe.period, close)
+vix1m = request.security("VIX", timeframe.period, close)
+vix3m = request.security("VIX3M", timeframe.period, close)
+vix6m = request.security("VIX6M", timeframe.period, close)
+
+// Function to calculate MA based on type
+calcMA(source, length) =>
+    ma_type == "EMA" ? ta.ema(source, length) : ta.sma(source, length)
+
+// Calculate MAs
+short_ma_9d = calcMA(vix9d, short_ma_length)
+long_ma_9d = calcMA(vix9d, long_ma_length)
+
+short_ma_1m = calcMA(vix1m, short_ma_length)
+long_ma_1m = calcMA(vix1m, long_ma_length)
+
+short_ma_3m = calcMA(vix3m, short_ma_length)
+long_ma_3m = calcMA(vix3m, long_ma_length)
+
+short_ma_6m = calcMA(vix6m, short_ma_length)
+long_ma_6m = calcMA(vix6m, long_ma_length)
+
+// Define colors with transparency
+purple_transp = color.new(color.red, 40)
+orange_transp = color.new(color.orange, 50)
+green_transp = color.new(color.green, 90)
+red_transp = color.new(color.red, 90)
+
+// Get current short and long MA values based on selection
+current_short_ma = switch vix_option
+    "VIX9D" => short_ma_9d
+    "VIX" => short_ma_1m
+    "VIX3M" => short_ma_3m
+    "VIX6M" => short_ma_6m
+
+current_long_ma = switch vix_option
+    "VIX9D" => long_ma_9d
+    "VIX" => long_ma_1m
+    "VIX3M" => long_ma_3m
+    "VIX6M" => long_ma_6m
+
+// Set background color based on MA crossover
+bgcolor(current_short_ma > current_long_ma ? red_transp : green_transp)
+
+// Plot based on selection
+plot(vix_option == "VIX9D" ? short_ma_9d : na, color=purple_transp, style=plot.style_line, linewidth=2)
+plot(vix_option == "VIX9D" ? long_ma_9d : na, color=orange_transp, style=plot.style_line, linewidth=1)
+
+plot(vix_option == "VIX" ? short_ma_1m : na, color=purple_transp, style=plot.style_line, linewidth=2)
+plot(vix_option == "VIX" ? long_ma_1m : na, color=orange_transp, style=plot.style_line, linewidth=1)
+
+plot(vix_option == "VIX3M" ? short_ma_3m : na, color=purple_transp, style=plot.style_line, linewidth=2)
+plot(vix_option == "VIX3M" ? long_ma_3m : na, color=orange_transp, style=plot.style_line, linewidth=1)
+
+plot(vix_option == "VIX6M" ? short_ma_6m : na, color=purple_transp, style=plot.style_line, linewidth=2)
+plot(vix_option == "VIX6M" ? long_ma_6m : na, color=orange_transp, style=plot.style_line, linewidth=1)
