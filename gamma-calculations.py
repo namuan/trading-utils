@@ -14,13 +14,10 @@ Usage:
 ./gamma_calculations.py -v # To log INFO messages
 ./gamma_calculations.py -vv # To log DEBUG messages
 """
+
 import logging
-import os
-import shutil
-from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -357,17 +354,7 @@ def plot_combined_gamma(
 
 def main(args):
     file_path = args.file
-    # Copy the file to the output directory with the current date
-    output_dir = "output"
-    os.makedirs(output_dir, exist_ok=True)
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    base_filename = os.path.basename(file_path)
-    new_filename = f"{os.path.splitext(base_filename)[0]}-{current_date}.csv"
-    new_file_path = os.path.join(output_dir, new_filename)
-    shutil.move(file_path, new_file_path)
-
-    # Use the copied file for processing
-    df, spot_price, today_date = load_and_process_data(new_file_path)
+    df, spot_price, today_date = load_and_process_data(file_path)
 
     from_strike = 0.8 * spot_price
     to_strike = 1.2 * spot_price
