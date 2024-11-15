@@ -10,13 +10,14 @@ Example:
 To install required packages:
     pip install pandas yfinance
 """
+
 import argparse
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
-import yfinance as yf
+
+from common.market import download_ticker_data
 
 OUTPUT_FOLDER = Path.cwd() / "output"
 OUTPUT_FOLDER.mkdir(exist_ok=True, parents=True)
@@ -42,11 +43,6 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def download_stock_data(symbol, start_date, end_date):
-    data = yf.download(symbol, start=start_date, end=end_date)
-    return data
-
-
 def save_to_file(symbol, data, start_date, end_date):
     file_name = OUTPUT_FOLDER.joinpath(f"{symbol}_{start_date}_{end_date}.csv")
     if not file_name.exists():
@@ -59,22 +55,36 @@ def load_data_frame(file_path):
 
 
 def find_max_consecutive(df, consecutive):
+    if isinstance(consecutive, pd.DataFrame):
+        if len(consecutive.columns) == 1:
+            consecutive = consecutive.iloc[:, 0]
+        else:
+            raise ValueError(
+                "The 'consecutive' DataFrame must have only one column for grouping."
+            )
+
     max_consecutive = consecutive * (
         consecutive.groupby((consecutive != consecutive.shift()).cumsum()).cumcount()
         + 1
     )
     max_increase_days = max_consecutive.max()
     max_period = max_consecutive.idxmax()
-    start_date = df.iloc[max_period - max_increase_days + 1]["Date"]
-    end_date = df.iloc[max_period]["Date"]
+    # Use iloc with index to find the start and end dates
+    start_date_index = df.index.get_loc(max_period) - max_increase_days + 1
+    end_date_index = df.index.get_loc(max_period)
+
+    # Ensure the index does not go out of bounds
+    start_date_index = max(0, start_date_index)
+    end_date_index = min(len(df) - 1, end_date_index)
+
+    start_date = df.index[start_date_index]
+    end_date = df.index[end_date_index]
     return max_increase_days, start_date, end_date
 
 
 def main():
     args = parse_arguments()
-    stock_data = download_stock_data(args.symbol, args.from_date, args.to_date)
-    file_path = save_to_file(args.symbol, stock_data, args.from_date, args.to_date)
-    df = load_data_frame(file_path)
+    df = download_ticker_data(args.symbol, start=args.from_date, end=args.to_date)
     max_increase_days, start_date, end_date = find_max_consecutive(
         df, (df["Adj Close"] > df["Adj Close"].shift()).astype(int)
     )
