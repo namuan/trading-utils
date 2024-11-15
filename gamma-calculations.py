@@ -250,7 +250,7 @@ def plot_combined_gamma(
     legend_fontsize = 6
 
     # Plot 1: Gamma Exposure
-    df_agg = df.groupby(["StrikePrice"]).sum()
+    df_agg = df.groupby(["StrikePrice"])[["TotalGamma"]].sum()
     strikes = df_agg.index.values
 
     ax1.grid(True)
