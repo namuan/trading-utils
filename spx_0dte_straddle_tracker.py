@@ -44,13 +44,40 @@ import os
 import sqlite3
 import time
 from datetime import datetime
+from datetime import time as dt_time
 from pathlib import Path
 
 import pandas as pd
+import pytz
 import schedule
 from persistent_cache import PersistentCache
 
 from common.options import option_chain, option_expirations, process_options_data
+
+
+def is_market_hours():
+    """Check if current time is during market hours (9:30 AM - 4:00 PM ET) on a weekday"""
+    local_tz = datetime.now().astimezone().tzinfo
+    et_timezone = pytz.timezone("US/Eastern")
+    current_time_local = datetime.now().astimezone(local_tz)
+    current_time_et = current_time_local.astimezone(et_timezone)
+
+    # Check if it's a weekday (Monday = 0, Sunday = 6)
+    if current_time_et.weekday() > 4:  # Saturday or Sunday
+        print(f"Weekend - Market Closed. Current ET time: {current_time_et}")
+        return False
+
+    market_start = dt_time(9, 30)  # 9:30 AM ET
+    market_end = dt_time(16, 0)  # 4:00 PM ET
+    current_time_et_time = current_time_et.time()
+
+    is_open = market_start <= current_time_et_time <= market_end
+    print(
+        f"Market hours check - Local time: {current_time_local.strftime('%H:%M:%S %Z')}, "
+        f"ET time: {current_time_et.strftime('%H:%M:%S %Z')}, Market is {'Open' if is_open else 'Closed'}"
+    )
+
+    return is_open
 
 
 def setup_database(symbol, date_for_suffix):
@@ -253,9 +280,16 @@ def find_at_the_money_options(options_df, expiry):
     )
 
 
-def run_script(symbol):
-    process_symbol(symbol)
-    print(f"Script ran at {datetime.now()}")
+def run_script(symbol, check_market_hours=True):
+    if not check_market_hours or is_market_hours():
+        process_symbol(symbol)
+        print(
+            f"Script ran at {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        )
+    else:
+        print(
+            f"Outside market hours - script not executed at {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        )
 
 
 # Argument parsing
@@ -274,9 +308,9 @@ def main():
 
     if args.once:
         # Run once and exit
-        run_script(symbol=args.symbol)
+        run_script(symbol=args.symbol, check_market_hours=False)
     else:
-        # Scheduled mode (existing behavior)
+        # Scheduled mode
         schedule.every(1).minutes.do(run_script, symbol=args.symbol)
 
         print(f"Script scheduled to run every minute for symbol: {args.symbol}")
