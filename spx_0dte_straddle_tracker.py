@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!uv run
 """
 Options Trading Data Script
 
