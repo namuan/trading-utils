@@ -281,15 +281,12 @@ def find_at_the_money_options(options_df, expiry):
 
 
 def run_script(symbol, check_market_hours=True):
+    current_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     if not check_market_hours or is_market_hours():
         process_symbol(symbol)
-        print(
-            f"Script ran at {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}"
-        )
+        print(f"Script ran successfully at {current_time}")
     else:
-        print(
-            f"Outside market hours - script not executed at {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}"
-        )
+        print(f"Outside market hours - script not executed at {current_time}")
 
 
 # Argument parsing
