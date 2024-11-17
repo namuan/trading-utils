@@ -138,6 +138,18 @@ def setup_database(symbol, date_for_suffix):
     """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS RawOptionsChain (
+            Id INTEGER PRIMARY KEY,
+            Date DATE,
+            Time TIME,
+            Symbol TEXT,
+            RawData JSON
+        )
+    """
+    )
+
     conn.commit()
     conn.close()
 
@@ -183,6 +195,17 @@ def process_symbol(symbol):
 
     todays_expiry = first_expiry(symbol, current_date)
     options_data = option_chain(symbol, todays_expiry)
+
+    # Store raw options data
+    current_time = datetime.now().time().isoformat()
+    cursor.execute(
+        """
+        INSERT INTO RawOptionsChain (Date, Time, Symbol, RawData)
+        VALUES (?, ?, ?, ?)
+    """,
+        (current_date, current_time, symbol, (json.dumps(options_data.toDict()))),
+    )
+
     options_df = process_options_data(options_data)
 
     if existing_trade:
