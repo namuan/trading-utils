@@ -1,4 +1,15 @@
 #!uv run
+# /// script
+# dependencies = [
+#   "pandas",
+#   "schedule",
+#   "requests",
+#   "dotmap",
+#   "flatten-dict",
+#   "python-dotenv",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 Options Trading Data Script
 
