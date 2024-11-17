@@ -65,6 +65,11 @@ from persistent_cache import PersistentCache
 
 from common.options import option_chain, option_expirations, process_options_data
 
+pd.set_option("display.max_rows", None)
+pd.set_option("display.max_columns", None)
+pd.set_option("display.width", None)
+pd.set_option("display.float_format", "{:.2f}".format)
+
 
 def is_market_hours():
     """Check if current time is during market hours (9:30 AM - 4:00 PM ET) on a weekday"""
@@ -168,11 +173,6 @@ def process_symbol(symbol):
     current_date = datetime.now().date().isoformat()  # Convert date to string
 
     db_path = setup_database(symbol, current_date)
-    pd.set_option("display.max_rows", None)
-    pd.set_option("display.max_columns", None)
-    pd.set_option("display.width", None)
-    pd.set_option("display.float_format", "{:.2f}".format)
-
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute(
