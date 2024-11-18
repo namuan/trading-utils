@@ -231,7 +231,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         # Add title in top left
         title_ann = ax.annotate(
             "$SPY - Journey towards 600",
-            xy=(0.15, 0.8),  # Position in axes coordinates
+            xy=(0.10, 0.8),  # Position in axes coordinates
             xycoords="axes fraction",
             color="#FFFFFF",
             fontfamily=FONT_FAMILY,
@@ -243,7 +243,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         # Add year display in top left
         year_ann = ax.annotate(
             f"{current_date.year}",
-            xy=(0.15, 0.7),  # Position in axes coordinates
+            xy=(0.10, 0.7),  # Position in axes coordinates
             xycoords="axes fraction",
             color="#666666",  # Grey color
             fontfamily=FONT_FAMILY,
@@ -256,7 +256,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
         # credit annotation
         plt.figtext(
             0.84,
-            0.1,
+            0.13,
             "Developed by ",
             ha="right",
             va="bottom",
@@ -267,13 +267,24 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
         plt.figtext(
             0.9,
-            0.1,
+            0.13,
             "@namuan_twt",
             ha="right",
             va="bottom",
             fontsize=10,
             fontfamily=FONT_FAMILY,
             color="lightblue",
+        )
+
+        plt.figtext(
+            0.9,
+            0.1,
+            "Data from Yahoo Finance",
+            ha="right",
+            va="bottom",
+            fontsize=10,
+            fontfamily=FONT_FAMILY,
+            color="#FFFFFF",
         )
 
         return [line, scatter] + annotations
