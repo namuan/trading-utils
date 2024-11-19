@@ -7,6 +7,10 @@ Usage:
 """
 
 from argparse import ArgumentParser
+from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
 
 from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
@@ -30,12 +34,6 @@ def parse_args():
         help="Increase verbosity of logging output",
     )
     return parser.parse_args()
-
-
-from datetime import datetime, timedelta
-
-import numpy as np
-import pandas as pd
 
 
 def calculate_atr(stock_data, period=14):
