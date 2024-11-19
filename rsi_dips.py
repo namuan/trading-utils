@@ -1,4 +1,12 @@
-#!/usr/bin/env python3
+#!uv run
+# /// script
+# dependencies = [
+#   "rich",
+#   "finta",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 A script to analyze RSI dips below a specified lower value before a significant rise above a specified higher value.
 
@@ -20,14 +28,15 @@ import logging
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 
+import yfinance as yf
 from finta import TA
+from persistent_cache import PersistentCache
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
 from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
-from common.market import download_ticker_data
 
 
 def parse_args():
@@ -43,7 +52,7 @@ def parse_args():
         help="Increase verbosity of logging output",
     )
     parser.add_argument(
-        "-s", "--symbol", type=str, required=True, help="Stock symbol to analyze"
+        "-s", "--symbol", type=str, default="SPY", help="Stock symbol to analyze"
     )
     parser.add_argument(
         "-d",
@@ -73,6 +82,16 @@ def parse_args():
     return parser.parse_args()
 
 
+def calculate_buy_and_hold(df, initial_investment):
+    """Calculate buy and hold returns using the same initial investment as RSI strategy."""
+    initial_price = df.iloc[0]["Close"]
+    final_price = df.iloc[-1]["Close"]
+    shares = initial_investment / initial_price
+    buy_and_hold_pnl = (final_price - initial_price) * shares
+    buy_and_hold_return = ((final_price - initial_price) / initial_price) * 100
+    return buy_and_hold_pnl, buy_and_hold_return, shares
+
+
 def identify_dips(df, lower, higher):
     dips_below_threshold = 0
     dip_dates = []
@@ -81,9 +100,13 @@ def identify_dips(df, lower, higher):
     max_continuous_dips_date = None
     total_dips = 0
     positions = []
+    total_pnl = 0
+    total_trades = 0
+    max_investment = 0
+    initial_price = df.iloc[0]["Close"]
 
-    table = Table()
-    table.add_column("Date", justify="center", style="cyan", no_wrap=True)
+    table = Table(title=f"RSI Trading Strategy Results")
+    table.add_column("Week Ending", justify="center", style="cyan", no_wrap=True)
     table.add_column("total_shares", justify="right", style="magenta")
     table.add_column("sold_price", justify="right", style="green")
     table.add_column("pnl", justify="right", style="bold")
@@ -101,7 +124,7 @@ def identify_dips(df, lower, higher):
                 dips_below_threshold += 1
                 dip_dates.append(index)
                 above_lower_once = False
-                logging.debug(f"📉 Buy: {index} Close: {close} RSI: {rsi}")
+                logging.debug(f"📉 Buy: Week ending {index} Close: {close} RSI: {rsi}")
                 positions.append(
                     dict(
                         date_purchased=index,
@@ -112,14 +135,17 @@ def identify_dips(df, lower, higher):
                 )
 
         if rsi > higher and dips_below_threshold > 0:
+            total_trades += 1
             logging.debug(
-                f"✅ Dips below threshold: {dips_below_threshold} Date: {index} Close: {close} RSI: {rsi}"
+                f"✅ Dips below threshold: {dips_below_threshold} Week ending: {index} Close: {close} RSI: {rsi}"
             )
             total_shares = sum([p["shares"] for p in positions])
             invested_amount = sum(p["purchase_price"] for p in positions)
+            max_investment = max(max_investment, invested_amount)
             sold_price = close * total_shares
-            date_sold = index.date()
             pnl = sold_price - invested_amount
+            total_pnl += pnl
+
             if pnl > 0:
                 pnl_text = Text(f"{pnl:.2f}", style="green")
             elif pnl < 0:
@@ -127,7 +153,7 @@ def identify_dips(df, lower, higher):
             else:
                 pnl_text = Text(f"{pnl:.2f}")
             table.add_row(
-                str(date_sold), str(total_shares), f"{sold_price:.2f}", pnl_text
+                str(index.date()), str(total_shares), f"{sold_price:.2f}", pnl_text
             )
             if dips_below_threshold > max_continuous_dips:
                 max_continuous_dips = dips_below_threshold
@@ -135,18 +161,81 @@ def identify_dips(df, lower, higher):
             dips_below_threshold = 0
             positions.clear()
 
+    # Calculate buy and hold results using the same max_investment
+    buy_and_hold_pnl, buy_and_hold_return, buy_and_hold_shares = calculate_buy_and_hold(
+        df, max_investment
+    )
+
+    # Calculate strategy metrics
+    strategy_return = (total_pnl / max_investment * 100) if max_investment > 0 else 0
+
+    console = Console()
+    console.print("\n=== Trading Statistics ===")
     print(
         f"Maximum continuous dips: {max_continuous_dips} on {max_continuous_dips_date}"
     )
     print(f"Total dips: {total_dips}")
-    console = Console()
+    print(f"Total trades: {total_trades}")
+    print(f"Maximum investment required: ${max_investment:.2f}")
     console.print(table)
+
+    # Print comparison results
+    console.print("\n=== Strategy Comparison ===")
+    console.print(f"Initial Price: ${initial_price:.2f}")
+    console.print(f"Final Price: ${df.iloc[-1]['Close']:.2f}")
+    console.print(f"Initial Investment: ${max_investment:.2f}")
+
+    # RSI Strategy Results
+    console.print("\nRSI Dips Strategy:")
+    if total_pnl > 0:
+        console.print(f"Total PNL: ", Text(f"${total_pnl:.2f}", style="green"))
+    else:
+        console.print(f"Total PNL: ", Text(f"${total_pnl:.2f}", style="red"))
+    console.print(f"Return on Investment: {strategy_return:.2f}%")
+
+    # Buy and Hold Results
+    console.print("\nBuy and Hold Strategy:")
+    console.print(f"Shares held: {buy_and_hold_shares:.2f}")
+    if buy_and_hold_pnl > 0:
+        console.print(f"Total PNL: ", Text(f"${buy_and_hold_pnl:.2f}", style="green"))
+    else:
+        console.print(f"Total PNL: ", Text(f"${buy_and_hold_pnl:.2f}", style="red"))
+    console.print(f"Return on Investment: {buy_and_hold_return:.2f}%")
+
+    # Strategy Comparison
+    console.print("\nStrategy Comparison:")
+    pnl_difference = total_pnl - buy_and_hold_pnl
+    if pnl_difference > 0:
+        console.print(
+            f"RSI Strategy outperformed Buy & Hold by: ",
+            Text(f"${pnl_difference:.2f}", style="green"),
+        )
+    else:
+        console.print(
+            f"RSI Strategy underperformed Buy & Hold by: ",
+            Text(f"${abs(pnl_difference):.2f}", style="red"),
+        )
+
+
+@PersistentCache()
+def download_data(symbol, start_date, end_date):
+    stock_data = yf.download(symbol, start=start_date, end=end_date)
+    stock_data.columns = stock_data.columns.droplevel("Ticker")
+    return stock_data
+
+
+def resample_to_weekly(df):
+    """Resample the dataframe to weekly frequency."""
+    weekly_df = df.resample("W").agg(
+        {"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"}
+    )
+    return weekly_df
 
 
 def main(args):
     ticker = args.symbol
     end_date = datetime.now().strftime("%Y-%m-%d")
-    df = download_ticker_data(
+    df = download_data(
         ticker,
         args.start,
         end_date,
@@ -157,11 +246,14 @@ def main(args):
         )
         return
 
-    # Calculate RSI
-    df["RSI"] = TA.RSI(df, period=args.rsi_period)
+    # Resample to weekly frequency
+    weekly_df = resample_to_weekly(df)
+
+    # Calculate RSI on weekly data
+    weekly_df["RSI"] = TA.RSI(weekly_df, period=args.rsi_period)
 
     # Identify dips below the specified lower threshold
-    identify_dips(df, args.lower, args.higher)
+    identify_dips(weekly_df, args.lower, args.higher)
 
 
 if __name__ == "__main__":
