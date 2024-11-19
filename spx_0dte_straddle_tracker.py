@@ -276,18 +276,19 @@ def process_symbol(symbol):
         ),
     )
 
-    # Check if adjustment is required
-    price_diff = max(call_contract_price, put_contract_price) / min(
-        call_contract_price, put_contract_price
-    )
-    print(
-        f"Current difference between options prices({call_contract_price, put_contract_price}): "
-        f"{price_diff}"
-    )
-    if price_diff >= 5:
-        print("We may need an adjustment. Review data first")
-        print(call_strike_record)
-        print(put_strike_record)
+    # Check if adjustment is required only if both prices are non-zero
+    if call_contract_price > 0 and put_contract_price > 0:
+        price_diff = max(call_contract_price, put_contract_price) / min(
+            call_contract_price, put_contract_price
+        )
+        print(
+            f"Current difference between options prices({call_contract_price, put_contract_price}): "
+            f"{price_diff}"
+        )
+        if price_diff >= 5:
+            print("We may need an adjustment. Review data first")
+            print(call_strike_record)
+            print(put_strike_record)
 
     conn.commit()
     conn.close()
