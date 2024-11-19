@@ -5,8 +5,7 @@ import requests
 from dotmap import DotMap
 from flatten_dict import flatten
 
-from common.environment import TRADIER_BASE_URL
-from common.environment import TRADIER_TOKEN
+from common.environment import TRADIER_BASE_URL, TRADIER_TOKEN
 from common.filesystem import output_dir
 
 
@@ -20,6 +19,12 @@ def get_data(path, params):
         },
     )
     return DotMap(response.json())
+
+
+def stock_quote(symbols):
+    path = "/markets/quotes"
+    params = {"symbols": symbols}
+    return get_data(path, params)
 
 
 def option_chain(symbol, expiration):

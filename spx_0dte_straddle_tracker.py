@@ -64,7 +64,12 @@ import schedule
 from persistent_cache import PersistentCache
 
 from common import RawTextWithDefaultsFormatter
-from common.options import option_chain, option_expirations, process_options_data
+from common.options import (
+    option_chain,
+    option_expirations,
+    process_options_data,
+    stock_quote,
+)
 
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_columns", None)
@@ -128,6 +133,7 @@ def setup_database(symbol, date_for_suffix):
             Date DATE,
             Time TIME,
             Symbol TEXT,
+            SpotPrice REAL,
             StrikePrice REAL,
             CallPrice REAL,
             PutPrice REAL,
@@ -146,6 +152,7 @@ def setup_database(symbol, date_for_suffix):
             Date DATE,
             Time TIME,
             Symbol TEXT,
+            SpotPrice REAL,
             RawData JSON
         )
     """
@@ -182,6 +189,13 @@ def first_expiry(symbol, current_date):
     return todays_expiry
 
 
+def get_last_value(data, symbol):
+    quote = data.quotes.quote
+    if quote.symbol == symbol:
+        return quote.last
+    return None
+
+
 def process_symbol(symbol):
     current_date = datetime.now().date().isoformat()  # Convert date to string
 
@@ -194,6 +208,9 @@ def process_symbol(symbol):
     )
     existing_trade = cursor.fetchone()
 
+    spot_price_data = stock_quote(symbol)
+    spot_price = get_last_value(spot_price_data, symbol)
+
     todays_expiry = first_expiry(symbol, current_date)
     options_data = option_chain(symbol, todays_expiry)
 
@@ -201,10 +218,16 @@ def process_symbol(symbol):
     current_time = datetime.now().time().isoformat()
     cursor.execute(
         """
-        INSERT INTO RawOptionsChain (Date, Time, Symbol, RawData)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO RawOptionsChain (Date, Time, Symbol, SpotPrice, RawData)
+        VALUES (?, ?, ?, ?, ?)
     """,
-        (current_date, current_time, symbol, (json.dumps(options_data.toDict()))),
+        (
+            current_date,
+            current_time,
+            symbol,
+            spot_price,
+            (json.dumps(options_data.toDict())),
+        ),
     )
 
     options_df = process_options_data(options_data)
@@ -236,13 +259,14 @@ def process_symbol(symbol):
 
     cursor.execute(
         """
-        INSERT INTO ContractPrices (Date, Time, Symbol, StrikePrice, CallPrice, PutPrice, CallContractData, PutContractData, TradeId)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ContractPrices (Date, Time, Symbol, SpotPrice, StrikePrice, CallPrice, PutPrice, CallContractData, PutContractData, TradeId)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             current_date,
             current_time,
             symbol,
+            spot_price,
             strike_price,
             call_contract_price,
             put_contract_price,
