@@ -14,14 +14,14 @@ BSV →  IDTG
 Usage:
 ./tqqq-for-the-long-run.py
 """
+
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pandas as pd
 from stockstats import StockDataFrame
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 from common.market import download_ticker_data
 from common.tele_notifier import pushover_send_message
@@ -29,7 +29,7 @@ from common.tele_notifier import pushover_send_message
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

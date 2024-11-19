@@ -6,12 +6,13 @@ Usage:
 $ ./try_enricher.py --help
 $ ./try_enricher.py --symbol TSLA
 """
+
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from common import RawTextWithDefaultsFormatter
 from common.analyst import fetch_data_on_demand
 from common.logger import setup_logging
 
@@ -23,7 +24,7 @@ pd.set_option("display.width", None)
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

@@ -8,10 +8,9 @@ https://www.invesco.com/us/financial-products/etfs/holdings?audienceType=Investo
 # Specify a custom CSV file for QQQ holdings
 python tqqq-relative-strength.py --qqq-csv path/to/qqq_holdings.csv
 """
+
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -20,13 +19,14 @@ from matplotlib import pyplot as plt
 from matplotlib.dates import DateFormatter
 from stockstats import StockDataFrame
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 from common.market import download_ticker_data
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "--qqq-csv",

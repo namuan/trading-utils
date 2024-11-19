@@ -24,6 +24,7 @@ $ python3 ib_straddle_adjustments.py --expiry-date 20240816 --plot --apply-adjus
 
 from ib_async import *
 
+from common import RawTextWithDefaultsFormatter
 from common.ib import (
     find_options_for_expiry,
     get_next_futures_expiry,
@@ -93,7 +94,7 @@ def main(args):
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-e",

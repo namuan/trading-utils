@@ -5,16 +5,17 @@ Calculates optimal portfolio position sizes using volatility weighting strategy.
 Usage:
 ./portfolio-sizing -h
 """
-from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
 
+from argparse import ArgumentParser
+
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 from common.market import download_ticker_data
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument("-t", "--tickers", required=True, help="Ticker symbol")
     parser.add_argument(
@@ -31,9 +32,10 @@ def parse_args():
     return parser.parse_args()
 
 
-import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
+
+import numpy as np
+import pandas as pd
 
 
 def calculate_atr(stock_data, period=14):

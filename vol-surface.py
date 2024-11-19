@@ -13,13 +13,15 @@ Usage:
 
 import datetime as dt
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from matplotlib.colors import LinearSegmentedColormap
+
+from common import RawTextWithDefaultsFormatter
 
 # Plot constants
 FIGURE_SIZE = (12, 8)
@@ -58,7 +60,7 @@ def setup_logging(verbosity):
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",
@@ -72,14 +74,14 @@ def parse_args():
         "-t",
         "--ticker",
         default="SPY",
-        help="Ticker symbol to analyze (default: SPY)",
+        help="Ticker symbol to analyze",
     )
     parser.add_argument(
         "-d",
         "--days",
         type=int,
         default=30,
-        help="Maximum days to expiration to analyze (default: 30)",
+        help="Maximum days to expiration to analyze",
     )
     return parser.parse_args()
 

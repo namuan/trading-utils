@@ -16,14 +16,13 @@ Usage:
 
 import logging
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from common import RawTextWithDefaultsFormatter
 from common.market import get_cached_data
 
 # Constants
@@ -62,7 +61,7 @@ def setup_logging(verbosity):
 def parse_args():
     """Parse command-line arguments."""
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

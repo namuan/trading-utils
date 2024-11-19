@@ -12,30 +12,31 @@ $ python3 tele_spx_theta_gang_bot.py
 Run as bot:
 $ python3 tele_spx_theta_gang_bot.py -b
 """
+
 import logging
 import os
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from telegram import Update
-from telegram.ext import CallbackContext
-from telegram.ext import CommandHandler
-from telegram.ext import Filters
-from telegram.ext import MessageHandler
-from telegram.ext import Updater
+from telegram.ext import (
+    CallbackContext,
+    CommandHandler,
+    Filters,
+    MessageHandler,
+    Updater,
+)
 
-from common.bot_wrapper import help_command
-from common.bot_wrapper import start
-from common.environment import DTE_TO_TARGET
-from common.environment import LONG_STRIKE_DISTANCE
-from common.environment import SHORT_STRIKE_DELTA
-from common.environment import TELEGRAM_SPX_THETA_GANG_BOT
+from common import RawTextWithDefaultsFormatter
+from common.bot_wrapper import help_command, start
+from common.environment import (
+    DTE_TO_TARGET,
+    LONG_STRIKE_DISTANCE,
+    SHORT_STRIKE_DELTA,
+    TELEGRAM_SPX_THETA_GANG_BOT,
+)
 from common.logger import setup_logging
-from common.options import option_chain
-from common.options import option_expirations
-from common.options import process_options_data
+from common.options import option_chain, option_expirations, process_options_data
 
 
 def select_strikes_for(
@@ -177,7 +178,7 @@ def run_once(ticker):
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

@@ -9,24 +9,24 @@ Usage:
 ./spy_bear_market_analysis.py -v # To log INFO messages
 ./spy_bear_market_analysis.py -vv # To log DEBUG messages
 """
+
 import logging
 import os
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 from common.market import download_ticker_data
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

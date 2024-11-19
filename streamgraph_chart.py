@@ -9,21 +9,22 @@ Usage:
 ./streamgraph_chart.py -vv # To log DEBUG messages
 ./streamgraph_chart.py --animate # To generate an animated chart
 """
+
 import logging
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
 from pathlib import Path
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

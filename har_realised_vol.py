@@ -6,7 +6,7 @@ Usage:
 ./har_realised_vol.py -h
 """
 
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
 from datetime import timedelta
 from typing import Tuple
 
@@ -17,10 +17,12 @@ import statsmodels.api as sm
 import yfinance as yf
 from statsmodels.regression.linear_model import OLS
 
+from common import RawTextWithDefaultsFormatter
+
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument("--start", default="2020-01-01", help="Start date (YYYY-MM-DD)")
     parser.add_argument("--end", default="2024-01-01", help="End date (YYYY-MM-DD)")

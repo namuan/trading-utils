@@ -16,7 +16,7 @@ Usage:
 """
 
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 
 pd.options.display.float_format = "{:,.4f}".format
@@ -31,7 +32,7 @@ pd.options.display.float_format = "{:,.4f}".format
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

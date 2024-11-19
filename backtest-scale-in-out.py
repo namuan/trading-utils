@@ -5,11 +5,13 @@ $ python3 backtest-scale-in-out.py --help
 Eg:
 $ python3 backtest-scale-in-out.py --ticker TSLA
 """
+
 import argparse
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from common import RawTextWithDefaultsFormatter
 from common.market import download_ticker_data
 
 
@@ -26,7 +28,7 @@ def moving_average(duration, price_data):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "--ticker", type=str, default="AAPL", help="Stock ticker symbol (default: AAPL)"

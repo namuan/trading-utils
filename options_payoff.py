@@ -41,14 +41,15 @@ initial_position:
 
 adjustment: []
 """
+
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import yaml
 
+from common import RawTextWithDefaultsFormatter
 from common.ib import OptionContract
 
 
@@ -395,7 +396,7 @@ def create_option_contracts(options_data):
 
 def main():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "config_file", type=str, help="Path to the YAML configuration file"

@@ -63,6 +63,7 @@ import pytz
 import schedule
 from persistent_cache import PersistentCache
 
+from common import RawTextWithDefaultsFormatter
 from common.options import option_chain, option_expirations, process_options_data
 
 pd.set_option("display.max_rows", None)
@@ -326,7 +327,7 @@ def run_script(symbol, check_market_hours=True):
 # Argument parsing
 def main():
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument("-s", "--symbol", default="SPX", help="Symbol to process")
     parser.add_argument(

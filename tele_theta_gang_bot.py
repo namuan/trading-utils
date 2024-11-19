@@ -12,21 +12,23 @@ $ python3 tele_theta_gang_bot.py -s NVDA
 Run as bot:
 $ python3 tele_theta_gang_bot.py -b
 """
+
 import logging
 import os
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
 from datetime import datetime
 
 from telegram import Update
-from telegram.ext import CallbackContext
-from telegram.ext import CommandHandler
-from telegram.ext import Filters
-from telegram.ext import MessageHandler
-from telegram.ext import Updater
+from telegram.ext import (
+    CallbackContext,
+    CommandHandler,
+    Filters,
+    MessageHandler,
+    Updater,
+)
 
-from common.bot_wrapper import help_command
-from common.bot_wrapper import start
+from common import RawTextWithDefaultsFormatter
+from common.bot_wrapper import help_command, start
 from common.environment import TELEGRAM_THETA_GANG_BOT
 from common.logger import setup_logging
 from common.options import combined_options_df
@@ -181,7 +183,7 @@ def run_once(ticker):
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

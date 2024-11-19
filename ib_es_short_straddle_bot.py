@@ -8,21 +8,20 @@ Usage:
 ./ib_es_short_straddle_bot.py --dte 3 -v # To log INFO messages
 ./ib_es_short_straddle_bot.py --dte 3 -vv # To log DEBUG messages
 """
+
 import logging
 import time
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import date
-from datetime import timedelta
-from typing import Any
-from typing import Dict
+from datetime import date, timedelta
+from typing import Any, Dict
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

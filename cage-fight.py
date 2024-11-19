@@ -12,11 +12,10 @@ Example:
 To install required packages:
     pip install pandas yfinance matplotlib seaborn
 """
+
 import colorsys
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
@@ -24,6 +23,7 @@ import numpy as np
 import seaborn as sns
 from matplotlib.dates import DateFormatter
 
+from common import RawTextWithDefaultsFormatter
 from common.market import download_ticker_data
 
 
@@ -245,7 +245,7 @@ def plot_stock_performance(
 
 def main():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "--tickers",

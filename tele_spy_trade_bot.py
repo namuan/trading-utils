@@ -2,26 +2,26 @@
 """
 Generate volatility report for SPY and send to telegram
 """
+
 import logging
 import time
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
 from datetime import datetime
 
 import schedule
 
+from common import RawTextWithDefaultsFormatter
 from common.analyst import fetch_data_on_demand
 from common.external_charts import build_chart_link
 from common.logger import setup_logging
 from common.plotting import plot_intraday
-from common.tele_notifier import send_file_to_telegram
-from common.tele_notifier import send_message_to_telegram
+from common.tele_notifier import send_file_to_telegram, send_message_to_telegram
 from common.trading_hours import after_hour_during_trading_day
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

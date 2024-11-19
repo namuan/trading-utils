@@ -18,7 +18,7 @@ Examples:
 
 import logging
 import sys
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
@@ -28,6 +28,7 @@ import pandas as pd
 import seaborn as sns
 from pandas import DataFrame
 
+from common import RawTextWithDefaultsFormatter
 from common.market import get_cached_data
 
 # Constants
@@ -142,7 +143,7 @@ def parse_args() -> ArgOptions:
         ArgOptions: Validated command line arguments
     """
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

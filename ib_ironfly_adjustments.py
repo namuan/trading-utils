@@ -8,16 +8,19 @@ $ python3 ib_ironfly_adjustments.py --help
 Eg:
 $ python3 ib_ironfly_adjustments.py --expiry-date 20240816  --plot
 """
+
 from ib_async import *
 
-from common.ib import calculate_breakeven_on_each_side
-from common.ib import calculate_total_premium
-from common.ib import find_options_for_expiry
-from common.ib import get_next_futures_expiry
-from common.ib import open_contracts_for_expiry
-from common.ib import setup_ib
-from common.options import calculate_nearest_strike
-from common.options import get_mid_price
+from common import RawTextWithDefaultsFormatter
+from common.ib import (
+    calculate_breakeven_on_each_side,
+    calculate_total_premium,
+    find_options_for_expiry,
+    get_next_futures_expiry,
+    open_contracts_for_expiry,
+    setup_ib,
+)
+from common.options import calculate_nearest_strike, get_mid_price
 from options_payoff import *
 
 
@@ -137,7 +140,7 @@ def main(args):
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-e",

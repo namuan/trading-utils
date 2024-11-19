@@ -13,17 +13,17 @@ Usage:
 ./compare_stocks.py "XHB,XLC,XLY" --show-plot  # Compare RS and display the heatmap
 ./compare_stocks.py "XHB,XLC,XLY" --rs-period 90 --end-date 2024-09-01 --show-plot  # Full example with all options
 """
+
 import logging
 import os
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 from common.market import download_ticker_data
 
@@ -33,7 +33,7 @@ def parse_args():
     default_end_date = datetime.today().strftime("%Y-%m-%d")
 
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

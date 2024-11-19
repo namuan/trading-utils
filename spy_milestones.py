@@ -21,7 +21,7 @@ Usage:
 """
 
 import logging
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 
@@ -31,12 +31,13 @@ import yfinance as yf
 from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 from persistent_cache import PersistentCache
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",

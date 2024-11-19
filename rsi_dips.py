@@ -15,24 +15,24 @@ Optional arguments:
 --higher <value>        Set the higher RSI threshold (default: 80)
 --rsi-period <value>    Set the RSI period (default: 3)
 """
+
 import logging
 from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from finta import TA
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
 from common.market import download_ticker_data
 
 
 def parse_args():
     parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+        description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument(
         "-v",
