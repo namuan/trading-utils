@@ -6,10 +6,8 @@ import yfinance as yf
 from tqdm import tqdm
 from yahoo_earnings_calendar import YahooEarningsCalendar
 
-from common import ALL_LISTED_TICKERS_FILE
-from common import LARGE_CAP_TICKERS_FILE
-from common.filesystem import file_exists
-from common.filesystem import output_dir
+from common import ALL_LISTED_TICKERS_FILE, LARGE_CAP_TICKERS_FILE
+from common.filesystem import file_exists, output_dir
 
 yec = YahooEarningsCalendar()
 
@@ -54,6 +52,7 @@ def load_all_tickers(market_type="all"):
 def download_ticker_data(ticker, start, end):
     try:
         ticker_df = yf.download(ticker, start=start, end=end)
+        ticker_df.columns = ticker_df.columns.droplevel("Ticker")
         ticker_df.to_csv(f"{output_dir()}/{ticker}.csv")
         return ticker_df
     except:
