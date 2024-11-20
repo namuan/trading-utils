@@ -35,6 +35,9 @@ stocksohlcv: ## Download OHLCV of all available stocks
 etfsohlcv: ## Download OHLCV of all Macro ETFs
 	$(VENV_PATH)/python3 download_macro_etfs.py
 
+weeklyoptions: ## Download list of Symbols with weekly options
+	$(VENV_PATH)/python3 download_weekly_option_symbols.py -v
+
 enrich: ## Enrich data and calculate indicators
 	$(VENV_PATH)/python3 stocks_data_enricher.py
 	$(VENV_PATH)/python3 tele_message.py -m "Completed data enrichment"
