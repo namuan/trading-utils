@@ -1,14 +1,14 @@
 import argparse
 import logging
 from datetime import datetime
+from urllib.parse import quote
 
 import pandas as pd
 
 from common.filesystem import output_dir
 from common.logger import init_logging
-from common.reporting import add_reporting_data
-from common.reporting import convert_to_html
-from common.reporting import generate_report
+from common.reporting import add_reporting_data, convert_to_html, generate_report
+from common.subprocess_runner import open_in_browser
 
 
 def parse_args():
@@ -65,11 +65,15 @@ if __name__ == "__main__":
         .head(n=select_top)
     )
     report_data = add_reporting_data(selected_stocks)
+    selected_stock_symbols = ",".join([d.get("symbol") for d in report_data])
     logging.info(
-        "({}) Selected Stocks: {}".format(
-            len(report_data), ", ".join([f"${d.get('symbol')}" for d in report_data])
-        )
+        "({}) Selected Stocks: {}".format(len(report_data), selected_stock_symbols)
     )
+
+    finviz_screener = (
+        f"https://finviz.com/screener.ashx?v=311&t={quote(selected_stock_symbols)}"
+    )
+    logging.info(finviz_screener)
     template_data = {"sort_by": sort_by, "query": query, "report_data": report_data}
     logging.info("Generating report for: {}".format(report_title))
     output_file = generate_report(
@@ -93,5 +97,6 @@ if __name__ == "__main__":
         logging.info("Exporting report to CSV file: {}".format(output_csv_file))
     elif view_in_browser:
         convert_to_html(output_file, open_page=True)
+        open_in_browser(finviz_screener)
     else:
         logging.info(f"Generated {output_file}")
