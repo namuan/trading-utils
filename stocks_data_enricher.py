@@ -1,9 +1,9 @@
 """
 Enrich Stocks and ETF data with different indicators and generates a CSV file for analysis
 """
+
 import argparse
 from datetime import datetime
-from pathlib import Path
 
 import pandas as pd
 
@@ -49,10 +49,7 @@ if __name__ == "__main__":
     scanner_df = pd.DataFrame(combined_db, copy=True)
     scanner_df.to_csv(file_path, index=False)
     print("Generated output {}".format(file_path))
-    dtale_path = Path("venv").joinpath("bin").joinpath("dtale")
-    view_in_browser_cmd = (
-        f"{dtale_path.as_posix()} --open-browser --csv-path {file_path}"
-    )
+    view_in_browser_cmd = f"uvx dtale --open-browser --csv-path {file_path}"
     if view_in_browser:
         run_cmd(view_in_browser_cmd)
     else:

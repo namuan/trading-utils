@@ -1,5 +1,4 @@
 -r ../requirements.txt
 black
-dtale
 bpython
 pre-commit

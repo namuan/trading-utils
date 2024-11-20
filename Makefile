@@ -40,7 +40,7 @@ enrich: ## Enrich data and calculate indicators
 	$(VENV_PATH)/python3 tele_message.py -m "Completed data enrichment"
 
 dtale: ## Open DTale
-	$(DTALE) --open-browser --csv-path $(csvpath)
+	uvx dtale --open-browser --csv-path $(csvpath)
 
 weekend: ftplist stocksohlcv etfsohlcv enrich ## Refreshes stock list, download OHLCV data and run analysis
 
