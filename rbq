@@ -1,1 +1,1 @@
-./venv/bin/python3 report_by_query.py -o natr_30 -c 50 -t "Experiment" -q "$1" -v
+uv run report_by_query.py -o natr_30 -c 50 -t "Experiment" -q "$1" -v
