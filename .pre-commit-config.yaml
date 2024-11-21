@@ -34,6 +34,6 @@ repos:
     hooks:
       - id: ruff # linter
         types_or: [ python, pyi, jupyter, toml ]
-        args: ['--select', 'I', '--fix' ]
+        args: ['--select', 'I', '--fix', ", --max-line-length=120" ]
       - id: ruff-format # formatter
         types_or: [ python, pyi, jupyter, toml ]
