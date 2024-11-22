@@ -18,13 +18,13 @@ Usage:
 ./sp500_comparison.py -h
 ./sp500_comparison.py -v # To log INFO messages
 ./sp500_comparison.py -vv # To log DEBUG messages
-./sp500_comparison.py -y 2023 # Analyze specific year
-./sp500_comparison.py -y 2023 -f averages.csv # Specify historical averages file
+./sp500_comparison.py -y 5 # Analyze last 5 full years
+./sp500_comparison.py -y 10 -f averages.csv # Analyze last 10 full years with specific historical averages file
 """
 
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -51,13 +51,18 @@ def setup_logging(verbosity):
     logging.captureWarnings(capture=True)
 
 
+def get_full_year_dates(years_back):
+    """Calculate start and end dates for full years"""
+    current_date = datetime.now()
+    start_year = current_date.year - years_back + 1
+    start_date = datetime(start_year, 1, 1)
+    return start_date, current_date
+
+
 def parse_args():
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
     )
-    # Calculate default dates (last 5 years)
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=5 * 365)
 
     parser.add_argument(
         "-v",
@@ -68,25 +73,28 @@ def parse_args():
         help="Increase verbosity of logging output",
     )
     parser.add_argument(
+        "-y",
+        "--years",
+        type=int,
+        default=5,
+        help="Number of full years to analyze (default: 5)",
+    )
+    parser.add_argument(
         "-f",
         "--file",
         type=str,
         default="historical_averages.csv",
         help="CSV file containing historical averages",
     )
-    parser.add_argument(
-        "--start",
-        type=str,
-        default=start_date.strftime("%Y-%m-%d"),
-        help="Start date in YYYY-MM-DD format (default: 5 years ago)",
-    )
-    parser.add_argument(
-        "--end",
-        type=str,
-        default=end_date.strftime("%Y-%m-%d"),
-        help="End date in YYYY-MM-DD format (default: today)",
-    )
-    return parser.parse_args()
+
+    args = parser.parse_args()
+
+    # Calculate start and end dates based on years
+    start_date, end_date = get_full_year_dates(args.years)
+    args.start = start_date.strftime("%Y-%m-%d")
+    args.end = end_date.strftime("%Y-%m-%d")
+
+    return args
 
 
 def load_historical_averages(file_path):
@@ -262,7 +270,7 @@ def plot_return_scatter(comparison_df):
             showactive=True,
             x=1.25,
             xanchor="right",
-            y=1.10,
+            y=1.05,
             yanchor="top",
             name="Year",
             font=dict(color="#000000"),
@@ -276,7 +284,7 @@ def plot_return_scatter(comparison_df):
             "text": "Actual Returns vs Historical Averages",
             "font": {"color": "white"},
             "y": 0.95,
-            "x": 0.5,
+            "x": 0.40,
             "xanchor": "center",
             "yanchor": "top",
         },
