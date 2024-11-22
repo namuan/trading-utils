@@ -187,13 +187,20 @@ def plot_return_scatter(comparison_df):
                 )
             )
 
-    # Calculate min and max values for reference line
-    min_val = min(
-        comparison_df["Historical_Average"].min(), comparison_df["Actual_Return"].min()
-    )
-    max_val = max(
-        comparison_df["Historical_Average"].max(), comparison_df["Actual_Return"].max()
-    )
+    # Calculate min and max values for both axes
+    x_min = comparison_df["Historical_Average"].min()
+    x_max = comparison_df["Historical_Average"].max()
+    y_min = comparison_df["Actual_Return"].min()
+    y_max = comparison_df["Actual_Return"].max()
+
+    # Add small padding (5% of range)
+    x_padding = (x_max - x_min) * 0.05
+    y_padding = (y_max - y_min) * 0.05
+
+    x_min = x_min - x_padding
+    x_max = x_max + x_padding
+    y_min = y_min - y_padding
+    y_max = y_max + y_padding
 
     # Add zero lines
     fig.add_hline(y=0, line_color="gray", opacity=0.3)
@@ -210,29 +217,29 @@ def plot_return_scatter(comparison_df):
         # Add annotations for quadrants
         annotations=[
             dict(
-                x=max_val * 0.7,
-                y=max_val * 0.7,
+                x=x_max * 0.7,
+                y=y_max * 0.7,
                 text="Both Positive<br>Outperforming",
                 showarrow=False,
                 font=dict(size=10, color="gray"),
             ),
             dict(
-                x=min_val * 0.7,
-                y=max_val * 0.7,
+                x=x_min * 0.7,
+                y=y_max * 0.7,
                 text="Historical Negative<br>Actual Positive",
                 showarrow=False,
                 font=dict(size=10, color="gray"),
             ),
             dict(
-                x=max_val * 0.7,
-                y=min_val * 0.7,
+                x=x_max * 0.7,
+                y=y_min * 0.7,
                 text="Historical Positive<br>Actual Negative",
                 showarrow=False,
                 font=dict(size=10, color="gray"),
             ),
             dict(
-                x=min_val * 0.7,
-                y=min_val * 0.7,
+                x=x_min * 0.7,
+                y=y_min * 0.7,
                 text="Both Negative<br>Underperforming",
                 showarrow=False,
                 font=dict(size=10, color="gray"),
@@ -240,7 +247,7 @@ def plot_return_scatter(comparison_df):
         ],
     )
 
-    # Update axes to be symmetric and show grid
+    # Update axes independently
     fig.update_xaxes(
         showgrid=True,
         gridwidth=1,
@@ -248,9 +255,8 @@ def plot_return_scatter(comparison_df):
         zeroline=True,
         zerolinewidth=2,
         zerolinecolor="Gray",
-        scaleanchor="y",
-        scaleratio=1,
-    )  # Make axes equal scale
+        range=[x_min, x_max],
+    )
     fig.update_yaxes(
         showgrid=True,
         gridwidth=1,
@@ -258,8 +264,8 @@ def plot_return_scatter(comparison_df):
         zeroline=True,
         zerolinewidth=2,
         zerolinecolor="Gray",
-        constrain="domain",
-    )  # Constrain y-axis to available space
+        range=[y_min, y_max],
+    )
 
     # Show plot
     fig.show()
