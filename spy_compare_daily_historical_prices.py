@@ -1,6 +1,6 @@
 #!uv run
 """
-S&P 500 Daily Return Comparison Script
+S&P 500 Daily Return Comparison Script with Day-by-Day Analysis
 
 Usage:
 ./sp500_comparison.py -h
@@ -14,8 +14,10 @@ import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from tabulate import tabulate
 
 from common.market import download_ticker_data
 
@@ -114,22 +116,25 @@ def compare_returns(sp500_data, historical_averages):
             if hist_avg is not None and not np.isnan(actual_return):
                 actual_return = round(actual_return, 2)
                 difference = round(actual_return - hist_avg, 2)
+                performance = (
+                    "ABOVE"
+                    if difference > 0
+                    else "BELOW"
+                    if difference < 0
+                    else "EQUAL"
+                )
 
                 results.append(
                     {
                         "Date": date_idx.strftime("%Y-%m-%d"),
+                        "Day": date_idx.strftime("%A"),
                         "Actual_Return": actual_return,
                         "Historical_Average": hist_avg,
                         "Difference": difference,
+                        "Performance": performance,
                     }
                 )
 
-                logging.debug(
-                    f"Date: {date_idx.strftime('%Y-%m-%d')}, "
-                    f"Actual: {actual_return}%, "
-                    f"Historical: {hist_avg}%, "
-                    f"Diff: {difference}%"
-                )
         except (ValueError, TypeError):
             logging.debug(f"Skipping {date_idx}: Invalid or missing data")
             continue
@@ -137,34 +142,121 @@ def compare_returns(sp500_data, historical_averages):
     return pd.DataFrame(results)
 
 
-def print_monthly_summary(comparison_df):
-    """Print summary statistics by month"""
-    if comparison_df.empty:
-        print("\nNo data available for monthly summary")
-        return
+def plot_return_scatter(comparison_df):
+    """Create a scatter plot comparing actual returns vs historical averages"""
+    plt.figure(figsize=(12, 10))
 
+    # Convert Date column to datetime if it's not already
     comparison_df["Date"] = pd.to_datetime(comparison_df["Date"])
-    monthly_stats = (
-        comparison_df.set_index("Date")
-        .resample("M")
-        .agg(
-            {
-                "Difference": ["mean", "count"],
-                "Actual_Return": "mean",
-                "Historical_Average": "mean",
-            }
-        )
+
+    # Create color map for months
+    months = range(1, 13)
+    colors = plt.cm.viridis(np.linspace(0, 1, 12))  # Using viridis colormap
+    month_colors = dict(zip(months, colors))
+
+    # Plot each month with different color
+    for month in months:
+        month_data = comparison_df[comparison_df["Date"].dt.month == month]
+        if not month_data.empty:
+            plt.scatter(
+                month_data["Historical_Average"],
+                month_data["Actual_Return"],
+                alpha=0.6,
+                color=month_colors[month],
+                label=datetime.strptime(str(month), "%m").strftime("%B"),
+            )
+
+    # Add reference line (y = x)
+    min_val = min(
+        comparison_df["Historical_Average"].min(), comparison_df["Actual_Return"].min()
+    )
+    max_val = max(
+        comparison_df["Historical_Average"].max(), comparison_df["Actual_Return"].max()
+    )
+    plt.plot([min_val, max_val], [min_val, max_val], "k--", alpha=0.5, label="y = x")
+
+    # Customize plot
+    plt.title("Actual Returns vs Historical Average Returns")
+    plt.xlabel("Historical Average Return (%)")
+    plt.ylabel("Actual Return (%)")
+    plt.grid(True, alpha=0.3)
+
+    # Position legend outside of plot
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+
+    # Add quadrant labels
+    plt.text(
+        max_val * 0.7,
+        max_val * 0.7,
+        "Both Positive\nOutperforming",
+        ha="center",
+        va="center",
+        alpha=0.5,
+    )
+    plt.text(
+        min_val * 0.7,
+        max_val * 0.7,
+        "Historical Negative\nActual Positive",
+        ha="center",
+        va="center",
+        alpha=0.5,
+    )
+    plt.text(
+        max_val * 0.7,
+        min_val * 0.7,
+        "Historical Positive\nActual Negative",
+        ha="center",
+        va="center",
+        alpha=0.5,
+    )
+    plt.text(
+        min_val * 0.7,
+        min_val * 0.7,
+        "Both Negative\nUnderperforming",
+        ha="center",
+        va="center",
+        alpha=0.5,
     )
 
-    print("\nMonthly Summary:")
-    print("=" * 80)
-    for idx, row in monthly_stats.iterrows():
-        month_name = idx.strftime("%B")
-        print(f"\n{month_name} {idx.year}:")
-        print(f"Average Difference: {row[('Difference', 'mean')]:.2f}%")
-        print(f"Average Actual Return: {row[('Actual_Return', 'mean')]:.2f}%")
-        print(f"Average Historical Return: {row[('Historical_Average', 'mean')]:.2f}%")
-        print(f"Days Analyzed: {int(row[('Difference', 'count')])}")
+    # Add zero lines
+    plt.axhline(y=0, color="gray", linestyle="-", alpha=0.3)
+    plt.axvline(x=0, color="gray", linestyle="-", alpha=0.3)
+
+    # Adjust layout to prevent legend cutoff
+    plt.tight_layout()
+
+    # Show plot
+    plt.show()
+
+
+def print_daily_analysis(comparison_df):
+    """Print detailed daily analysis"""
+    print("\nDay-by-Day Analysis:")
+    print("=" * 100)
+
+    # Format the data for tabulate
+    table_data = []
+    for _, row in comparison_df.iterrows():
+        table_data.append(
+            [
+                row["Date"],
+                row["Day"],
+                f"{row['Actual_Return']:+.2f}%",
+                f"{row['Historical_Average']:+.2f}%",
+                f"{row['Difference']:+.2f}%",
+                row["Performance"],
+            ]
+        )
+
+    headers = [
+        "Date",
+        "Day",
+        "Actual Return",
+        "Historical Avg",
+        "Difference",
+        "Performance",
+    ]
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
 
 def main(args):
@@ -181,20 +273,11 @@ def main(args):
         print("No data available for comparison")
         return
 
-    # Print results
-    print(f"\nS&P 500 Return Comparison for {args.year}")
-    print("=" * 80)
-    print(comparison.to_string(index=False))
+    # Print daily analysis
+    print_daily_analysis(comparison)
 
-    # Print summary statistics
-    print("\nOverall Summary:")
-    print("-" * 40)
-    print(f"Days above historical average: {(comparison['Difference'] > 0).sum()}")
-    print(f"Days below historical average: {(comparison['Difference'] < 0).sum()}")
-    print(f"Average difference: {comparison['Difference'].mean():.2f}%")
-
-    # Print monthly summary
-    print_monthly_summary(comparison)
+    # Create visualization
+    plot_return_scatter(comparison)
 
 
 if __name__ == "__main__":
