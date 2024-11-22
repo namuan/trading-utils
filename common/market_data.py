@@ -19,3 +19,14 @@ def download_ticker_data(ticker, start, end):
     except:
         print(f"Unable to fetch data for ticker: {ticker}")
         return pd.DataFrame()
+
+
+def ticker_price(ticker):
+    t = yf.Ticker(ticker)
+    ask = t.info.get("ask")
+    bid = t.info.get("bid")
+    if ask is not None and bid is not None:
+        mid_price = (ask + bid) / 2
+        return round(mid_price, 2)  # Round to 2 decimal places
+    else:
+        return None

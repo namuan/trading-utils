@@ -3,6 +3,7 @@
 # dependencies = [
 #   "pandas",
 #   "schedule",
+#   "yfinance",
 #   "requests",
 #   "dotmap",
 #   "flatten-dict",
@@ -64,11 +65,11 @@ import schedule
 from persistent_cache import PersistentCache
 
 from common import RawTextWithDefaultsFormatter
+from common.market_data import ticker_price
 from common.options import (
     option_chain,
     option_expirations,
     process_options_data,
-    stock_quote,
 )
 
 pd.set_option("display.max_rows", None)
@@ -205,8 +206,8 @@ def get_last_value(data, symbol):
 def adjustment_required(
     current_call_contract_price, current_put_contract_price, existing_trade
 ):
-    open_call_contract_price = existing_trade[5]
-    open_put_contract_price = existing_trade[6]
+    open_call_contract_price = existing_trade[5] if existing_trade else -1
+    open_put_contract_price = existing_trade[6] if existing_trade else -1
     premium_received = open_call_contract_price + open_put_contract_price
     premium_now = current_call_contract_price + open_put_contract_price
     print(
@@ -236,8 +237,9 @@ def process_symbol(symbol):
     )
     existing_trade = cursor.fetchone()
 
-    spot_price_data = stock_quote(symbol)
-    spot_price = get_last_value(spot_price_data, symbol)
+    yfinance_symbol = f"^{symbol}" if symbol == "SPX" else symbol
+    spot_price = ticker_price(yfinance_symbol)
+    print(f"Spot Price: {spot_price}")
 
     todays_expiry = first_expiry(symbol, current_date)
     options_data = option_chain(symbol, todays_expiry)
