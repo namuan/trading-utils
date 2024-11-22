@@ -178,29 +178,33 @@ def plot_return_scatter(comparison_df):
     # Get unique years and months
     years = sorted(comparison_df["Year"].unique())
     months = list(range(1, 13))
-    [datetime(2000, m, 1).strftime("%B") for m in months]
+    current_year = datetime.now().year
 
-    # Create a colormap for the years
-    num_years = len(years)
-    colors = [f"hsl({i * 360 / num_years}, 70%, 50%)" for i in range(num_years)]
+    # Create a colormap for the months
+    num_months = 12
+    month_colors = {
+        month: f"hsl({i * 360 / num_months}, 70%, 50%)"
+        for i, month in enumerate(months)
+    }
 
-    # Add traces for each year
-    for year, color in zip(years, colors):
+    # Add traces for each month and year combination
+    for year in years:
         for month in months:
             data = comparison_df[
                 (comparison_df["Year"] == year) & (comparison_df["Month"] == month)
             ]
 
             if not data.empty:
+                month_name = datetime(2000, month, 1).strftime("%B")
                 fig.add_trace(
                     go.Scatter(
                         x=data["Historical_Average"],
                         y=data["Actual_Return"],
                         mode="markers",
-                        name=f"{year} - {datetime(2000, month, 1).strftime('%B')}",
+                        name=f"{year} - {month_name}",
                         marker=dict(
                             size=8,
-                            color=color,
+                            color=month_colors[month],
                             opacity=0.7,
                         ),
                         hovertemplate=(
@@ -210,7 +214,7 @@ def plot_return_scatter(comparison_df):
                             "<extra></extra>"
                         ),
                         customdata=data["Date"].dt.strftime("%Y-%m-%d"),
-                        visible=True,
+                        visible=True if year == current_year else False,
                     )
                 )
 
@@ -233,18 +237,10 @@ def plot_return_scatter(comparison_df):
     fig.add_hline(y=0, line_color="gray", opacity=0.3)
     fig.add_vline(x=0, line_color="gray", opacity=0.3)
 
-    # Create dropdown menus
+    # Create dropdown menus with current year selected by default
     updatemenus = [
-        # Year dropdown
         dict(
             buttons=[
-                dict(
-                    args=[{"visible": [True] * len(fig.data)}],
-                    label="All Years",
-                    method="update",
-                )
-            ]
-            + [
                 dict(
                     args=[
                         {
@@ -259,9 +255,12 @@ def plot_return_scatter(comparison_df):
                 )
                 for year in years
             ],
+            active=years.index(current_year)
+            if current_year in years
+            else 0,  # Set active button to current year
             direction="down",
             showactive=True,
-            x=1.10,
+            x=1.25,
             xanchor="right",
             y=1.10,
             yanchor="top",
@@ -288,6 +287,14 @@ def plot_return_scatter(comparison_df):
         plot_bgcolor="black",
         font=dict(color="white"),
         updatemenus=updatemenus,
+        showlegend=True,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=1.15,
+            font=dict(color="white"),
+        ),
         annotations=[
             dict(
                 x=x_max * 0.7,
