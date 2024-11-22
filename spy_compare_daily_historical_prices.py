@@ -1,4 +1,16 @@
 #!uv run
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "plotly",
+#   "yfinance",
+#   "tabulate",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
+#!uv run
 """
 S&P 500 Daily Return Comparison Script with Day-by-Day Analysis
 
@@ -14,12 +26,11 @@ import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from tabulate import tabulate
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def setup_logging(verbosity):
@@ -143,90 +154,115 @@ def compare_returns(sp500_data, historical_averages):
 
 
 def plot_return_scatter(comparison_df):
-    """Create a scatter plot comparing actual returns vs historical averages"""
-    plt.figure(figsize=(12, 10))
+    """Create an interactive scatter plot comparing actual returns vs historical averages using Plotly"""
+    import plotly.graph_objects as go
 
     # Convert Date column to datetime if it's not already
     comparison_df["Date"] = pd.to_datetime(comparison_df["Date"])
 
-    # Create color map for months
-    months = range(1, 13)
-    colors = plt.cm.viridis(np.linspace(0, 1, 12))  # Using viridis colormap
-    month_colors = dict(zip(months, colors))
+    # Create figure with custom size
+    fig = go.Figure()
 
-    # Plot each month with different color
+    # Add scatter traces for each month
+    months = range(1, 13)
     for month in months:
         month_data = comparison_df[comparison_df["Date"].dt.month == month]
         if not month_data.empty:
-            plt.scatter(
-                month_data["Historical_Average"],
-                month_data["Actual_Return"],
-                alpha=0.6,
-                color=month_colors[month],
-                label=datetime.strptime(str(month), "%m").strftime("%B"),
+            month_name = datetime.strptime(str(month), "%m").strftime("%B")
+
+            fig.add_trace(
+                go.Scatter(
+                    x=month_data["Historical_Average"],
+                    y=month_data["Actual_Return"],
+                    mode="markers",
+                    name=month_name,
+                    hovertemplate=(
+                        "Date: %{customdata}<br>"
+                        "Historical Average: %{x:.2f}%<br>"
+                        "Actual Return: %{y:.2f}%<br>"
+                        "<extra></extra>"
+                    ),
+                    customdata=month_data["Date"].dt.strftime("%Y-%m-%d"),
+                    visible=True,
+                )
             )
 
-    # Add reference line (y = x)
+    # Calculate min and max values for reference line
     min_val = min(
         comparison_df["Historical_Average"].min(), comparison_df["Actual_Return"].min()
     )
     max_val = max(
         comparison_df["Historical_Average"].max(), comparison_df["Actual_Return"].max()
     )
-    plt.plot([min_val, max_val], [min_val, max_val], "k--", alpha=0.5, label="y = x")
-
-    # Customize plot
-    plt.title("Actual Returns vs Historical Average Returns")
-    plt.xlabel("Historical Average Return (%)")
-    plt.ylabel("Actual Return (%)")
-    plt.grid(True, alpha=0.3)
-
-    # Position legend outside of plot
-    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-
-    # Add quadrant labels
-    plt.text(
-        max_val * 0.7,
-        max_val * 0.7,
-        "Both Positive\nOutperforming",
-        ha="center",
-        va="center",
-        alpha=0.5,
-    )
-    plt.text(
-        min_val * 0.7,
-        max_val * 0.7,
-        "Historical Negative\nActual Positive",
-        ha="center",
-        va="center",
-        alpha=0.5,
-    )
-    plt.text(
-        max_val * 0.7,
-        min_val * 0.7,
-        "Historical Positive\nActual Negative",
-        ha="center",
-        va="center",
-        alpha=0.5,
-    )
-    plt.text(
-        min_val * 0.7,
-        min_val * 0.7,
-        "Both Negative\nUnderperforming",
-        ha="center",
-        va="center",
-        alpha=0.5,
-    )
 
     # Add zero lines
-    plt.axhline(y=0, color="gray", linestyle="-", alpha=0.3)
-    plt.axvline(x=0, color="gray", linestyle="-", alpha=0.3)
+    fig.add_hline(y=0, line_color="gray", opacity=0.3)
+    fig.add_vline(x=0, line_color="gray", opacity=0.3)
 
-    # Adjust layout to prevent legend cutoff
-    plt.tight_layout()
+    # Update layout
+    fig.update_layout(
+        title={
+            "text": "Actual Returns vs Historical Averages",
+        },
+        xaxis_title="Historical Average Return (%)",
+        yaxis_title="Actual Return (%)",
+        hovermode="closest",
+        # Add annotations for quadrants
+        annotations=[
+            dict(
+                x=max_val * 0.7,
+                y=max_val * 0.7,
+                text="Both Positive<br>Outperforming",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+            ),
+            dict(
+                x=min_val * 0.7,
+                y=max_val * 0.7,
+                text="Historical Negative<br>Actual Positive",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+            ),
+            dict(
+                x=max_val * 0.7,
+                y=min_val * 0.7,
+                text="Historical Positive<br>Actual Negative",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+            ),
+            dict(
+                x=min_val * 0.7,
+                y=min_val * 0.7,
+                text="Both Negative<br>Underperforming",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+            ),
+        ],
+    )
+
+    # Update axes to be symmetric and show grid
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGray",
+        zeroline=True,
+        zerolinewidth=2,
+        zerolinecolor="Gray",
+        scaleanchor="y",
+        scaleratio=1,
+    )  # Make axes equal scale
+    fig.update_yaxes(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGray",
+        zeroline=True,
+        zerolinewidth=2,
+        zerolinecolor="Gray",
+        constrain="domain",
+    )  # Constrain y-axis to available space
 
     # Show plot
-    plt.show()
+    fig.show()
 
 
 def print_daily_analysis(comparison_df):
@@ -274,7 +310,7 @@ def main(args):
         return
 
     # Print daily analysis
-    print_daily_analysis(comparison)
+    # print_daily_analysis(comparison)
 
     # Create visualization
     plot_return_scatter(comparison)
