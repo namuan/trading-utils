@@ -121,7 +121,11 @@ def setup_database(symbol, date_for_suffix):
             Date DATE,
             Symbol TEXT,
             StrikePrice REAL,
-            Status TEXT
+            Status TEXT,
+            CallPriceOpen REAL,
+            PutPriceOpen REAL,
+            CallPriceClose REAL,
+            PutPriceClose REAL
         )
     """
     )
@@ -191,8 +195,10 @@ def first_expiry(symbol, current_date):
 
 def get_last_value(data, symbol):
     quote = data.quotes.quote
-    if quote.symbol == symbol:
+    if quote.symbol == symbol and quote.last is not None:
         return quote.last
+    print("⚠️ No quote found for symbol " + symbol)
+    print(data.quotes.quote)
     return None
 
 
@@ -244,13 +250,21 @@ def process_symbol(symbol):
             options_df, todays_expiry
         )
         strike_price = call_strike_record.get("strike")
+        call_contract_price = call_strike_record.get("bid")
+        put_contract_price = put_strike_record.get("bid")
         print(f"Strike price around 50 Delta from Option Chain {strike_price}")
         cursor.execute(
             """
-            INSERT INTO Trades (Date, Symbol, StrikePrice, Status)
-            VALUES (?, ?, ?, 'OPEN')
+            INSERT INTO Trades (Date, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
+            VALUES (?, ?, ?, 'OPEN', ?, ?)
         """,
-            (current_date, symbol, strike_price),
+            (
+                current_date,
+                symbol,
+                strike_price,
+                call_contract_price,
+                put_contract_price,
+            ),
         )
 
     current_time = datetime.now().time().isoformat()  # Convert time to string
