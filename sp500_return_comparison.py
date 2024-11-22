@@ -15,11 +15,11 @@
 S&P 500 Daily Return Comparison Script with Day-by-Day Analysis
 
 Usage:
-./sp500_comparison.py -h
-./sp500_comparison.py -v # To log INFO messages
-./sp500_comparison.py -vv # To log DEBUG messages
-./sp500_comparison.py -y 5 # Analyze last 5 full years
-./sp500_comparison.py -y 10 -f averages.csv # Analyze last 10 full years with specific historical averages file
+./sp500_return_comparison.py -h
+./sp500_return_comparison.py -v # To log INFO messages
+./sp500_return_comparison.py -vv # To log DEBUG messages
+./sp500_return_comparison.py -y 5 # Analyze last 5 full years
+./sp500_return_comparison.py -y 10 -f averages.csv # Analyze last 10 full years with specific historical averages file
 """
 
 import logging
@@ -85,6 +85,11 @@ def parse_args():
         type=str,
         default="historical_averages.csv",
         help="CSV file containing historical averages",
+    )
+    parser.add_argument(
+        "--show_plot",
+        action="store_true",
+        help="Show plot in browser instead of generating output file",
     )
 
     args = parser.parse_args()
@@ -358,9 +363,7 @@ def plot_return_scatter(comparison_df):
         linecolor="gray",
         color="white",
     )
-
-    # Show plot
-    fig.show()
+    return fig
 
 
 def print_daily_analysis(comparison_df):
@@ -393,6 +396,38 @@ def print_daily_analysis(comparison_df):
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
 
+def write_figure_to_file(fig, output_file):
+    # Add custom HTML and CSS for better responsiveness
+    custom_html = """
+    <style>
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        @media (max-width: 768px) {
+            .js-plotly-plot {
+                height: 500px !important;
+            }
+        }
+    </style>
+    <div class="container">
+        <div id="chart"></div>
+    </div>
+    """
+
+    # Save as standalone HTML file
+    fig.write_html(
+        output_file,
+        include_plotlyjs=True,
+        full_html=True,
+        config={"responsive": True},
+        post_script=custom_html,
+    )
+
+    logging.info(f"Plot saved as {output_file}")
+
+
 def main(args):
     # Load historical averages
     historical_averages = load_historical_averages(args.file)
@@ -418,7 +453,12 @@ def main(args):
         return
 
     # Create visualization
-    plot_return_scatter(comparison)
+    output_file = f"sp500_comparison_{args.start[:4]}_{args.end[:4]}.html"
+    fig = plot_return_scatter(comparison)
+    if args.show_plot:
+        fig.show()
+    else:
+        write_figure_to_file(fig, output_file)
 
 
 if __name__ == "__main__":
