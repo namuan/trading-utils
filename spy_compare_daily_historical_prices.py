@@ -210,10 +210,18 @@ def plot_return_scatter(comparison_df):
     fig.update_layout(
         title={
             "text": "Actual Returns vs Historical Averages",
+            "font": {"color": "white"},
+            "y": 0.95,
+            "x": 0.5,
+            "xanchor": "center",
+            "yanchor": "top",
         },
         xaxis_title="Historical Average Return (%)",
         yaxis_title="Actual Return (%)",
         hovermode="closest",
+        paper_bgcolor="black",
+        plot_bgcolor="black",
+        font=dict(color="white"),
         # Add annotations for quadrants
         annotations=[
             dict(
@@ -249,22 +257,26 @@ def plot_return_scatter(comparison_df):
 
     # Update axes independently
     fig.update_xaxes(
-        showgrid=True,
-        gridwidth=1,
-        gridcolor="LightGray",
+        showgrid=False,
         zeroline=True,
         zerolinewidth=2,
-        zerolinecolor="Gray",
+        zerolinecolor="gray",
         range=[x_min, x_max],
+        showline=True,
+        linewidth=2,
+        linecolor="gray",
+        color="white",
     )
     fig.update_yaxes(
-        showgrid=True,
-        gridwidth=1,
-        gridcolor="LightGray",
+        showgrid=False,
         zeroline=True,
         zerolinewidth=2,
-        zerolinecolor="Gray",
+        zerolinecolor="gray",
         range=[y_min, y_max],
+        showline=True,
+        linewidth=2,
+        linecolor="gray",
+        color="white",
     )
 
     # Show plot
