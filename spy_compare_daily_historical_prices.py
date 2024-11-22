@@ -24,7 +24,7 @@ Usage:
 
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -55,6 +55,10 @@ def parse_args():
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
     )
+    # Calculate default dates (last 5 years)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=5 * 365)
+
     parser.add_argument(
         "-v",
         "--verbose",
@@ -64,18 +68,23 @@ def parse_args():
         help="Increase verbosity of logging output",
     )
     parser.add_argument(
-        "-y",
-        "--year",
-        type=int,
-        default=datetime.now().year,
-        help="Year to analyze (default: current year)",
-    )
-    parser.add_argument(
         "-f",
         "--file",
         type=str,
         default="historical_averages.csv",
         help="CSV file containing historical averages",
+    )
+    parser.add_argument(
+        "--start",
+        type=str,
+        default=start_date.strftime("%Y-%m-%d"),
+        help="Start date in YYYY-MM-DD format (default: 5 years ago)",
+    )
+    parser.add_argument(
+        "--end",
+        type=str,
+        default=end_date.strftime("%Y-%m-%d"),
+        help="End date in YYYY-MM-DD format (default: today)",
     )
     return parser.parse_args()
 
@@ -101,16 +110,17 @@ def load_historical_averages(file_path):
         raise
 
 
-def get_sp500_data(year):
-    """Fetch S&P 500 data for a given year"""
+def get_sp500_data(start_date, end_date):
+    """Fetch S&P 500 data for the specified date range"""
     ticker = "SPY"
-    start_date = f"{year}-01-01"
-    end_date = f"{year}-12-31"
-
-    logging.info(f"Fetching S&P 500 data for {year}")
-    sp500 = download_ticker_data(ticker, start=start_date, end=end_date)
-    sp500["Daily_Return"] = sp500["Close"].pct_change() * 100
-    return sp500
+    logging.info(f"Fetching S&P 500 data from {start_date} to {end_date}")
+    try:
+        sp500 = download_ticker_data(ticker, start=start_date, end=end_date)
+        sp500["Daily_Return"] = sp500["Close"].pct_change() * 100
+        return sp500
+    except Exception as e:
+        logging.error(f"Error fetching S&P 500 data: {e}")
+        raise
 
 
 def compare_returns(sp500_data, historical_averages):
@@ -157,35 +167,52 @@ def plot_return_scatter(comparison_df):
     """Create an interactive scatter plot comparing actual returns vs historical averages using Plotly"""
     import plotly.graph_objects as go
 
-    # Convert Date column to datetime if it's not already
     comparison_df["Date"] = pd.to_datetime(comparison_df["Date"])
+    comparison_df["Year"] = comparison_df["Date"].dt.year
+    comparison_df["Month"] = comparison_df["Date"].dt.month
+    comparison_df["MonthName"] = comparison_df["Date"].dt.strftime("%B")
 
-    # Create figure with custom size
+    # Create figure
     fig = go.Figure()
 
-    # Add scatter traces for each month
-    months = range(1, 13)
-    for month in months:
-        month_data = comparison_df[comparison_df["Date"].dt.month == month]
-        if not month_data.empty:
-            month_name = datetime.strptime(str(month), "%m").strftime("%B")
+    # Get unique years and months
+    years = sorted(comparison_df["Year"].unique())
+    months = list(range(1, 13))
+    [datetime(2000, m, 1).strftime("%B") for m in months]
 
-            fig.add_trace(
-                go.Scatter(
-                    x=month_data["Historical_Average"],
-                    y=month_data["Actual_Return"],
-                    mode="markers",
-                    name=month_name,
-                    hovertemplate=(
-                        "Date: %{customdata}<br>"
-                        "Historical Average: %{x:.2f}%<br>"
-                        "Actual Return: %{y:.2f}%<br>"
-                        "<extra></extra>"
-                    ),
-                    customdata=month_data["Date"].dt.strftime("%Y-%m-%d"),
-                    visible=True,
+    # Create a colormap for the years
+    num_years = len(years)
+    colors = [f"hsl({i * 360 / num_years}, 70%, 50%)" for i in range(num_years)]
+
+    # Add traces for each year
+    for year, color in zip(years, colors):
+        for month in months:
+            data = comparison_df[
+                (comparison_df["Year"] == year) & (comparison_df["Month"] == month)
+            ]
+
+            if not data.empty:
+                fig.add_trace(
+                    go.Scatter(
+                        x=data["Historical_Average"],
+                        y=data["Actual_Return"],
+                        mode="markers",
+                        name=f"{year} - {datetime(2000, month, 1).strftime('%B')}",
+                        marker=dict(
+                            size=8,
+                            color=color,
+                            opacity=0.7,
+                        ),
+                        hovertemplate=(
+                            "Date: %{customdata}<br>"
+                            "Historical Average: %{x:.2f}%<br>"
+                            "Actual Return: %{y:.2f}%<br>"
+                            "<extra></extra>"
+                        ),
+                        customdata=data["Date"].dt.strftime("%Y-%m-%d"),
+                        visible=True,
+                    )
                 )
-            )
 
     # Calculate min and max values for both axes
     x_min = comparison_df["Historical_Average"].min()
@@ -206,6 +233,44 @@ def plot_return_scatter(comparison_df):
     fig.add_hline(y=0, line_color="gray", opacity=0.3)
     fig.add_vline(x=0, line_color="gray", opacity=0.3)
 
+    # Create dropdown menus
+    updatemenus = [
+        # Year dropdown
+        dict(
+            buttons=[
+                dict(
+                    args=[{"visible": [True] * len(fig.data)}],
+                    label="All Years",
+                    method="update",
+                )
+            ]
+            + [
+                dict(
+                    args=[
+                        {
+                            "visible": [
+                                year == int(fig.data[i].name.split(" - ")[0])
+                                for i in range(len(fig.data))
+                            ]
+                        }
+                    ],
+                    label=str(year),
+                    method="update",
+                )
+                for year in years
+            ],
+            direction="down",
+            showactive=True,
+            x=1.10,
+            xanchor="right",
+            y=1.10,
+            yanchor="top",
+            name="Year",
+            font=dict(color="#000000"),
+            bgcolor="#ffffff",
+        ),
+    ]
+
     # Update layout
     fig.update_layout(
         title={
@@ -222,7 +287,7 @@ def plot_return_scatter(comparison_df):
         paper_bgcolor="black",
         plot_bgcolor="black",
         font=dict(color="white"),
-        # Add annotations for quadrants
+        updatemenus=updatemenus,
         annotations=[
             dict(
                 x=x_max * 0.7,
@@ -255,7 +320,7 @@ def plot_return_scatter(comparison_df):
         ],
     )
 
-    # Update axes independently
+    # Update axes
     fig.update_xaxes(
         showgrid=False,
         zeroline=True,
@@ -317,8 +382,18 @@ def main(args):
     # Load historical averages
     historical_averages = load_historical_averages(args.file)
 
-    # Get actual data
-    sp500_data = get_sp500_data(args.year)
+    # Validate dates
+    try:
+        start_date = datetime.strptime(args.start, "%Y-%m-%d")
+        end_date = datetime.strptime(args.end, "%Y-%m-%d")
+        if start_date > end_date:
+            raise ValueError("Start date must be before end date")
+    except ValueError as e:
+        logging.error(f"Invalid date format: {e}")
+        return
+
+    # Get actual data for specified date range
+    sp500_data = get_sp500_data(args.start, args.end)
 
     # Compare returns
     comparison = compare_returns(sp500_data, historical_averages)
@@ -326,9 +401,6 @@ def main(args):
     if comparison.empty:
         print("No data available for comparison")
         return
-
-    # Print daily analysis
-    # print_daily_analysis(comparison)
 
     # Create visualization
     plot_return_scatter(comparison)
