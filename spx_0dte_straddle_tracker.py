@@ -202,6 +202,28 @@ def get_last_value(data, symbol):
     return None
 
 
+def adjustment_required(
+    current_call_contract_price, current_put_contract_price, existing_trade
+):
+    open_call_contract_price = existing_trade[5]
+    open_put_contract_price = existing_trade[6]
+    premium_received = open_call_contract_price + open_put_contract_price
+    premium_now = current_call_contract_price + open_put_contract_price
+    print(
+        f"🧾 Existing trade {existing_trade} with {open_call_contract_price=}, {open_put_contract_price=}"
+    )
+    print(f"Premium Received: {premium_received}, Premium Now: {premium_now}")
+    if current_call_contract_price > 0 and current_put_contract_price > 0:
+        price_diff = max(current_call_contract_price, current_put_contract_price) / min(
+            current_call_contract_price, current_put_contract_price
+        )
+        print(
+            f"Current difference between options prices({current_call_contract_price, current_put_contract_price}): "
+            f"{price_diff}"
+        )
+        return price_diff >= 5
+
+
 def process_symbol(symbol):
     current_date = datetime.now().date().isoformat()  # Convert date to string
 
@@ -290,19 +312,10 @@ def process_symbol(symbol):
         ),
     )
 
-    # Check if adjustment is required only if both prices are non-zero
-    if call_contract_price > 0 and put_contract_price > 0:
-        price_diff = max(call_contract_price, put_contract_price) / min(
-            call_contract_price, put_contract_price
-        )
-        print(
-            f"Current difference between options prices({call_contract_price, put_contract_price}): "
-            f"{price_diff}"
-        )
-        if price_diff >= 5:
-            print("We may need an adjustment. Review data first")
-            print(call_strike_record)
-            print(put_strike_record)
+    if adjustment_required(call_contract_price, put_contract_price, existing_trade):
+        print("We may need an adjustment. Review data first")
+        print(call_strike_record)
+        print(put_strike_record)
 
     conn.commit()
     conn.close()
