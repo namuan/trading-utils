@@ -83,7 +83,7 @@ def parse_args():
         "-f",
         "--file",
         type=str,
-        default="historical_averages.csv",
+        required=True,
         help="CSV file containing historical averages",
     )
     parser.add_argument(
@@ -419,10 +419,8 @@ def write_figure_to_file(fig, output_file):
     # Save as standalone HTML file
     fig.write_html(
         output_file,
-        include_plotlyjs=True,
+        include_plotlyjs="cdn",
         full_html=True,
-        config={"responsive": True},
-        post_script=custom_html,
     )
 
     logging.info(f"Plot saved as {output_file}")
