@@ -2,6 +2,7 @@ from datetime import datetime
 
 import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
+import pytz
 import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 
@@ -180,8 +181,8 @@ def create_plots(reit_data, market_data, start_date, end_date):
 
 def main():
     # Define the time period for the analysis
-    initial_start_date = datetime(2001, 1, 1)
-    end_date = datetime.now()
+    initial_start_date = datetime(2001, 1, 1).replace(tzinfo=pytz.UTC)
+    end_date = datetime.now().replace(tzinfo=pytz.UTC)
 
     # Symbols for the REIT index and the S&P 500 index
     reit_symbol = "IYR"  # Vanguard Real Estate ETF
@@ -194,6 +195,7 @@ def main():
     if full_reit_data is not None and full_market_data is not None:
         # Generate plots for different start dates
         current_start_date = initial_start_date
+
         while current_start_date < end_date:
             # Filter data for the current time period
             reit_data = full_reit_data[current_start_date:]
@@ -206,7 +208,7 @@ def main():
 
             # Increment the start date by 4 years
             next_year = current_start_date.year + 4
-            current_start_date = datetime(next_year, 1, 1)
+            current_start_date = datetime(next_year, 1, 1).replace(tzinfo=pytz.UTC)
 
 
 if __name__ == "__main__":
