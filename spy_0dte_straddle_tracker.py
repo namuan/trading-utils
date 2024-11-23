@@ -3,7 +3,6 @@
 # dependencies = [
 #   "pandas",
 #   "schedule",
-#   "yfinance",
 #   "requests",
 #   "dotmap",
 #   "flatten-dict",
@@ -20,7 +19,7 @@ It will not open a new trade if an existing trade is open for the symbol on the 
 but will still update the ContractPrices table with the latest data.
 
 To see the data from command line
-sqlite3 output/spx_straddle.db "
+sqlite3 output/spy_straddle.db "
 SELECT
     Trades.TradeId,
     Trades.Date,
@@ -35,7 +34,7 @@ LEFT JOIN ContractPrices ON Trades.TradeId = ContractPrices.TradeId;
 "
 
 Extract JSON Data
-sqlite3 output/spx_straddle.db "SELECT
+sqlite3 output/spy_straddle.db "SELECT
     Trades.*,
     ContractPrices.Time,
     ContractPrices.CallPrice,
@@ -46,8 +45,8 @@ FROM Trades
 LEFT JOIN ContractPrices ON Trades.TradeId = ContractPrices.TradeId;"
 
 Usage:
-./spx_0dte_straddle_tracker.py -h
-./spx_0dte_straddle_tracker.py -s SYMBOL [-v] [-vv]
+./spy_0dte_straddle_tracker.py -h
+./spy_0dte_straddle_tracker.py -s SYMBOL [-v] [-vv]
 """
 
 import argparse
@@ -65,11 +64,11 @@ import schedule
 from persistent_cache import PersistentCache
 
 from common import RawTextWithDefaultsFormatter
-from common.market_data import ticker_price
 from common.options import (
     option_chain,
     option_expirations,
     process_options_data,
+    stock_quote,
 )
 
 pd.set_option("display.max_rows", None)
@@ -237,8 +236,8 @@ def process_symbol(symbol):
     )
     existing_trade = cursor.fetchone()
 
-    yfinance_symbol = f"^{symbol}" if symbol == "SPX" else symbol
-    spot_price = ticker_price(yfinance_symbol)
+    spot_price_data = stock_quote(symbol)
+    spot_price = get_last_value(spot_price_data, symbol)
     print(f"Spot Price: {spot_price}")
 
     todays_expiry = first_expiry(symbol, current_date)
@@ -383,7 +382,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
-    parser.add_argument("-s", "--symbol", default="SPX", help="Symbol to process")
+    parser.add_argument("-s", "--symbol", default="SPY", help="Symbol to process")
     parser.add_argument(
         "-o",
         "--once",
