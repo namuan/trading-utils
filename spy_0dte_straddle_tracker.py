@@ -13,10 +13,7 @@
 """
 Options Trading Data Script
 
-This script processes stock symbol data, retrieves option chain information,
-and manages trade data in an SQLite database stored in the 'output' directory.
-It will not open a new trade if an existing trade is open for the symbol on the current date,
-but will still update the ContractPrices table with the latest data.
+This script processes and replays options data from an existing database
 
 To see the data from command line
 sqlite3 output/spy_straddle.db "
