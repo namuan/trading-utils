@@ -51,7 +51,6 @@ Usage:
 
 import argparse
 import json
-import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -71,13 +70,9 @@ pd.set_option("display.width", None)
 pd.set_option("display.float_format", "{:.2f}".format)
 
 
-def setup_database(symbol, date_for_suffix):
-    if not os.path.exists("output"):
-        os.makedirs("output")
-
-    db_path = f"output/{symbol.lower()}_trades_{date_for_suffix}.db"
-    if Path.cwd().joinpath(db_path).exists():
-        print(f"Database exists: {db_path}")
+def setup_database(db_path):
+    if not Path.cwd().joinpath(db_path).exists():
+        raise Exception(f"Database not found at {db_path}")
 
     print(f"Setting up database {db_path}")
     conn = sqlite3.connect(db_path)
@@ -179,84 +174,98 @@ def adjustment_required(
         return price_diff >= 5
 
 
-def process_symbol(symbol):
-    current_date = datetime.now().date().isoformat()  # Convert date to string
-
-    db_path = setup_database(symbol, current_date)
+def process_symbol(symbol, db_path):
+    current_date = datetime.now().date().isoformat()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # TODO: Load row by row data from existing database
-    options_data, todays_expiry, spot_price = ...
-
-    # TODO: Loop through the data and run the following code for each row
-
+    # Load data from RawOptionsChain table
     cursor.execute(
-        "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
-        (current_date, symbol),
+        """
+        SELECT Date, Time, Symbol, SpotPrice, RawData
+        FROM RawOptionsChain
+        ORDER BY Time
+        """
     )
-    existing_trade = cursor.fetchone()
+    raw_data_rows = cursor.fetchall()
 
-    options_df = process_options_data(options_data)
+    if not raw_data_rows:
+        print(f"No data found in RawOptionsChain for {symbol}")
+        conn.close()
+        return
 
-    if existing_trade:
-        strike_price = existing_trade[3]
-        print(f"Found existing trade. Strike price from database {strike_price}")
-        call_strike_record, put_strike_record = find_options_for(
-            options_df, strike_price, todays_expiry
+    for row in raw_data_rows:
+        date, time, symbol, spot_price, raw_data = row
+        options_data = json.loads(raw_data)
+        todays_expiry = options_data["options"]["option"][0]["expiration_date"]
+
+        cursor.execute(
+            "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
+            (current_date, symbol),
         )
-    else:
-        print("No trades found in the database. Trying to locate ATM strike ...")
-        call_strike_record, put_strike_record = find_at_the_money_options(
-            options_df, todays_expiry
-        )
-        strike_price = call_strike_record.get("strike")
+        existing_trade = cursor.fetchone()
+
+        options_df = process_options_data(options_data)
+
+        if existing_trade:
+            strike_price = existing_trade[3]
+            print(f"Found existing trade. Strike price from database {strike_price}")
+            call_strike_record, put_strike_record = find_options_for(
+                options_df, strike_price, todays_expiry
+            )
+        else:
+            print("No trades found in the database. Trying to locate ATM strike ...")
+            call_strike_record, put_strike_record = find_at_the_money_options(
+                options_df, todays_expiry
+            )
+            strike_price = call_strike_record.get("strike")
+            call_contract_price = call_strike_record.get("bid")
+            put_contract_price = put_strike_record.get("bid")
+            print(f"Strike price around 50 Delta from Option Chain {strike_price}")
+            cursor.execute(
+                """
+                INSERT INTO Trades (Date, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
+                VALUES (?, ?, ?, 'OPEN', ?, ?)
+                """,
+                (
+                    current_date,
+                    symbol,
+                    strike_price,
+                    call_contract_price,
+                    put_contract_price,
+                ),
+            )
+
+        current_time = time
         call_contract_price = call_strike_record.get("bid")
         put_contract_price = put_strike_record.get("bid")
-        print(f"Strike price around 50 Delta from Option Chain {strike_price}")
+
         cursor.execute(
             """
-            INSERT INTO Trades (Date, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
-            VALUES (?, ?, ?, 'OPEN', ?, ?)
-        """,
+            INSERT INTO ContractPrices (Date, Time, Symbol, SpotPrice, StrikePrice, CallPrice, PutPrice, CallContractData, PutContractData, TradeId)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             (
                 current_date,
+                current_time,
                 symbol,
+                spot_price,
                 strike_price,
                 call_contract_price,
                 put_contract_price,
+                json.dumps(call_strike_record),
+                json.dumps(put_strike_record),
+                existing_trade[0] if existing_trade else cursor.lastrowid,
             ),
         )
 
-    current_time = datetime.now().time().isoformat()  # Convert time to string
-    call_contract_price = call_strike_record.get("bid")
-    put_contract_price = put_strike_record.get("bid")
+        if adjustment_required(call_contract_price, put_contract_price, existing_trade):
+            print("We may need an adjustment. Review data first")
+            print(call_strike_record)
+            print(put_strike_record)
 
-    cursor.execute(
-        """
-        INSERT INTO ContractPrices (Date, Time, Symbol, SpotPrice, StrikePrice, CallPrice, PutPrice, CallContractData, PutContractData, TradeId)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """,
-        (
-            current_date,
-            current_time,
-            symbol,
-            spot_price,
-            strike_price,
-            call_contract_price,
-            put_contract_price,
-            json.dumps(call_strike_record),
-            json.dumps(put_strike_record),
-            existing_trade[0] if existing_trade else cursor.lastrowid,
-        ),
-    )
+        conn.commit()
 
-    if adjustment_required(call_contract_price, put_contract_price, existing_trade):
-        print("We may need an adjustment. Review data first")
-        print(call_strike_record)
-        print(put_strike_record)
-
-    conn.commit()
     conn.close()
 
 
@@ -306,22 +315,27 @@ def find_at_the_money_options(options_df, expiry):
     )
 
 
-def run_script(symbol):
+def run_script(symbol, database_path):
     current_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
-    process_symbol(symbol)
+    db_path = setup_database(database_path)
+    process_symbol(symbol, db_path)
     print(f"Script ran successfully at {current_time}")
 
 
-# Argument parsing
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
     parser.add_argument("-s", "--symbol", default="SPY", help="Symbol to process")
-    # TODO: Pass database file path
+    parser.add_argument(
+        "-d",
+        "--database",
+        help="Path to the database file containing RawOptionsChain table",
+        required=True,
+    )
     args = parser.parse_args()
 
-    run_script(symbol=args.symbol)
+    run_script(symbol=args.symbol, database_path=args.database)
 
 
 if __name__ == "__main__":
