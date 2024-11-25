@@ -117,7 +117,7 @@ def plot_3d_visualization(df):
 
     # Plot calls and puts with different colors
     # Note: Changed the order of parameters to put last_price on Y-axis
-    scatter_calls = ax.scatter(
+    ax.scatter(
         df["hours"],
         df["call_greeks_delta"],  # X-axis
         df["call_last"],  # Y-axis (height)
@@ -126,7 +126,7 @@ def plot_3d_visualization(df):
         alpha=0.6,
     )
 
-    scatter_puts = ax.scatter(
+    ax.scatter(
         df["hours"],
         df["put_greeks_delta"],  # X-axis
         df["put_last"],  # Y-axis (height)
