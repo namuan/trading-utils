@@ -47,19 +47,18 @@ Usage:
 """
 
 import argparse
+import contextlib
 import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Tuple
+from typing import ContextManager, Tuple
 
 import pandas as pd
-from persistent_cache import PersistentCache
 
 from common import RawTextWithDefaultsFormatter
 from common.options import (
-    option_expirations,
     process_options_data,
 )
 
@@ -85,55 +84,64 @@ class Trade:
     ClosedTradeAt: str = None
 
 
-def setup_database(db_path):
+@contextlib.contextmanager
+def get_db_connection(db_path: str) -> ContextManager[sqlite3.Connection]:
+    """Context manager for database connections"""
+    conn = sqlite3.connect(db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def setup_database(db_path: str) -> str:
     if not Path.cwd().joinpath(db_path).exists():
         raise Exception(f"Database not found at {db_path}")
 
     print(f"Setting up database {db_path}")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS Trades (
-            TradeId INTEGER PRIMARY KEY,
-            Date DATE,
-            Time TIME,
-            Symbol TEXT,
-            StrikePrice REAL,
-            Status TEXT,
-            CallPriceOpen REAL,
-            PutPriceOpen REAL,
-            CallPriceClose REAL,
-            PutPriceClose REAL,
-            PremiumCaptured REAL,
-            ClosedTradeAt TIME
-        )
-    """
-    )
-    cursor.execute("DELETE FROM Trades")
 
-    cursor.execute(
+    with get_db_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS Trades (
+                TradeId INTEGER PRIMARY KEY,
+                Date DATE,
+                Time TIME,
+                Symbol TEXT,
+                StrikePrice REAL,
+                Status TEXT,
+                CallPriceOpen REAL,
+                PutPriceOpen REAL,
+                CallPriceClose REAL,
+                PutPriceClose REAL,
+                PremiumCaptured REAL,
+                ClosedTradeAt TIME
+            )
         """
-        CREATE TABLE IF NOT EXISTS ContractPrices (
-            Id INTEGER PRIMARY KEY,
-            Date DATE,
-            Time TIME,
-            Symbol TEXT,
-            SpotPrice REAL,
-            StrikePrice REAL,
-            CallPrice REAL,
-            PutPrice REAL,
-            CallContractData JSON,
-            PutContractData JSON,
-            TradeId INTEGER,
-            FOREIGN KEY (TradeId) REFERENCES Trades (TradeId)
         )
-    """
-    )
-    cursor.execute("DELETE FROM ContractPrices")
+        cursor.execute("DELETE FROM Trades")
 
-    conn.commit()
-    conn.close()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ContractPrices (
+                Id INTEGER PRIMARY KEY,
+                Date DATE,
+                Time TIME,
+                Symbol TEXT,
+                SpotPrice REAL,
+                StrikePrice REAL,
+                CallPrice REAL,
+                PutPrice REAL,
+                CallContractData JSON,
+                PutContractData JSON,
+                TradeId INTEGER,
+                FOREIGN KEY (TradeId) REFERENCES Trades (TradeId)
+            )
+        """
+        )
+        cursor.execute("DELETE FROM ContractPrices")
+        conn.commit()
 
     return db_path
 
@@ -150,26 +158,6 @@ def select_strikes_for(
     return (
         options_df.query(option_query).sort_values(**sort_criteria).head(n=fetch_limit)
     )
-
-
-@PersistentCache()
-def first_expiry(symbol, current_date):
-    print(f"Trying to find first expiry on {current_date}")
-    expirations_output = option_expirations(symbol, include_expiration_type=True)
-    [todays_expiry] = [
-        datetime.strptime(x.date, "%Y-%m-%d").date()
-        for x in expirations_output.expirations.expiration
-    ][:1]
-    return todays_expiry
-
-
-def get_last_value(data, symbol):
-    quote = data.quotes.quote
-    if quote.symbol == symbol and quote.last is not None:
-        return quote.last
-    print("⚠️ No quote found for symbol " + symbol)
-    print(data.quotes.quote)
-    return None
 
 
 def adjustment_required_or_profit_target_reached(
@@ -201,119 +189,120 @@ def adjustment_required_or_profit_target_reached(
     return False, 0.0
 
 
-def process_symbol(symbol, db_path):
+def process_symbol(symbol: str, db_path: str) -> None:
     current_date = datetime.now().date().isoformat()
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
 
-    # Load data from RawOptionsChain table
-    cursor.execute(
-        """
-        SELECT Date, Time, Symbol, SpotPrice, RawData
-        FROM RawOptionsChain
-        ORDER BY Time
-        """
-    )
-    raw_data_rows = cursor.fetchall()
+    with get_db_connection(db_path) as conn:
+        cursor = conn.cursor()
 
-    if not raw_data_rows:
-        print(f"No data found in RawOptionsChain for {symbol}")
-        conn.close()
-        return
-
-    for row in raw_data_rows:
-        date, time, symbol, spot_price, raw_data = row
-        options_data = json.loads(raw_data)
-        todays_expiry = options_data["options"]["option"][0]["expiration_date"]
-
+        # Load data from RawOptionsChain table
         cursor.execute(
-            "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
-            (current_date, symbol),
+            """
+            SELECT Date, Time, Symbol, SpotPrice, RawData
+            FROM RawOptionsChain
+            ORDER BY Time
+            """
         )
-        trade_row = cursor.fetchone()
+        raw_data_rows = cursor.fetchall()
 
-        existing_trade = Trade(*trade_row) if trade_row else None
+        if not raw_data_rows:
+            print(f"No data found in RawOptionsChain for {symbol}")
+            return
 
-        options_df = process_options_data(options_data)
+        for row in raw_data_rows:
+            date, time, symbol, spot_price, raw_data = row
+            options_data = json.loads(raw_data)
+            todays_expiry = options_data["options"]["option"][0]["expiration_date"]
 
-        if existing_trade:
-            strike_price = existing_trade.StrikePrice
-            print(f"Found existing trade. Strike price from database {strike_price}")
-            call_strike_record, put_strike_record = find_options_for(
-                options_df, strike_price, todays_expiry
+            cursor.execute(
+                "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
+                (current_date, symbol),
             )
-        else:
-            print("No trades found in the database. Trying to locate ATM strike ...")
-            call_strike_record, put_strike_record = find_at_the_money_options(
-                options_df, todays_expiry
-            )
-            strike_price = call_strike_record.get("strike")
+            trade_row = cursor.fetchone()
+
+            existing_trade = Trade(*trade_row) if trade_row else None
+
+            options_df = process_options_data(options_data)
+
+            if existing_trade:
+                strike_price = existing_trade.StrikePrice
+                print(
+                    f"Found existing trade. Strike price from database {strike_price}"
+                )
+                call_strike_record, put_strike_record = find_options_for(
+                    options_df, strike_price, todays_expiry
+                )
+            else:
+                print(
+                    "No trades found in the database. Trying to locate ATM strike ..."
+                )
+                call_strike_record, put_strike_record = find_at_the_money_options(
+                    options_df, todays_expiry
+                )
+                strike_price = call_strike_record.get("strike")
+                call_contract_price = call_strike_record.get("bid")
+                put_contract_price = put_strike_record.get("bid")
+                cursor.execute(
+                    """
+                    INSERT INTO Trades (Date, Time, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
+                    VALUES (?, ?, ?, ?, 'OPEN', ?, ?)
+                    """,
+                    (
+                        current_date,
+                        time,
+                        symbol,
+                        strike_price,
+                        call_contract_price,
+                        put_contract_price,
+                    ),
+                )
+                print(
+                    f"Opened trade around {strike_price=} with {call_contract_price=} and {put_contract_price=}"
+                )
+
             call_contract_price = call_strike_record.get("bid")
             put_contract_price = put_strike_record.get("bid")
+
             cursor.execute(
                 """
-                INSERT INTO Trades (Date, Time, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
-                VALUES (?, ?, ?, ?, 'OPEN', ?, ?)
+                INSERT INTO ContractPrices (Date, Time, Symbol, SpotPrice, StrikePrice, CallPrice, PutPrice, CallContractData, PutContractData, TradeId)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     current_date,
                     time,
                     symbol,
+                    spot_price,
                     strike_price,
                     call_contract_price,
                     put_contract_price,
+                    json.dumps(call_strike_record),
+                    json.dumps(put_strike_record),
+                    existing_trade.TradeId if existing_trade else cursor.lastrowid,
                 ),
             )
-            print(
-                f"Opened trade around {strike_price=} with {call_contract_price=} and {put_contract_price=}"
+
+            close_trade, premium_diff = adjustment_required_or_profit_target_reached(
+                call_contract_price, put_contract_price, existing_trade
             )
+            if close_trade:
+                cursor.execute(
+                    """
+                    UPDATE Trades
+                    SET CallPriceClose = ?, PutPriceClose = ?, Status = 'CLOSED', PremiumCaptured = ?, ClosedTradeAt = ?
+                    WHERE TradeId = ?
+                    """,
+                    (
+                        call_contract_price,
+                        put_contract_price,
+                        premium_diff,
+                        time,
+                        existing_trade.TradeId,
+                    ),
+                )
+                print(f"Trade {existing_trade.TradeId} closed successfully.")
 
-        call_contract_price = call_strike_record.get("bid")
-        put_contract_price = put_strike_record.get("bid")
-
-        cursor.execute(
-            """
-            INSERT INTO ContractPrices (Date, Time, Symbol, SpotPrice, StrikePrice, CallPrice, PutPrice, CallContractData, PutContractData, TradeId)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                current_date,
-                time,
-                symbol,
-                spot_price,
-                strike_price,
-                call_contract_price,
-                put_contract_price,
-                json.dumps(call_strike_record),
-                json.dumps(put_strike_record),
-                existing_trade.TradeId if existing_trade else cursor.lastrowid,
-            ),
-        )
-
-        close_trade, premium_diff = adjustment_required_or_profit_target_reached(
-            call_contract_price, put_contract_price, existing_trade
-        )
-        if close_trade:
-            # Update Trades table to close the existing trade
-            cursor.execute(
-                """
-                UPDATE Trades
-                SET CallPriceClose = ?, PutPriceClose = ?, Status = 'CLOSED', PremiumCaptured = ?, ClosedTradeAt = ?
-                WHERE TradeId = ?
-                """,
-                (
-                    call_contract_price,  # Closing Call Price
-                    put_contract_price,  # Closing Put Price
-                    premium_diff,
-                    time,  # Closing Date
-                    existing_trade.TradeId,  # TradeId of the existing trade
-                ),
-            )
-            print(f"Trade {existing_trade.TradeId} closed successfully.")
-
-        conn.commit()
-
-    conn.close()
+            conn.commit()
 
 
 def find_options_for(options_df, strike_price, todays_expiry):
