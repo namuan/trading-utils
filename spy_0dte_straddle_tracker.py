@@ -49,8 +49,10 @@ Usage:
 import argparse
 import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Tuple
 
 import pandas as pd
 from persistent_cache import PersistentCache
@@ -67,6 +69,22 @@ pd.set_option("display.width", None)
 pd.set_option("display.float_format", "{:.2f}".format)
 
 
+@dataclass
+class Trade:
+    TradeId: int
+    Date: str
+    Time: str
+    Symbol: str
+    StrikePrice: float
+    Status: str
+    CallPriceOpen: float
+    PutPriceOpen: float
+    CallPriceClose: float
+    PutPriceClose: float
+    PremiumCaptured: float
+    ClosedTradeAt: str = None
+
+
 def setup_database(db_path):
     if not Path.cwd().joinpath(db_path).exists():
         raise Exception(f"Database not found at {db_path}")
@@ -79,16 +97,20 @@ def setup_database(db_path):
         CREATE TABLE IF NOT EXISTS Trades (
             TradeId INTEGER PRIMARY KEY,
             Date DATE,
+            Time TIME,
             Symbol TEXT,
             StrikePrice REAL,
             Status TEXT,
             CallPriceOpen REAL,
             PutPriceOpen REAL,
             CallPriceClose REAL,
-            PutPriceClose REAL
+            PutPriceClose REAL,
+            PremiumCaptured REAL,
+            ClosedTradeAt TIME
         )
     """
     )
+    cursor.execute("DELETE FROM Trades")
 
     cursor.execute(
         """
@@ -108,6 +130,7 @@ def setup_database(db_path):
         )
     """
     )
+    cursor.execute("DELETE FROM ContractPrices")
 
     conn.commit()
     conn.close()
@@ -149,26 +172,33 @@ def get_last_value(data, symbol):
     return None
 
 
-def adjustment_required(
-    current_call_contract_price, current_put_contract_price, existing_trade
-):
-    open_call_contract_price = existing_trade[5] if existing_trade else -1
-    open_put_contract_price = existing_trade[6] if existing_trade else -1
+def adjustment_required_or_profit_target_reached(
+    current_call_contract_price, current_put_contract_price, existing_trade: Trade
+) -> Tuple[bool, float]:
+    if not existing_trade:
+        return False, 0.0
+
+    open_call_contract_price = existing_trade.CallPriceOpen
+    open_put_contract_price = existing_trade.PutPriceOpen
     premium_received = open_call_contract_price + open_put_contract_price
-    premium_now = current_call_contract_price + open_put_contract_price
+    premium_now = current_call_contract_price + current_put_contract_price
     print(
         f"🧾 Existing trade {existing_trade} with {open_call_contract_price=}, {open_put_contract_price=}"
     )
-    print(f"Premium Received: {premium_received}, Premium Now: {premium_now}")
-    if current_call_contract_price > 0 and current_put_contract_price > 0:
-        price_diff = max(current_call_contract_price, current_put_contract_price) / min(
-            current_call_contract_price, current_put_contract_price
-        )
-        print(
-            f"Current difference between options prices({current_call_contract_price, current_put_contract_price}): "
-            f"{price_diff}"
-        )
-        return price_diff >= 5
+    print("⁉️ Checking if adjustment is required ...")
+    premium_diff = round(premium_received - premium_now, 2)
+    print(
+        f"Premium Received: {premium_received:.2f}, Premium Now: {premium_now:.2f} -> Diff: {premium_diff}"
+    )
+    if premium_diff >= 2:
+        print(f"✅  Profit target reached: {premium_diff=}")
+        return True, premium_diff
+
+    if premium_diff <= -2:
+        print(f"❌  Stop loss reached {premium_diff=}")
+        return True, premium_diff
+
+    return False, 0.0
 
 
 def process_symbol(symbol, db_path):
@@ -200,12 +230,14 @@ def process_symbol(symbol, db_path):
             "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
             (current_date, symbol),
         )
-        existing_trade = cursor.fetchone()
+        trade_row = cursor.fetchone()
+
+        existing_trade = Trade(*trade_row) if trade_row else None
 
         options_df = process_options_data(options_data)
 
         if existing_trade:
-            strike_price = existing_trade[3]
+            strike_price = existing_trade.StrikePrice
             print(f"Found existing trade. Strike price from database {strike_price}")
             call_strike_record, put_strike_record = find_options_for(
                 options_df, strike_price, todays_expiry
@@ -218,22 +250,24 @@ def process_symbol(symbol, db_path):
             strike_price = call_strike_record.get("strike")
             call_contract_price = call_strike_record.get("bid")
             put_contract_price = put_strike_record.get("bid")
-            print(f"Strike price around 50 Delta from Option Chain {strike_price}")
             cursor.execute(
                 """
-                INSERT INTO Trades (Date, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
-                VALUES (?, ?, ?, 'OPEN', ?, ?)
+                INSERT INTO Trades (Date, Time, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
+                VALUES (?, ?, ?, ?, 'OPEN', ?, ?)
                 """,
                 (
                     current_date,
+                    time,
                     symbol,
                     strike_price,
                     call_contract_price,
                     put_contract_price,
                 ),
             )
+            print(
+                f"Opened trade around {strike_price=} with {call_contract_price=} and {put_contract_price=}"
+            )
 
-        current_time = time
         call_contract_price = call_strike_record.get("bid")
         put_contract_price = put_strike_record.get("bid")
 
@@ -244,7 +278,7 @@ def process_symbol(symbol, db_path):
             """,
             (
                 current_date,
-                current_time,
+                time,
                 symbol,
                 spot_price,
                 strike_price,
@@ -252,14 +286,30 @@ def process_symbol(symbol, db_path):
                 put_contract_price,
                 json.dumps(call_strike_record),
                 json.dumps(put_strike_record),
-                existing_trade[0] if existing_trade else cursor.lastrowid,
+                existing_trade.TradeId if existing_trade else cursor.lastrowid,
             ),
         )
 
-        if adjustment_required(call_contract_price, put_contract_price, existing_trade):
-            print("We may need an adjustment. Review data first")
-            print(call_strike_record)
-            print(put_strike_record)
+        close_trade, premium_diff = adjustment_required_or_profit_target_reached(
+            call_contract_price, put_contract_price, existing_trade
+        )
+        if close_trade:
+            # Update Trades table to close the existing trade
+            cursor.execute(
+                """
+                UPDATE Trades
+                SET CallPriceClose = ?, PutPriceClose = ?, Status = 'CLOSED', PremiumCaptured = ?, ClosedTradeAt = ?
+                WHERE TradeId = ?
+                """,
+                (
+                    call_contract_price,  # Closing Call Price
+                    put_contract_price,  # Closing Put Price
+                    premium_diff,
+                    time,  # Closing Date
+                    existing_trade.TradeId,  # TradeId of the existing trade
+                ),
+            )
+            print(f"Trade {existing_trade.TradeId} closed successfully.")
 
         conn.commit()
 
