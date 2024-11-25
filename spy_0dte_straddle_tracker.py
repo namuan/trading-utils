@@ -53,7 +53,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import ContextManager, Tuple
+from typing import Any, ContextManager, Dict, Tuple
 
 import pandas as pd
 
@@ -147,13 +147,13 @@ def setup_database(db_path: str) -> str:
 
 
 def select_strikes_for(
-    options_df,
-    selected_expiry,
-    option_type,
-    additional_filters,
-    sort_criteria,
-    fetch_limit,
-):
+    options_df: pd.DataFrame,
+    selected_expiry: str,
+    option_type: str,
+    additional_filters: str,
+    sort_criteria: Dict[str, Any],
+    fetch_limit: int,
+) -> pd.DataFrame:
     option_query = f"(expiration_date == '{selected_expiry}') and (option_type == '{option_type}') and {additional_filters}"
     return (
         options_df.query(option_query).sort_values(**sort_criteria).head(n=fetch_limit)
@@ -161,7 +161,9 @@ def select_strikes_for(
 
 
 def adjustment_required_or_profit_target_reached(
-    current_call_contract_price, current_put_contract_price, existing_trade: Trade
+    current_call_contract_price: float,
+    current_put_contract_price: float,
+    existing_trade: Trade,
 ) -> Tuple[bool, float]:
     if not existing_trade:
         return False, 0.0
@@ -305,7 +307,9 @@ def process_symbol(symbol: str, db_path: str) -> None:
             conn.commit()
 
 
-def find_options_for(options_df, strike_price, todays_expiry):
+def find_options_for(
+    options_df: pd.DataFrame, strike_price: float, todays_expiry: str
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     selected_call_strikes = select_strikes_for(
         options_df,
         todays_expiry,
@@ -328,7 +332,9 @@ def find_options_for(options_df, strike_price, todays_expiry):
     )
 
 
-def find_at_the_money_options(options_df, expiry):
+def find_at_the_money_options(
+    options_df: pd.DataFrame, expiry: str
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     selected_call_strikes = select_strikes_for(
         options_df,
         expiry,
@@ -351,14 +357,14 @@ def find_at_the_money_options(options_df, expiry):
     )
 
 
-def run_script(symbol, database_path):
+def run_script(symbol: str, database_path: str) -> None:
     current_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     db_path = setup_database(database_path)
     process_symbol(symbol, db_path)
     print(f"Script ran successfully at {current_time}")
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=RawTextWithDefaultsFormatter
     )
