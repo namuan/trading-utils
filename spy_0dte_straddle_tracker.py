@@ -49,6 +49,7 @@ Usage:
 import argparse
 import contextlib
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
@@ -58,6 +59,7 @@ from typing import Any, ContextManager, Dict, Tuple
 import pandas as pd
 
 from common import RawTextWithDefaultsFormatter
+from common.logger import setup_logging
 from common.options import (
     process_options_data,
 )
@@ -98,7 +100,7 @@ def setup_database(db_path: str) -> str:
     if not Path.cwd().joinpath(db_path).exists():
         raise Exception(f"Database not found at {db_path}")
 
-    print(f"Setting up database {db_path}")
+    logging.info(f"Setting up database {db_path}")
 
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
@@ -172,20 +174,20 @@ def adjustment_required_or_profit_target_reached(
     open_put_contract_price = existing_trade.PutPriceOpen
     premium_received = open_call_contract_price + open_put_contract_price
     premium_now = current_call_contract_price + current_put_contract_price
-    print(
+    logging.info(
         f"🧾 Existing trade {existing_trade} with {open_call_contract_price=}, {open_put_contract_price=}"
     )
-    print("⁉️ Checking if adjustment is required ...")
+    logging.info("⁉️ Checking if adjustment is required ...")
     premium_diff = round(premium_received - premium_now, 2)
-    print(
+    logging.info(
         f"Premium Received: {premium_received:.2f}, Premium Now: {premium_now:.2f} -> Diff: {premium_diff}"
     )
     if premium_diff >= 2:
-        print(f"✅  Profit target reached: {premium_diff=}")
+        logging.info(f"✅  Profit target reached: {premium_diff=}")
         return True, premium_diff
 
     if premium_diff <= -2:
-        print(f"❌  Stop loss reached {premium_diff=}")
+        logging.info(f"❌  Stop loss reached {premium_diff=}")
         return True, premium_diff
 
     return False, 0.0
@@ -208,7 +210,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
         raw_data_rows = cursor.fetchall()
 
         if not raw_data_rows:
-            print(f"No data found in RawOptionsChain for {symbol}")
+            logging.info(f"No data found in RawOptionsChain for {symbol}")
             return
 
         for row in raw_data_rows:
@@ -228,14 +230,14 @@ def process_symbol(symbol: str, db_path: str) -> None:
 
             if existing_trade:
                 strike_price = existing_trade.StrikePrice
-                print(
+                logging.info(
                     f"Found existing trade. Strike price from database {strike_price}"
                 )
                 call_strike_record, put_strike_record = find_options_for(
                     options_df, strike_price, todays_expiry
                 )
             else:
-                print(
+                logging.info(
                     "No trades found in the database. Trying to locate ATM strike ..."
                 )
                 call_strike_record, put_strike_record = find_at_the_money_options(
@@ -258,7 +260,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                         put_contract_price,
                     ),
                 )
-                print(
+                logging.info(
                     f"Opened trade around {strike_price=} with {call_contract_price=} and {put_contract_price=}"
                 )
 
@@ -302,7 +304,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                         existing_trade.TradeId,
                     ),
                 )
-                print(f"Trade {existing_trade.TradeId} closed successfully.")
+                logging.info(f"Trade {existing_trade.TradeId} closed successfully.")
 
             conn.commit()
 
@@ -361,7 +363,7 @@ def run_script(symbol: str, database_path: str) -> None:
     current_time = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
     db_path = setup_database(database_path)
     process_symbol(symbol, db_path)
-    print(f"Script ran successfully at {current_time}")
+    logging.info(f"Script ran successfully at {current_time}")
 
 
 def main() -> None:
@@ -375,8 +377,15 @@ def main() -> None:
         help="Path to the database file containing RawOptionsChain table",
         required=True,
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase verbosity (can be used multiple times, e.g., -v, -vv)",
+    )
     args = parser.parse_args()
-
+    setup_logging(args.verbose)
     run_script(symbol=args.symbol, database_path=args.database)
 
 
