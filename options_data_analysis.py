@@ -15,7 +15,6 @@ Usage:
 ./options_data_analysis.py --db-file path/to/your.db
 """
 
-import json
 import logging
 import sqlite3
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
@@ -68,19 +67,6 @@ def parse_args():
     return args
 
 
-def extract_json_data(json_data):
-    try:
-        data = json.loads(json_data)
-        return {
-            "last": data.get("last", None),
-            "greeks_delta": data.get("greeks_delta", None),
-            "option_type": data.get("option_type", None),
-        }
-    except (json.JSONDecodeError, TypeError):
-        logging.warning("Failed to parse JSON data")
-        return {"last": None, "greeks_delta": None, "option_type": None}
-
-
 def main(args):
     logging.info(f"Using SQLite database at: {args.db_path}")
 
@@ -88,43 +74,22 @@ def main(args):
     try:
         query = """
         SELECT
-            CallContractData,
-            PutContractData,
-            Id, Date, Time, Symbol, SpotPrice, StrikePrice, CallPrice, PutPrice, TradeId
+            Date, Time, SpotPrice, StrikePrice,
+            json_extract(CallContractData, '$.last') as call_last,
+            json_extract(CallContractData, '$.greeks_delta') as call_greeks_delta,
+            json_extract(CallContractData, '$.option_type') as call_option_type,
+            json_extract(PutContractData, '$.last') as put_last,
+            json_extract(PutContractData, '$.greeks_delta') as put_greeks_delta,
+            json_extract(PutContractData, '$.option_type') as put_option_type
         FROM ContractPrices
         """
         df = pd.read_sql_query(query, conn)
-
-        # Extract data from JSON columns
-        df["call_last"] = (
-            df["CallContractData"].apply(extract_json_data).apply(lambda x: x["last"])
+        df["call_last"] = pd.to_numeric(df["call_last"], errors="coerce")
+        df["call_greeks_delta"] = pd.to_numeric(
+            df["call_greeks_delta"], errors="coerce"
         )
-        df["call_greeks_delta"] = (
-            df["CallContractData"]
-            .apply(extract_json_data)
-            .apply(lambda x: x["greeks_delta"])
-        )
-        df["call_option_type"] = (
-            df["CallContractData"]
-            .apply(extract_json_data)
-            .apply(lambda x: x["option_type"])
-        )
-        df["put_last"] = (
-            df["PutContractData"].apply(extract_json_data).apply(lambda x: x["last"])
-        )
-        df["put_greeks_delta"] = (
-            df["PutContractData"]
-            .apply(extract_json_data)
-            .apply(lambda x: x["greeks_delta"])
-        )
-        df["put_option_type"] = (
-            df["PutContractData"]
-            .apply(extract_json_data)
-            .apply(lambda x: x["option_type"])
-        )
-
-        # Drop original JSON columns for cleaner output
-        df = df.drop(columns=["CallContractData", "PutContractData"])
+        df["put_last"] = pd.to_numeric(df["put_last"], errors="coerce")
+        df["put_greeks_delta"] = pd.to_numeric(df["put_greeks_delta"], errors="coerce")
 
         logging.info("DataFrame created:")
         print(df)
