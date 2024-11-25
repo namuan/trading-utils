@@ -193,40 +193,144 @@ def adjustment_required_or_profit_target_reached(
     return False, 0.0
 
 
+def load_raw_options_data(cursor: sqlite3.Cursor, symbol: str) -> list:
+    """Load raw options data from the database."""
+    cursor.execute(
+        """
+        SELECT Date, Time, Symbol, SpotPrice, RawData
+        FROM RawOptionsChain
+        ORDER BY Time
+        """
+    )
+    raw_data_rows = cursor.fetchall()
+
+    if not raw_data_rows:
+        logging.info(f"No data found in RawOptionsChain for {symbol}")
+
+    return raw_data_rows
+
+
+def get_existing_trade(cursor: sqlite3.Cursor, current_date: str, symbol: str) -> Trade:
+    """Retrieve existing open trade from the database."""
+    cursor.execute(
+        "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
+        (current_date, symbol),
+    )
+    trade_row = cursor.fetchone()
+    return Trade(*trade_row) if trade_row else None
+
+
+def open_new_trade(
+    cursor: sqlite3.Cursor,
+    current_date: str,
+    time: str,
+    symbol: str,
+    strike_price: float,
+    call_contract_price: float,
+    put_contract_price: float,
+) -> int:
+    """Open a new trade and return its ID."""
+    cursor.execute(
+        """
+        INSERT INTO Trades (Date, Time, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
+        VALUES (?, ?, ?, ?, 'OPEN', ?, ?)
+        """,
+        (
+            current_date,
+            time,
+            symbol,
+            strike_price,
+            call_contract_price,
+            put_contract_price,
+        ),
+    )
+    logging.info(
+        f"Opened trade around {strike_price=} with {call_contract_price=} and {put_contract_price=}"
+    )
+    return cursor.lastrowid
+
+
+def record_contract_prices(
+    cursor: sqlite3.Cursor,
+    current_date: str,
+    time: str,
+    symbol: str,
+    spot_price: float,
+    strike_price: float,
+    call_contract_price: float,
+    put_contract_price: float,
+    call_strike_record: dict,
+    put_strike_record: dict,
+    trade_id: int,
+) -> None:
+    """Record contract prices in the database."""
+    cursor.execute(
+        """
+        INSERT INTO ContractPrices (
+            Date, Time, Symbol, SpotPrice, StrikePrice,
+            CallPrice, PutPrice, CallContractData, PutContractData, TradeId
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            current_date,
+            time,
+            symbol,
+            spot_price,
+            strike_price,
+            call_contract_price,
+            put_contract_price,
+            json.dumps(call_strike_record),
+            json.dumps(put_strike_record),
+            trade_id,
+        ),
+    )
+
+
+def close_trade(
+    cursor: sqlite3.Cursor,
+    trade_id: int,
+    call_contract_price: float,
+    put_contract_price: float,
+    premium_diff: float,
+    time: str,
+) -> None:
+    """Close an existing trade."""
+    cursor.execute(
+        """
+        UPDATE Trades
+        SET CallPriceClose = ?, PutPriceClose = ?, Status = 'CLOSED',
+            PremiumCaptured = ?, ClosedTradeAt = ?
+        WHERE TradeId = ?
+        """,
+        (
+            call_contract_price,
+            put_contract_price,
+            premium_diff,
+            time,
+            trade_id,
+        ),
+    )
+    logging.info(f"Trade {trade_id} closed successfully.")
+
+
 def process_symbol(symbol: str, db_path: str) -> None:
+    """Process options data for a given symbol."""
     current_date = datetime.now().date().isoformat()
 
     with get_db_connection(db_path) as conn:
         cursor = conn.cursor()
-
-        # Load data from RawOptionsChain table
-        cursor.execute(
-            """
-            SELECT Date, Time, Symbol, SpotPrice, RawData
-            FROM RawOptionsChain
-            ORDER BY Time
-            """
-        )
-        raw_data_rows = cursor.fetchall()
+        raw_data_rows = load_raw_options_data(cursor, symbol)
 
         if not raw_data_rows:
-            logging.info(f"No data found in RawOptionsChain for {symbol}")
             return
 
-        for row in raw_data_rows:
-            date, time, symbol, spot_price, raw_data = row
+        for date, time, symbol, spot_price, raw_data in raw_data_rows:
             options_data = json.loads(raw_data)
             todays_expiry = options_data["options"]["option"][0]["expiration_date"]
-
-            cursor.execute(
-                "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
-                (current_date, symbol),
-            )
-            trade_row = cursor.fetchone()
-
-            existing_trade = Trade(*trade_row) if trade_row else None
-
             options_df = process_options_data(options_data)
+
+            existing_trade = get_existing_trade(cursor, current_date, symbol)
 
             if existing_trade:
                 strike_price = existing_trade.StrikePrice
@@ -236,6 +340,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                 call_strike_record, put_strike_record = find_options_for(
                     options_df, strike_price, todays_expiry
                 )
+                trade_id = existing_trade.TradeId
             else:
                 logging.info(
                     "No trades found in the database. Trying to locate ATM strike ..."
@@ -246,65 +351,48 @@ def process_symbol(symbol: str, db_path: str) -> None:
                 strike_price = call_strike_record.get("strike")
                 call_contract_price = call_strike_record.get("bid")
                 put_contract_price = put_strike_record.get("bid")
-                cursor.execute(
-                    """
-                    INSERT INTO Trades (Date, Time, Symbol, StrikePrice, Status, CallPriceOpen, PutPriceOpen)
-                    VALUES (?, ?, ?, ?, 'OPEN', ?, ?)
-                    """,
-                    (
-                        current_date,
-                        time,
-                        symbol,
-                        strike_price,
-                        call_contract_price,
-                        put_contract_price,
-                    ),
-                )
-                logging.info(
-                    f"Opened trade around {strike_price=} with {call_contract_price=} and {put_contract_price=}"
+                trade_id = open_new_trade(
+                    cursor,
+                    current_date,
+                    time,
+                    symbol,
+                    strike_price,
+                    call_contract_price,
+                    put_contract_price,
                 )
 
             call_contract_price = call_strike_record.get("bid")
             put_contract_price = put_strike_record.get("bid")
 
-            cursor.execute(
-                """
-                INSERT INTO ContractPrices (Date, Time, Symbol, SpotPrice, StrikePrice, CallPrice, PutPrice, CallContractData, PutContractData, TradeId)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    current_date,
-                    time,
-                    symbol,
-                    spot_price,
-                    strike_price,
-                    call_contract_price,
-                    put_contract_price,
-                    json.dumps(call_strike_record),
-                    json.dumps(put_strike_record),
-                    existing_trade.TradeId if existing_trade else cursor.lastrowid,
-                ),
+            record_contract_prices(
+                cursor,
+                current_date,
+                time,
+                symbol,
+                spot_price,
+                strike_price,
+                call_contract_price,
+                put_contract_price,
+                call_strike_record,
+                put_strike_record,
+                trade_id,
             )
 
-            close_trade, premium_diff = adjustment_required_or_profit_target_reached(
-                call_contract_price, put_contract_price, existing_trade
-            )
-            if close_trade:
-                cursor.execute(
-                    """
-                    UPDATE Trades
-                    SET CallPriceClose = ?, PutPriceClose = ?, Status = 'CLOSED', PremiumCaptured = ?, ClosedTradeAt = ?
-                    WHERE TradeId = ?
-                    """,
-                    (
+            if existing_trade:
+                close_trade_needed, premium_diff = (
+                    adjustment_required_or_profit_target_reached(
+                        call_contract_price, put_contract_price, existing_trade
+                    )
+                )
+                if close_trade_needed:
+                    close_trade(
+                        cursor,
+                        existing_trade.TradeId,
                         call_contract_price,
                         put_contract_price,
                         premium_diff,
                         time,
-                        existing_trade.TradeId,
-                    ),
-                )
-                logging.info(f"Trade {existing_trade.TradeId} closed successfully.")
+                    )
 
             conn.commit()
 
