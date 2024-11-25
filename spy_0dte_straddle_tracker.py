@@ -64,10 +64,8 @@ from common.options import (
     process_options_data,
 )
 
-pd.set_option("display.max_rows", None)
-pd.set_option("display.max_columns", None)
-pd.set_option("display.width", None)
-pd.set_option("display.float_format", "{:.2f}".format)
+STOP_LOSS_PREMIUM = -2
+PROFIT_TARGET_PREMIUM = 2
 
 
 @dataclass
@@ -182,11 +180,11 @@ def adjustment_required_or_profit_target_reached(
     logging.info(
         f"Premium Received: {premium_received:.2f}, Premium Now: {premium_now:.2f} -> Diff: {premium_diff}"
     )
-    if premium_diff >= 2:
+    if premium_diff >= PROFIT_TARGET_PREMIUM:
         logging.info(f"✅  Profit target reached: {premium_diff=}")
         return True, premium_diff
 
-    if premium_diff <= -2:
+    if premium_diff <= STOP_LOSS_PREMIUM:
         logging.info(f"❌  Stop loss reached {premium_diff=}")
         return True, premium_diff
 
