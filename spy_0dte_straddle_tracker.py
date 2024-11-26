@@ -172,9 +172,6 @@ def adjustment_required_or_profit_target_reached(
     open_put_contract_price = existing_trade.PutPriceOpen
     premium_received = open_call_contract_price + open_put_contract_price
     premium_now = current_call_contract_price + current_put_contract_price
-    logging.info(
-        f"🧾 Existing trade {existing_trade} with {open_call_contract_price=}, {open_put_contract_price=}"
-    )
     logging.info("⁉️ Checking if adjustment is required ...")
     premium_diff = round(premium_received - premium_now, 2)
     logging.info(
@@ -309,7 +306,6 @@ def close_trade(
             trade_id,
         ),
     )
-    logging.info(f"Trade {trade_id} closed successfully.")
 
 
 def process_symbol(symbol: str, db_path: str) -> None:
@@ -332,9 +328,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
 
             if existing_trade:
                 strike_price = existing_trade.StrikePrice
-                logging.info(
-                    f"Found existing trade. Strike price from database {strike_price}"
-                )
+                logging.info(f"🔍  Found existing {existing_trade}")
                 call_strike_record, put_strike_record = find_options_for(
                     options_df, strike_price, todays_expiry
                 )
@@ -391,6 +385,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                         premium_diff,
                         time,
                     )
+                    logging.info(f"🧾 Closed Trade {existing_trade}")
 
             conn.commit()
 
