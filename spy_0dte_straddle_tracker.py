@@ -52,7 +52,7 @@ import json
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from pathlib import Path
 from typing import Any, ContextManager, Dict, Tuple
 
@@ -64,8 +64,8 @@ from common.options import (
     process_options_data,
 )
 
-STOP_LOSS_PREMIUM = -2
-PROFIT_TARGET_PREMIUM = 2
+STOP_LOSS_PREMIUM = -0.5
+PROFIT_TARGET_PREMIUM = 0.5
 
 
 @dataclass
@@ -319,7 +319,14 @@ def process_symbol(symbol: str, db_path: str) -> None:
         if not raw_data_rows:
             return
 
-        for date, time, symbol, spot_price, raw_data in raw_data_rows:
+        for _, time_str, symbol, spot_price, raw_data in raw_data_rows:
+            time_obj = datetime.strptime(time_str.split(".")[0], "%H:%M:%S").time()
+            if time_obj < time(15, 0) or time_obj > time(20, 0):
+                logging.debug(
+                    f"Skipping processing for time {time_str} - outside window"
+                )
+                continue
+
             options_data = json.loads(raw_data)
             todays_expiry = options_data["options"]["option"][0]["expiration_date"]
             options_df = process_options_data(options_data)
@@ -346,7 +353,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                 trade_id = open_new_trade(
                     cursor,
                     current_date,
-                    time,
+                    time_str,
                     symbol,
                     strike_price,
                     call_contract_price,
@@ -359,7 +366,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
             record_contract_prices(
                 cursor,
                 current_date,
-                time,
+                time_str,
                 symbol,
                 spot_price,
                 strike_price,
@@ -383,7 +390,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                         call_contract_price,
                         put_contract_price,
                         premium_diff,
-                        time,
+                        time_str,
                     )
                     logging.info(f"🧾 Closed Trade {existing_trade}")
 
