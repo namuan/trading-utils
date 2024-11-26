@@ -66,6 +66,7 @@ from common.options import (
 
 STOP_LOSS_PREMIUM = -0.5
 PROFIT_TARGET_PREMIUM = 0.5
+MAX_DAILY_LOSSES = 3
 
 
 @dataclass
@@ -348,10 +349,27 @@ def close_remaining_trades(
     logging.info(f"🛑 Closed remaining trade {trade} with {premium_diff=}")
 
 
-def allowed_to_open_trades(time_str):
+def allowed_to_open_trades(time_str: str, cursor: sqlite3.Cursor) -> bool:
+    # Check trading hours
     time_obj = datetime.strptime(time_str.split(".")[0], "%H:%M:%S").time()
     if time_obj < time(15, 0) or time_obj > time(20, 0):
         logging.info(f"Outside trade window. Can't open any new trades at {time_str}")
+        return False
+
+    # Check for losing trades
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM Trades
+        WHERE Status = 'CLOSED'
+        AND PremiumCaptured < 0
+    """)
+
+    losing_trades_count = cursor.fetchone()[0]
+
+    if losing_trades_count >= MAX_DAILY_LOSSES:
+        logging.info(
+            f"🛃 Already had {losing_trades_count} losing trades today. No more trades allowed."
+        )
         return False
 
     return True
@@ -390,7 +408,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                 logging.info(
                     "No trades found in the database. Trying to open a new trade using ATM strike ..."
                 )
-                if not allowed_to_open_trades(time_str):
+                if not allowed_to_open_trades(time_str, cursor):
                     continue
 
                 call_strike_record, put_strike_record = find_at_the_money_options(
