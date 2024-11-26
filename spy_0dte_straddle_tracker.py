@@ -205,14 +205,22 @@ def load_raw_options_data(cursor: sqlite3.Cursor, symbol: str) -> list:
     return raw_data_rows
 
 
-def get_existing_trade(cursor: sqlite3.Cursor, current_date: str, symbol: str) -> Trade:
+def get_existing_trade(
+    cursor: sqlite3.Cursor, current_date: str, symbol: str
+) -> Trade | None:
     """Retrieve existing open trade from the database."""
     cursor.execute(
         "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
         (current_date, symbol),
     )
-    trade_row = cursor.fetchone()
-    return Trade(*trade_row) if trade_row else None
+    trade_rows = cursor.fetchall()
+
+    if len(trade_rows) > 1:
+        raise Exception(
+            f"Error: Multiple open trades found for {symbol} on {current_date}"
+        )
+
+    return Trade(*trade_rows[0]) if trade_rows else None
 
 
 def open_new_trade(
@@ -308,6 +316,38 @@ def close_trade(
     )
 
 
+def close_remaining_trades(
+    cursor: sqlite3.Cursor,
+    current_date: str,
+    symbol: str,
+    last_call_price: float,
+    last_put_price: float,
+    last_time: str,
+) -> None:
+    """Close any remaining open trades with the latest call and put prices."""
+    cursor.execute(
+        "SELECT * FROM Trades WHERE Date = ? AND Symbol = ? AND Status = 'OPEN'",
+        (current_date, symbol),
+    )
+    open_trade = cursor.fetchone()
+    if not open_trade:
+        return
+
+    trade = Trade(*open_trade)
+    premium_diff = (trade.CallPriceOpen + trade.PutPriceOpen) - (
+        last_call_price + last_put_price
+    )
+    close_trade(
+        cursor,
+        trade.TradeId,
+        last_call_price,
+        last_put_price,
+        premium_diff,
+        last_time,
+    )
+    logging.info(f"🛑 Closed remaining trade {trade} with {premium_diff=}")
+
+
 def process_symbol(symbol: str, db_path: str) -> None:
     """Process options data for a given symbol."""
     current_date = datetime.now().date().isoformat()
@@ -319,14 +359,11 @@ def process_symbol(symbol: str, db_path: str) -> None:
         if not raw_data_rows:
             return
 
-        for _, time_str, symbol, spot_price, raw_data in raw_data_rows:
-            time_obj = datetime.strptime(time_str.split(".")[0], "%H:%M:%S").time()
-            if time_obj < time(15, 0) or time_obj > time(20, 0):
-                logging.debug(
-                    f"Skipping processing for time {time_str} - outside window"
-                )
-                continue
+        last_call_price = None
+        last_put_price = None
+        last_time = None
 
+        for _, time_str, symbol, spot_price, raw_data in raw_data_rows:
             options_data = json.loads(raw_data)
             todays_expiry = options_data["options"]["option"][0]["expiration_date"]
             options_df = process_options_data(options_data)
@@ -342,8 +379,15 @@ def process_symbol(symbol: str, db_path: str) -> None:
                 trade_id = existing_trade.TradeId
             else:
                 logging.info(
-                    "No trades found in the database. Trying to locate ATM strike ..."
+                    "No trades found in the database. Trying to open a new trade using ATM strike ..."
                 )
+                time_obj = datetime.strptime(time_str.split(".")[0], "%H:%M:%S").time()
+                if time_obj < time(15, 0) or time_obj > time(20, 0):
+                    logging.info(
+                        f"Outside trade window. Can't open any new trades at {time_str}"
+                    )
+                    continue
+
                 call_strike_record, put_strike_record = find_at_the_money_options(
                     options_df, todays_expiry
                 )
@@ -362,6 +406,11 @@ def process_symbol(symbol: str, db_path: str) -> None:
 
             call_contract_price = call_strike_record.get("bid")
             put_contract_price = put_strike_record.get("bid")
+
+            # Save the last known call/put prices and time
+            last_call_price = call_contract_price
+            last_put_price = put_contract_price
+            last_time = time_str
 
             record_contract_prices(
                 cursor,
@@ -392,9 +441,24 @@ def process_symbol(symbol: str, db_path: str) -> None:
                         premium_diff,
                         time_str,
                     )
-                    logging.info(f"🧾 Closed Trade {existing_trade}")
+                    logging.info(
+                        f"🧾 Closed Trade {existing_trade} with {premium_diff=}"
+                    )
 
             conn.commit()
+
+        # Close any remaining open trades using the last known prices
+        if last_call_price is not None and last_put_price is not None and last_time:
+            close_remaining_trades(
+                cursor,
+                current_date,
+                symbol,
+                last_call_price,
+                last_put_price,
+                last_time,
+            )
+
+        conn.commit()
 
 
 def find_options_for(
