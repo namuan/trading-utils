@@ -348,6 +348,15 @@ def close_remaining_trades(
     logging.info(f"🛑 Closed remaining trade {trade} with {premium_diff=}")
 
 
+def allowed_to_open_trades(time_str):
+    time_obj = datetime.strptime(time_str.split(".")[0], "%H:%M:%S").time()
+    if time_obj < time(15, 0) or time_obj > time(20, 0):
+        logging.info(f"Outside trade window. Can't open any new trades at {time_str}")
+        return False
+
+    return True
+
+
 def process_symbol(symbol: str, db_path: str) -> None:
     """Process options data for a given symbol."""
     current_date = datetime.now().date().isoformat()
@@ -381,11 +390,7 @@ def process_symbol(symbol: str, db_path: str) -> None:
                 logging.info(
                     "No trades found in the database. Trying to open a new trade using ATM strike ..."
                 )
-                time_obj = datetime.strptime(time_str.split(".")[0], "%H:%M:%S").time()
-                if time_obj < time(15, 0) or time_obj > time(20, 0):
-                    logging.info(
-                        f"Outside trade window. Can't open any new trades at {time_str}"
-                    )
+                if not allowed_to_open_trades(time_str):
                     continue
 
                 call_strike_record, put_strike_record = find_at_the_money_options(
