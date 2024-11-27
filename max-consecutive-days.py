@@ -1,14 +1,26 @@
-#!/usr/bin/env python3
+#!uv run
+# /// script
+# dependencies = [
+#   "pandas",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
+#!uv run
 """
 Stock Data Analysis Script
 
-This script allows the user to download and analyze stock data.
+This script analyzes stock data to find:
+1. Longest streak of consecutive higher closing prices
+2. Longest streak of consecutive lower closing prices
+3. Longest streak of consecutive green candles (close > open)
+4. Longest streak of consecutive red candles (close < open)
+
+For each streak, it shows the date, opening price, and closing price for each day
+in the streak.
 
 Example:
     uvr max-consecutive-days.py --symbol TQQQ --from_date 2012-01-01 --to_date 2023-01-01
-
-To install required packages:
-    pip install pandas yfinance
 """
 
 import argparse
@@ -17,7 +29,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 OUTPUT_FOLDER = Path.cwd() / "output"
 OUTPUT_FOLDER.mkdir(exist_ok=True, parents=True)
