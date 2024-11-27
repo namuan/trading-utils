@@ -10,7 +10,7 @@ from tqdm import tqdm
 from common.analyst import fetch_data_on_demand
 from common.logger import init_logging
 from common.options import combined_options_df
-from common.trading_hours import inside_trading_hours
+from common.trading_hours import in_market_hours
 
 options_dir = "options"
 output_dir = "output"
@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     logging.info("Tracking Options prices for {}".format(tickers))
     while True:
-        if inside_trading_hours():
+        if in_market_hours():
             process_all_tickers(tickers)
             time.sleep(scheduled_timer * 60 * 60)
         else:
