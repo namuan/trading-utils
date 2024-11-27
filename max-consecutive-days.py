@@ -84,19 +84,37 @@ def main():
     args = parse_arguments()
     df = download_ticker_data(args.symbol, start=args.from_date, end=args.to_date)
 
-    # Up days
-    max_increase_days, period_df = find_max_consecutive(
+    print("\n=== Consecutive Close Price Patterns ===")
+    # Higher closes
+    max_up_days, period_df = find_max_consecutive(
         df, (df["Adj Close"] > df["Adj Close"].shift()).astype(int)
     )
-    print(f"\n✅ Maximum consecutive up days: {max_increase_days}")
+    print(f"\n📈 Maximum consecutive higher closes: {max_up_days}")
     for idx, row in period_df.iterrows():
         print(f"   {idx.date()}: Open ${row['Open']:.2f}, Close ${row['Close']:.2f}")
 
-    # Down days
-    max_decrease_days, period_df = find_max_consecutive(
+    # Lower closes
+    max_down_days, period_df = find_max_consecutive(
         df, (df["Adj Close"] < df["Adj Close"].shift()).astype(int)
     )
-    print(f"\n❌ Maximum consecutive down days: {max_decrease_days}")
+    print(f"\n📉 Maximum consecutive lower closes: {max_down_days}")
+    for idx, row in period_df.iterrows():
+        print(f"   {idx.date()}: Open ${row['Open']:.2f}, Close ${row['Close']:.2f}")
+
+    print("\n=== Consecutive Candle Patterns ===")
+    # Green candles (Close > Open)
+    max_green_days, period_df = find_max_consecutive(
+        df, (df["Close"] > df["Open"]).astype(int)
+    )
+    print(f"\n🟢 Maximum consecutive green candles: {max_green_days}")
+    for idx, row in period_df.iterrows():
+        print(f"   {idx.date()}: Open ${row['Open']:.2f}, Close ${row['Close']:.2f}")
+
+    # Red candles (Close < Open)
+    max_red_days, period_df = find_max_consecutive(
+        df, (df["Close"] < df["Open"]).astype(int)
+    )
+    print(f"\n🔴 Maximum consecutive red candles: {max_red_days}")
     for idx, row in period_df.iterrows():
         print(f"   {idx.date()}: Open ${row['Open']:.2f}, Close ${row['Close']:.2f}")
 
