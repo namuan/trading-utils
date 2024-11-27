@@ -5,7 +5,7 @@ Stock Data Analysis Script
 This script allows the user to download and analyze stock data.
 
 Example:
-    python3 max-consecutive-days.py --symbol TQQQ --from_date 2012-01-01 --to_date 2023-01-01
+    uvr max-consecutive-days.py --symbol TQQQ --from_date 2012-01-01 --to_date 2023-01-01
 
 To install required packages:
     pip install pandas yfinance
