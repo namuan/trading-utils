@@ -77,26 +77,28 @@ def find_max_consecutive(df, consecutive):
     start_date_index = max(0, start_date_index)
     end_date_index = min(len(df) - 1, end_date_index)
 
-    start_date = df.index[start_date_index]
-    end_date = df.index[end_date_index]
-    return max_increase_days, start_date, end_date
+    return max_increase_days, df.iloc[start_date_index : end_date_index + 1]
 
 
 def main():
     args = parse_arguments()
     df = download_ticker_data(args.symbol, start=args.from_date, end=args.to_date)
-    max_increase_days, start_date, end_date = find_max_consecutive(
+
+    # Up days
+    max_increase_days, period_df = find_max_consecutive(
         df, (df["Adj Close"] > df["Adj Close"].shift()).astype(int)
     )
-    print(
-        f"✅ {start_date} to {end_date} closing price increase: {max_increase_days} days"
-    )
-    max_decrease_days, start_date, end_date = find_max_consecutive(
+    print(f"\n✅ Maximum consecutive up days: {max_increase_days}")
+    for idx, row in period_df.iterrows():
+        print(f"   {idx.date()}: Open ${row['Open']:.2f}, Close ${row['Close']:.2f}")
+
+    # Down days
+    max_decrease_days, period_df = find_max_consecutive(
         df, (df["Adj Close"] < df["Adj Close"].shift()).astype(int)
     )
-    print(
-        f"❌ {start_date} to {end_date} closing price decrease: {max_decrease_days} days"
-    )
+    print(f"\n❌ Maximum consecutive down days: {max_decrease_days}")
+    for idx, row in period_df.iterrows():
+        print(f"   {idx.date()}: Open ${row['Open']:.2f}, Close ${row['Close']:.2f}")
 
 
 if __name__ == "__main__":
