@@ -78,8 +78,7 @@ FONT_FAMILY = "spot mono"
 def animate_spy_milestones(symbol="SPY", output_file=None):
     logging.info(f"Animating price milestones for {symbol}")
 
-    # Get data from 1993 (SPY inception) to present
-    start_date = "1993-01-29"
+    start_date = "2010-01-01"
     end_date = datetime.now().strftime("%Y-%m-%d")
 
     logging.info(f"Downloading data from {start_date} to {end_date}")
@@ -90,7 +89,19 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
     logging.debug(f"Resampled to {len(weekly_data)} weekly data points")
 
     # Milestones to track
-    milestones = [100, 200, 300, 400, 500, 600]
+    milestones = [
+        1000,
+        10000,
+        20000,
+        30000,
+        40000,
+        50000,
+        60000,
+        70000,
+        80000,
+        90000,
+        100000,
+    ]
     milestone_dates = {}
     milestone_points = {}
 
@@ -183,7 +194,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
             time_text = (
                 f"${milestone}\n{date.strftime('%Y-%m-%d')}"
-                if milestone == 100
+                if milestone == milestones[0]
                 else f"${milestone}\n{date.strftime('%Y-%m-%d')}\nTime: {format_timedelta(time_to_milestone[milestone])}"
             )
 
@@ -231,7 +242,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
 
         # Add title in top left
         title_ann = ax.annotate(
-            "$SPY - Journey towards 600",
+            "$BTC - Journey towards 100000",
             xy=(0.10, 0.8),  # Position in axes coordinates
             xycoords="axes fraction",
             color="#FFFFFF",
@@ -294,7 +305,7 @@ def animate_spy_milestones(symbol="SPY", output_file=None):
     logging.info(f"Creating animation with {frames} frames")
 
     anim = FuncAnimation(
-        fig, animate, frames=frames, interval=5, blit=True, repeat=False
+        fig, animate, frames=frames, interval=10, blit=True, repeat=False
     )
 
     if output_file:
