@@ -163,9 +163,8 @@ def plot_analysis(merged_data, spy_data, dates_crossed_below, dates_crossed_abov
 
 
 def main(args):
-    # Format end_date as 2021-01-01 AI!
-    end_date = datetime.today()
-    start_date = end_date - timedelta(days=args.days)
+    end_date = datetime.today().strftime("%Y-%m-%d")
+    start_date = (datetime.today() - timedelta(days=args.days)).strftime("%Y-%m-%d")
 
     logging.info(f"Analyzing VIX basis from {start_date} to {end_date}")
 
