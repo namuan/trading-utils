@@ -1,17 +1,17 @@
-#!/usr/bin/env python3
+#!/usr/bin/env uv run
 """
 Compare multiple stocks using Relative Strength (RS) over a specific date range.
 
 Usage:
-./compare_stocks.py -h                        # Show help message and exit
-./compare_stocks.py -v                         # Run with INFO level logging
-./compare_stocks.py -vv                        # Run with DEBUG level logging
-./compare_stocks.py "XHB,XLC,XLY"              # Compare RS for the specified stocks with default settings
-./compare_stocks.py "XHB,XLC,XLY" --rs-period 90  # Compare RS using a 90-day period
-./compare_stocks.py "XHB,XLC,XLY" --end-date 2024-09-01  # Compare RS up to a specific end date
-./compare_stocks.py "XHB,XLC,XLY" --rs-period 90 --end-date 2024-09-01  # Combine custom RS period and end date
-./compare_stocks.py "XHB,XLC,XLY" --show-plot  # Compare RS and display the heatmap
-./compare_stocks.py "XHB,XLC,XLY" --rs-period 90 --end-date 2024-09-01 --show-plot  # Full example with all options
+./compare_stocks_relative_strength.py -h                        # Show help message and exit
+./compare_stocks_relative_strength.py -v                         # Run with INFO level logging
+./compare_stocks_relative_strength.py -vv                        # Run with DEBUG level logging
+./compare_stocks_relative_strength.py "XHB,XLC,XLY"              # Compare RS for the specified stocks with default settings
+./compare_stocks_relative_strength.py "XHB,XLC,XLY" --rs-period 90  # Compare RS using a 90-day period
+./compare_stocks_relative_strength.py "XHB,XLC,XLY" --end-date 2024-09-01  # Compare RS up to a specific end date
+./compare_stocks_relative_strength.py "XHB,XLC,XLY" --rs-period 90 --end-date 2024-09-01  # Combine custom RS period and end date
+./compare_stocks_relative_strength.py "XHB,XLC,XLY" --show-plot  # Compare RS and display the heatmap
+./compare_stocks_relative_strength.py "XHB,XLC,XLY" --rs-period 90 --end-date 2024-09-01 --show-plot  # Full example with all options
 """
 
 import logging
