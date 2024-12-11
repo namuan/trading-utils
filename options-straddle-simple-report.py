@@ -153,7 +153,7 @@ def add_price_traces(fig, market_df, history_df, trade_df, window_start, window_
         go.Scatter(
             x=market_df["Date"],
             y=market_df["UnderlyingPrice"],
-            name="Market Context",
+            name="Market",
             line=dict(color="#2E4053", width=1.5),
             opacity=0.7,
         ),
@@ -166,7 +166,7 @@ def add_price_traces(fig, market_df, history_df, trade_df, window_start, window_
         go.Scatter(
             x=history_df["Date"],
             y=history_df["UnderlyingPrice"],
-            name="Trade Underlying Price",
+            name="Underlying",
             line=dict(color="blue", width=2),
         ),
         row=1,
