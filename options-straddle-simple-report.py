@@ -2,7 +2,7 @@
 # /// script
 # dependencies = [
 #   "pandas",
-#   "matplotlib",
+#   "plotly",
 # ]
 # ///
 """
@@ -30,8 +30,9 @@ import sqlite3
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import timedelta
 
-import matplotlib.pyplot as plt
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 def setup_logging(verbosity):
@@ -104,9 +105,9 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
     trade_start_date = pd.to_datetime(trade_df.Date.iloc[0])
     trade_end_date = pd.to_datetime(trade_df.ClosedTradeAt.iloc[0])
 
-    # Calculate the window
-    window_start = trade_start_date - timedelta(weeks=weeks_window)
-    window_end = trade_end_date + timedelta(weeks=weeks_window)
+    # Calculate the window using timedelta
+    window_start = trade_start_date - timedelta(days=weeks_window * 7)
+    window_end = trade_end_date + timedelta(days=weeks_window * 7)
 
     # Get all trade history within the window
     all_history_query = """
@@ -134,82 +135,146 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
 
     history_df["Date"] = pd.to_datetime(history_df["Date"])
 
-    # Create the plot with 2 subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), height_ratios=[2, 1])
-    fig.suptitle(
-        f"Trade Analysis (ID: {trade_id}, Strike: {trade_df.StrikePrice.iloc[0]})",
-        fontsize=12,
+    # Create figure with secondary y-axis
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        subplot_titles=("Underlying Price Movement", "Option Prices"),
+        vertical_spacing=0.15,
+        row_heights=[0.7, 0.3],
     )
 
-    # Plot all underlying prices in light gray
-    ax1.plot(
-        all_history_df["Date"],
-        all_history_df["UnderlyingPrice"],
-        color="lightgray",
-        alpha=0.5,
-        label="Market Context",
+    # Add market context trace
+    fig.add_trace(
+        go.Scatter(
+            x=all_history_df["Date"],
+            y=all_history_df["UnderlyingPrice"],
+            name="Market Context",
+            line=dict(color="lightgray", width=1),
+            opacity=0.5,
+        ),
+        row=1,
+        col=1,
     )
 
-    # Highlight the specific trade
-    ax1.plot(
-        history_df["Date"],
-        history_df["UnderlyingPrice"],
-        "b-",
-        linewidth=2,
-        label=f"Trade {trade_id} Underlying Price",
-    )
-    ax1.axhline(
-        y=trade_df.StrikePrice.iloc[0], color="r", linestyle="--", label="Strike Price"
-    )
-
-    # Add vertical lines for trade entry and exit
-    ax1.axvline(x=trade_start_date, color="g", linestyle="--", label="Entry Date")
-    ax1.axvline(x=trade_end_date, color="r", linestyle="--", label="Exit Date")
-
-    ax1.set_ylabel("Price ($)")
-    ax1.legend()
-    ax1.grid(True)
-
-    # Plot option prices
-    ax2.plot(history_df["Date"], history_df["CallPrice"], "g-", label="Call Price")
-    ax2.plot(history_df["Date"], history_df["PutPrice"], "r-", label="Put Price")
-    ax2.set_ylabel("Option Price ($)")
-    ax2.legend()
-    ax2.grid(True)
-
-    # Rotate x-axis labels for better readability
-    plt.xticks(rotation=45)
-
-    # Add trade information
-    info_text = (
-        f"Status: {trade_df.Status.iloc[0]}\n"
-        f"DTE: {trade_df.DTE.iloc[0]}\n"
-        f"Entry Date: {trade_df.Date.iloc[0]}\n"
-        f"Exit Date: {trade_df.ClosedTradeAt.iloc[0]}\n"
-        f"Premium Captured: ${trade_df.PremiumCaptured.iloc[0]:.2f}\n"
-        f"Entry Price: ${trade_df.UnderlyingPriceOpen.iloc[0]:.2f}\n"
-        f"Exit Price: ${trade_df.UnderlyingPriceClose.iloc[0]:.2f}"
-    )
-    plt.figtext(
-        0.02, 0.02, info_text, fontsize=10, bbox=dict(facecolor="white", alpha=0.8)
+    # Add specific trade underlying price
+    fig.add_trace(
+        go.Scatter(
+            x=history_df["Date"],
+            y=history_df["UnderlyingPrice"],
+            name="Trade Underlying Price",
+            line=dict(color="blue", width=2),
+        ),
+        row=1,
+        col=1,
     )
 
-    plt.tight_layout()
+    # Add strike price line
+    fig.add_trace(
+        go.Scatter(
+            x=[window_start, window_end],
+            y=[trade_df.StrikePrice.iloc[0], trade_df.StrikePrice.iloc[0]],
+            name="Strike Price",
+            line=dict(color="red", dash="dash"),
+        ),
+        row=1,
+        col=1,
+    )
+
+    # Add entry and exit vertical lines
+    y_range = [
+        min(all_history_df["UnderlyingPrice"].min(), trade_df.StrikePrice.iloc[0]),
+        max(all_history_df["UnderlyingPrice"].max(), trade_df.StrikePrice.iloc[0]),
+    ]
+
+    for date, color, name in [
+        (trade_start_date, "green", "Entry Date"),
+        (trade_end_date, "red", "Exit Date"),
+    ]:
+        # Create vertical line as scatter trace
+        fig.add_trace(
+            go.Scatter(
+                x=[date, date],
+                y=y_range,
+                mode="lines",
+                name=name,
+                line=dict(color=color, width=2, dash="dash"),
+                showlegend=True,
+            ),
+            row=1,
+            col=1,
+        )
+
+        # Add annotation
+        fig.add_annotation(
+            x=date, y=y_range[1], text=name, showarrow=False, yshift=10, row=1, col=1
+        )
+
+    # Add option prices
+    fig.add_trace(
+        go.Scatter(
+            x=history_df["Date"],
+            y=history_df["CallPrice"],
+            name="Call Price",
+            line=dict(color="green"),
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=history_df["Date"],
+            y=history_df["PutPrice"],
+            name="Put Price",
+            line=dict(color="red"),
+        ),
+        row=2,
+        col=1,
+    )
+
+    # Update layout
+    fig.update_layout(
+        title_text=f"Trade Analysis (ID: {trade_id}, Strike: {trade_df.StrikePrice.iloc[0]})",
+        showlegend=True,
+        height=800,
+        annotations=[
+            dict(
+                x=0,
+                y=-0.35,
+                showarrow=False,
+                text=(
+                    f"Status: {trade_df.Status.iloc[0]}<br>"
+                    f"DTE: {trade_df.DTE.iloc[0]}<br>"
+                    f"Entry Date: {trade_df.Date.iloc[0]}<br>"
+                    f"Exit Date: {trade_df.ClosedTradeAt.iloc[0]}<br>"
+                    f"Premium Captured: ${trade_df.PremiumCaptured.iloc[0]:.2f}<br>"
+                    f"Entry Price: ${trade_df.UnderlyingPriceOpen.iloc[0]:.2f}<br>"
+                    f"Exit Price: ${trade_df.UnderlyingPriceClose.iloc[0]:.2f}"
+                ),
+                xref="paper",
+                yref="paper",
+                align="left",
+                bgcolor="white",
+                bordercolor="black",
+                borderwidth=1,
+            )
+        ],
+    )
+
+    # Update yaxis labels
+    fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+    fig.update_yaxes(title_text="Option Price ($)", row=2, col=1)
+
     return fig
 
 
 def main(args):
     logging.info(f"Connecting to database: {args.database}")
-    try:
-        conn = sqlite3.connect(args.database)
-        fig = plot_trade_history(args.trade_id, conn, args.weeks)
-        if fig:
-            plt.show()
-        conn.close()
-    except sqlite3.Error as e:
-        logging.error(f"Database error: {e}")
-    except Exception as e:
-        logging.error(f"Error: {e}")
+    conn = sqlite3.connect(args.database)
+    fig = plot_trade_history(args.trade_id, conn, args.weeks)
+    if fig:
+        fig.show(renderer="browser")
+    conn.close()
 
 
 if __name__ == "__main__":
