@@ -19,6 +19,7 @@ Usage:
 import logging
 import sqlite3
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from datetime import datetime
 
 import pandas as pd
 
@@ -36,10 +37,19 @@ class OptionsDatabase:
         logging.info(f"Connecting to database: {self.db_path}")
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
-        self.setup_trades_table()
 
     def setup_trades_table(self):
-        """Create trades table if it doesn't exist and clean existing data"""
+        """Drop and recreate trades and trade_history tables"""
+        # Drop existing tables (trade_history first due to foreign key constraint)
+        drop_tables_sql = [
+            "DROP TABLE IF EXISTS trade_history",
+            "DROP TABLE IF EXISTS trades",
+        ]
+
+        for drop_sql in drop_tables_sql:
+            self.cursor.execute(drop_sql)
+
+        # Create trades table
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS trades (
             TradeId INTEGER PRIMARY KEY,
@@ -48,28 +58,49 @@ class OptionsDatabase:
             DTE REAL,
             StrikePrice REAL,
             Status TEXT,
+            UnderlyingPriceOpen REAL,
             CallPriceOpen REAL,
             PutPriceOpen REAL,
             CallPriceClose REAL,
             PutPriceClose REAL,
+            UnderlyingPriceClose REAL,
             PremiumCaptured REAL,
             ClosedTradeAt TIME
         )
         """
+        # Create trade_history table to track daily prices
+        create_history_table_sql = """
+        CREATE TABLE IF NOT EXISTS trade_history (
+            HistoryId INTEGER PRIMARY KEY,
+            TradeId INTEGER,
+            Date DATE,
+            UnderlyingPrice REAL,
+            CallPrice REAL,
+            PutPrice REAL,
+            FOREIGN KEY(TradeId) REFERENCES trades(TradeId)
+        )
+        """
         self.cursor.execute(create_table_sql)
-
-        # Clean existing data
-        self.cursor.execute("DELETE FROM trades")
+        self.cursor.execute(create_history_table_sql)
         self.conn.commit()
-        logging.info("Trades table setup complete and cleaned")
+        logging.info("Tables dropped and recreated successfully")
 
-    def create_trade(self, date, strike_price, call_price, put_price, expire_date, dte):
+    def create_trade(
+        self,
+        date,
+        strike_price,
+        call_price,
+        put_price,
+        underlying_price,
+        expire_date,
+        dte,
+    ):
         """Create a new short straddle trade"""
         insert_sql = """
         INSERT INTO trades (
             Date, ExpireDate, DTE, StrikePrice, Status,
-            CallPriceOpen, PutPriceOpen, PremiumCaptured
-        ) VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?)
+            UnderlyingPriceOpen, CallPriceOpen, PutPriceOpen, PremiumCaptured
+        ) VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?, ?)
         """
         premium_captured = call_price + put_price
         self.cursor.execute(
@@ -79,13 +110,83 @@ class OptionsDatabase:
                 expire_date,
                 dte,
                 strike_price,
+                underlying_price,
                 call_price,
                 put_price,
                 premium_captured,
             ),
         )
+        trade_id = self.cursor.lastrowid
+
+        # Add first history record
+        self.add_trade_history(trade_id, date, underlying_price, call_price, put_price)
+
         self.conn.commit()
-        logging.info(f"Created new trade for date {date} at strike {strike_price}")
+        logging.info(
+            f"Created new trade {trade_id} for date {date} at strike {strike_price}"
+        )
+        return trade_id
+
+    def add_trade_history(
+        self, trade_id, date, underlying_price, call_price, put_price
+    ):
+        """Add a history record for a trade"""
+        insert_sql = """
+        INSERT INTO trade_history (TradeId, Date, UnderlyingPrice, CallPrice, PutPrice)
+        VALUES (?, ?, ?, ?, ?)
+        """
+        self.cursor.execute(
+            insert_sql, (trade_id, date, underlying_price, call_price, put_price)
+        )
+        self.conn.commit()
+
+    def get_open_trades(self):
+        """Get all open trades"""
+        query = """
+            SELECT TradeId, Date, ExpireDate, StrikePrice, Status
+            FROM trades
+            WHERE Status = 'OPEN'
+            """
+        return pd.read_sql_query(query, self.conn)
+
+    def get_current_prices(self, quote_date, strike_price, expire_date):
+        """Get current prices for a specific strike and expiration"""
+        query = """
+        SELECT UNDERLYING_LAST, C_LAST, P_LAST
+        FROM options_data
+        WHERE QUOTE_DATE = ?
+        AND STRIKE = ?
+        AND EXPIRE_DATE = ?
+        """
+        self.cursor.execute(query, (quote_date, strike_price, expire_date))
+        result = self.cursor.fetchone()
+        return result if result else (None, None, None)
+
+    def update_trade_status(
+        self, trade_id, underlying_price, call_price, put_price, status="CLOSED"
+    ):
+        """Update trade with closing prices and status"""
+        update_sql = """
+        UPDATE trades
+        SET Status = ?,
+            UnderlyingPriceClose = ?,
+            CallPriceClose = ?,
+            PutPriceClose = ?,
+            ClosedTradeAt = ?
+        WHERE TradeId = ?
+        """
+        self.cursor.execute(
+            update_sql,
+            (
+                status,
+                underlying_price,
+                call_price,
+                put_price,
+                datetime.now().strftime("%H:%M:%S"),
+                trade_id,
+            ),
+        )
+        self.conn.commit()
 
     def disconnect(self):
         """Close database connection"""
@@ -194,6 +295,33 @@ class OptionsDatabase:
 
         return call_df, put_df
 
+    def get_trade_history(self):
+        """Get complete trade history with P&L tracking"""
+        query = """
+        SELECT
+            t.TradeId,
+            t.Date as OpenDate,
+            t.ExpireDate,
+            t.StrikePrice,
+            t.Status,
+            t.UnderlyingPriceOpen,
+            t.CallPriceOpen + t.PutPriceOpen as TotalPremiumOpen,
+            th.Date as TrackingDate,
+            th.UnderlyingPrice as CurrentUnderlyingPrice,
+            th.CallPrice + th.PutPrice as CurrentPremium,
+            ROUND(((t.CallPriceOpen + t.PutPriceOpen) - (th.CallPrice + th.PutPrice)) / (t.CallPriceOpen + t.PutPriceOpen) * 100, 2) as PremiumDecayPercent,
+            th.UnderlyingPrice - t.UnderlyingPriceOpen as UnderlyingPriceChange,
+            ROUND((th.UnderlyingPrice - t.UnderlyingPriceOpen) / t.UnderlyingPriceOpen * 100, 2) as UnderlyingPriceChangePercent,
+            CASE
+                WHEN t.Status = 'EXPIRED' AND th.Date = t.ExpireDate THEN 'Final'
+                ELSE 'Tracking'
+            END as RecordType
+        FROM trades t
+        LEFT JOIN trade_history th ON t.TradeId = th.TradeId
+        ORDER BY t.TradeId, th.Date
+        """
+        return pd.read_sql_query(query, self.conn)
+
 
 def setup_logging(verbosity):
     logging_level = logging.WARNING
@@ -211,6 +339,32 @@ def setup_logging(verbosity):
         level=logging_level,
     )
     logging.captureWarnings(capture=True)
+
+
+def update_open_trades(db, quote_date):
+    """Update all open trades with current prices"""
+    open_trades = db.get_open_trades()
+
+    for _, trade in open_trades.iterrows():
+        # Get current prices
+        underlying_price, call_price, put_price = db.get_current_prices(
+            quote_date, trade["StrikePrice"], trade["ExpireDate"]
+        )
+
+        if all(
+            price is not None for price in [underlying_price, call_price, put_price]
+        ):
+            # Add to trade history
+            db.add_trade_history(
+                trade["TradeId"], quote_date, underlying_price, call_price, put_price
+            )
+
+            # If trade has reached expiry date, close it
+            if quote_date >= trade["ExpireDate"]:
+                db.update_trade_status(
+                    trade["TradeId"], underlying_price, call_price, put_price, "EXPIRED"
+                )
+                logging.info(f"Closed trade {trade['TradeId']} at expiry")
 
 
 def parse_args():
@@ -236,6 +390,11 @@ def parse_args():
         default=30,
         help="Find next expiration with DTE greater than this value",
     )
+    parser.add_argument(
+        "--show-history",
+        action="store_true",
+        help="Show trade history without recreating trades",
+    )
     return parser.parse_args()
 
 
@@ -244,11 +403,64 @@ def main(args):
     db.connect()
 
     try:
-        print(
-            f"\nFinding options matching delta criteria for expirations with DTE > {args.dte}:"
-        )
+        if args.show_history:
+            history_df = db.get_trade_history()
+            if history_df.empty:
+                print("No trade history found in database")
+            else:
+                pd.set_option("display.max_rows", None)
+                pd.set_option("display.float_format", lambda x: "%.2f" % x)
+
+                # Print summary statistics
+                print("\nTrade Summary:")
+                print("-" * 50)
+                trades_summary = (
+                    history_df.groupby("TradeId")
+                    .agg(
+                        {
+                            "OpenDate": "first",
+                            "ExpireDate": "first",
+                            "Status": "first",
+                            "StrikePrice": "first",
+                            "TotalPremiumOpen": "first",
+                            "CurrentPremium": "last",
+                            "PremiumDecayPercent": "last",
+                        }
+                    )
+                    .round(2)
+                )
+                print(trades_summary)
+
+                print("\nDetailed Trade History:")
+                print("-" * 50)
+                print(history_df.to_string())
+
+                # Print aggregate statistics
+                print("\nAggregate Statistics:")
+                print("-" * 50)
+                expired_trades = history_df[history_df["RecordType"] == "Final"]
+                if not expired_trades.empty:
+                    print(f"Total Completed Trades: {len(expired_trades)}")
+                    print(
+                        f"Average Premium Decay: {expired_trades['PremiumDecayPercent'].mean():.2f}%"
+                    )
+                    print(
+                        f"Best Trade: {expired_trades['PremiumDecayPercent'].max():.2f}%"
+                    )
+                    print(
+                        f"Worst Trade: {expired_trades['PremiumDecayPercent'].min():.2f}%"
+                    )
+            return
+
+        # Original trade creation logic
+        db.setup_trades_table()  # Only called if not showing history
         quote_dates = db.get_quote_dates()
+
         for quote_date in quote_dates:
+            # Update existing open trades
+            update_open_trades(db, quote_date)
+
+            # Look for new trade opportunities
             result = db.get_next_expiry_by_dte(quote_date, args.dte)
             if result:
                 expiry_date, dte = result
@@ -256,7 +468,6 @@ def main(args):
                     f"\nQuote date: {quote_date} -> Next expiry: {expiry_date} (DTE: {dte:.1f})"
                 )
 
-                # Get options matching delta criteria
                 call_df, put_df = db.get_options_by_delta(quote_date, expiry_date)
 
                 if not call_df.empty and not put_df.empty:
@@ -265,22 +476,21 @@ def main(args):
                     print("\nPUT OPTION:")
                     print(put_df.to_string(index=False))
 
-                    # Create trade in database
-                    strike_price = call_df["CALL_STRIKE"].iloc[
-                        0
-                    ]  # Using call strike as the trade strike
+                    underlying_price = call_df["UNDERLYING_LAST"].iloc[0]
+                    strike_price = call_df["CALL_STRIKE"].iloc[0]
                     call_price = call_df["CALL_C_LAST"].iloc[0]
                     put_price = put_df["PUT_P_LAST"].iloc[0]
-                    db.create_trade(
+
+                    trade_id = db.create_trade(
                         quote_date,
                         strike_price,
                         call_price,
                         put_price,
+                        underlying_price,
                         expiry_date,
                         dte,
                     )
-
-                    print("\nTrade created in database")
+                    print(f"\nTrade {trade_id} created in database")
                 else:
                     print("No options matching delta criteria found")
             else:
