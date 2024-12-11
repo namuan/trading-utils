@@ -150,8 +150,8 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
             x=all_history_df["Date"],
             y=all_history_df["UnderlyingPrice"],
             name="Market Context",
-            line=dict(color="lightgray", width=1),
-            opacity=0.5,
+            line=dict(color="#2E4053", width=1.5),  # Darker blue-gray color
+            opacity=0.7,
         ),
         row=1,
         col=1,
@@ -237,6 +237,8 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
         title_text=f"Trade Analysis (ID: {trade_id}, Strike: {trade_df.StrikePrice.iloc[0]})",
         showlegend=True,
         height=800,
+        plot_bgcolor="white",  # White background
+        paper_bgcolor="white",  # White paper background
         annotations=[
             dict(
                 x=0,
@@ -261,9 +263,33 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
         ],
     )
 
-    # Update yaxis labels
-    fig.update_yaxes(title_text="Price ($)", row=1, col=1)
-    fig.update_yaxes(title_text="Option Price ($)", row=2, col=1)
+    # Update axes
+    fig.update_xaxes(
+        showgrid=False,  # Remove x-axis grid
+        zeroline=False,  # Remove x-axis zero line
+        row=1,
+        col=1,
+    )
+    fig.update_xaxes(
+        showgrid=False,  # Remove x-axis grid
+        zeroline=False,  # Remove x-axis zero line
+        row=2,
+        col=1,
+    )
+    fig.update_yaxes(
+        title_text="Price ($)",
+        showgrid=False,  # Remove y-axis grid
+        zeroline=False,  # Remove y-axis zero line
+        row=1,
+        col=1,
+    )
+    fig.update_yaxes(
+        title_text="Option Price ($)",
+        showgrid=False,  # Remove y-axis grid
+        zeroline=False,  # Remove y-axis zero line
+        row=2,
+        col=1,
+    )
 
     return fig
 
