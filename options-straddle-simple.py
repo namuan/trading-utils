@@ -227,7 +227,7 @@ def parse_args():
     )
     parser.add_argument(
         "--db-path",
-        default="options.db",
+        required=True,
         help="Path to the SQLite database file",
     )
     parser.add_argument(
