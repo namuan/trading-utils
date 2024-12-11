@@ -19,7 +19,6 @@ Usage:
 import logging
 import sqlite3
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from datetime import datetime
 
 import pandas as pd
 
@@ -65,7 +64,8 @@ class OptionsDatabase:
             PutPriceClose REAL,
             UnderlyingPriceClose REAL,
             PremiumCaptured REAL,
-            ClosedTradeAt TIME
+            ClosingPremium REAL,
+            ClosedTradeAt DATE
         )
         """
         # Create trade_history table to track daily prices
@@ -163,15 +163,23 @@ class OptionsDatabase:
         return result if result else (None, None, None)
 
     def update_trade_status(
-        self, trade_id, underlying_price, call_price, put_price, status="CLOSED"
+        self,
+        trade_id,
+        underlying_price,
+        call_price,
+        put_price,
+        quote_date,
+        status="CLOSED",
     ):
         """Update trade with closing prices and status"""
+        closing_premium = call_price + put_price
         update_sql = """
         UPDATE trades
         SET Status = ?,
             UnderlyingPriceClose = ?,
             CallPriceClose = ?,
             PutPriceClose = ?,
+            ClosingPremium = ?,
             ClosedTradeAt = ?
         WHERE TradeId = ?
         """
@@ -182,7 +190,8 @@ class OptionsDatabase:
                 underlying_price,
                 call_price,
                 put_price,
-                datetime.now().strftime("%H:%M:%S"),
+                closing_premium,
+                quote_date,
                 trade_id,
             ),
         )
@@ -197,7 +206,7 @@ class OptionsDatabase:
     def get_quote_dates(self):
         """Get all unique quote dates"""
         query = (
-            "SELECT DISTINCT QUOTE_DATE FROM options_data ORDER BY QUOTE_DATE LIMIT 5"
+            "SELECT DISTINCT QUOTE_DATE FROM options_data ORDER BY QUOTE_DATE LIMIT 10"
         )
         self.cursor.execute(query)
         dates = [row[0] for row in self.cursor.fetchall()]
@@ -306,6 +315,7 @@ class OptionsDatabase:
             t.Status,
             t.UnderlyingPriceOpen,
             t.CallPriceOpen + t.PutPriceOpen as TotalPremiumOpen,
+            t.ClosingPremium,
             th.Date as TrackingDate,
             th.UnderlyingPrice as CurrentUnderlyingPrice,
             th.CallPrice + th.PutPrice as CurrentPremium,
@@ -362,7 +372,12 @@ def update_open_trades(db, quote_date):
             # If trade has reached expiry date, close it
             if quote_date >= trade["ExpireDate"]:
                 db.update_trade_status(
-                    trade["TradeId"], underlying_price, call_price, put_price, "EXPIRED"
+                    trade["TradeId"],
+                    underlying_price,
+                    call_price,
+                    put_price,
+                    quote_date,
+                    "EXPIRED",
                 )
                 logging.info(f"Closed trade {trade['TradeId']} at expiry")
 
