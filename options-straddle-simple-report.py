@@ -239,7 +239,7 @@ def add_premium_traces(fig, history_df, initial_premium, window_start, window_en
         go.Scatter(
             x=history_df["Date"],
             y=history_df["TotalOptionValue"],
-            name="Current Total Premium",
+            name="Current Premium",
             line=dict(color="purple", width=2),
         ),
         row=3,
