@@ -1,12 +1,13 @@
+#!/usr/bin/env python3
 """
 Download stocks open, close, high, low and volume data for all available stocks.
 Make sure you have downloaded the list of tickers using download_stocklist.py script.
 """
+
 from argparse import ArgumentParser
 from datetime import datetime
 
-from common.market import download_tickers_data
-from common.market import load_all_tickers
+from common.market import download_tickers_data, load_all_tickers
 
 
 def parse_args():
