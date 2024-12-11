@@ -82,8 +82,21 @@ class OptionsDatabase:
         """
         self.cursor.execute(create_table_sql)
         self.cursor.execute(create_history_table_sql)
-        self.conn.commit()
         logging.info("Tables dropped and recreated successfully")
+
+        # Add indexes for options_data table
+        index_sql = [
+            "CREATE INDEX IF NOT EXISTS idx_options_quote_date ON options_data(QUOTE_DATE)",
+            "CREATE INDEX IF NOT EXISTS idx_options_expire_date ON options_data(EXPIRE_DATE)",
+            "CREATE INDEX IF NOT EXISTS idx_options_combined ON options_data(QUOTE_DATE, EXPIRE_DATE)",
+        ]
+
+        for sql in index_sql:
+            self.cursor.execute(sql)
+
+        logging.info("Added indexes successfully")
+
+        self.conn.commit()
 
     def create_trade(
         self,
@@ -205,9 +218,7 @@ class OptionsDatabase:
 
     def get_quote_dates(self):
         """Get all unique quote dates"""
-        query = (
-            "SELECT DISTINCT QUOTE_DATE FROM options_data ORDER BY QUOTE_DATE LIMIT 10"
-        )
+        query = "SELECT DISTINCT QUOTE_DATE FROM options_data ORDER BY QUOTE_DATE"
         self.cursor.execute(query)
         dates = [row[0] for row in self.cursor.fetchall()]
         logging.debug(f"Found {len(dates)} unique quote dates")
