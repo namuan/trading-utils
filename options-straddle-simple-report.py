@@ -261,7 +261,7 @@ def add_premium_traces(fig, history_df, initial_premium, window_start, window_en
     )
 
 
-def update_figure_layout(fig, trade_id, trade_df, initial_premium):
+def update_figure_layout(fig, trade_id, trade_df, initial_premium, final_premium):
     """Update the figure layout with trade details."""
     entry_price = trade_df.UnderlyingPriceOpen.iloc[0]
     exit_price = trade_df.UnderlyingPriceClose.iloc[0]
@@ -279,7 +279,17 @@ def update_figure_layout(fig, trade_id, trade_df, initial_premium):
         annotations.append("<b>Trade Status:</b> Open")
 
     annotations.append(f"<b>Strike:</b> ${strike_price:.2f}")
-    annotations.append(f"<b>Initial Premium:</b> ${initial_premium:.2f}")
+
+    premium_gain_loss = initial_premium - final_premium
+    annotations.append(f"<b>Entry Premium:</b> ${initial_premium:.2f}")
+    annotations.append(f"<b>Exit Premium:</b> ${final_premium:.2f}")
+    if premium_gain_loss >= 0:
+        gain_loss_color = "green"
+    else:
+        gain_loss_color = "red"
+    annotations.append(
+        f'<b>Gain/Loss:</b> <span style="color:{gain_loss_color};">${premium_gain_loss:.2f}</span>'
+    )
 
     # Join all annotations with <br> tags for newlines
     title_text = " | ".join(annotations)
@@ -368,6 +378,7 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
 
     # Calculate initial premium
     initial_premium = history_df["TotalOptionValue"].iloc[0]
+    final_premium = history_df["TotalOptionValue"].iloc[-1]
 
     # Create figure and add traces
     fig = create_base_figure()
@@ -385,7 +396,7 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
     add_premium_traces(fig, history_df, initial_premium, window_start, window_end)
 
     # Update layout and axes
-    update_figure_layout(fig, trade_id, trade_df, initial_premium)
+    update_figure_layout(fig, trade_id, trade_df, initial_premium, final_premium)
     update_axes(fig)
 
     return fig
