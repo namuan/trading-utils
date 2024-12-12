@@ -31,6 +31,7 @@ import time
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import timedelta
 
+import dash
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, dcc, html
@@ -426,6 +427,11 @@ def create_app(database_path, weeks_window=2):
                                 id="auto-cycle-button",
                                 style={"marginRight": "10px"},
                             ),
+                            html.Button(
+                                "Pause",
+                                id="pause-button",
+                                style={"marginRight": "10px"},
+                            ),
                             dcc.Input(
                                 id="interval-input",
                                 type="number",
@@ -445,7 +451,8 @@ def create_app(database_path, weeks_window=2):
             dcc.Store(id="database-path", data=database_path),
             dcc.Store(id="weeks-window", data=weeks_window),
             dcc.Store(
-                id="auto-cycle-state", data={"running": False, "last_update": None}
+                id="auto-cycle-state",
+                data={"running": False, "last_update": None, "paused": False},
             ),
             dcc.Interval(
                 id="auto-cycle-interval",
@@ -459,14 +466,40 @@ def create_app(database_path, weeks_window=2):
         Output("auto-cycle-state", "data"),
         Output("auto-cycle-button", "children"),
         Input("auto-cycle-button", "n_clicks"),
+        Input("pause-button", "n_clicks"),
         State("auto-cycle-state", "data"),
         prevent_initial_call=True,
     )
-    def toggle_auto_cycle(n_clicks, current_state):
-        if current_state["running"]:
-            return {"running": False, "last_update": None}, "Start Auto-Cycle"
-        else:
-            return {"running": True, "last_update": time.time()}, "Stop Auto-Cycle"
+    def toggle_auto_cycle(start_clicks, pause_clicks, current_state):
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return current_state, "Start Auto-Cycle"
+
+        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+        if trigger_id == "auto-cycle-button":
+            if current_state["running"]:
+                return {
+                    "running": False,
+                    "last_update": None,
+                    "paused": False,
+                }, "Start Auto-Cycle"
+            else:
+                return {
+                    "running": True,
+                    "last_update": time.time(),
+                    "paused": False,
+                }, "Stop Auto-Cycle"
+
+        elif trigger_id == "pause-button":
+            if current_state["running"]:
+                return {
+                    "running": True,
+                    "last_update": current_state["last_update"],
+                    "paused": not current_state["paused"],
+                }, "Stop Auto-Cycle"
+            else:
+                return current_state, "Start Auto-Cycle"
 
     @app.callback(
         Output("trade-selector", "value"),
@@ -479,7 +512,7 @@ def create_app(database_path, weeks_window=2):
     def update_selected_trade(
         n_intervals, auto_cycle_state, interval_seconds, current_trade, options
     ):
-        if not auto_cycle_state["running"]:
+        if not auto_cycle_state["running"] or auto_cycle_state["paused"]:
             return current_trade
 
         current_time = time.time()
