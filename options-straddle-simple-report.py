@@ -146,7 +146,7 @@ def create_base_figure():
         rows=3,
         cols=1,
         vertical_spacing=0.1,
-        row_heights=[0.5, 0.25, 0.25],
+        row_heights=[0.4, 0.3, 0.3],  # Adjusted row heights
     )
 
 
@@ -193,8 +193,8 @@ def add_price_traces(fig, market_df, history_df, trade_df, window_start, window_
 def add_entry_exit_lines(fig, trade_start_date, trade_end_date, y_range):
     """Add entry and exit vertical lines."""
     for date, color, name in [
-        (trade_start_date, "green", "Entry Date"),
-        (trade_end_date, "red", "Exit Date"),
+        (trade_start_date, "green", "Entry"),
+        (trade_end_date, "red", "Exit"),
     ]:
         fig.add_trace(
             go.Scatter(
@@ -267,22 +267,22 @@ def update_figure_layout(fig, trade_id, trade_df, initial_premium):
     exit_price = trade_df.UnderlyingPriceClose.iloc[0]
     strike_price = trade_df.StrikePrice.iloc[0]
 
-    # Create annotations list
+    # Create annotations list with HTML formatting
     annotations = [
-        f"Entry: ${entry_price:.2f}",
+        f"<b>Entry:</b> ${entry_price:.2f}",
     ]
 
     # Add exit price only if trade is closed
     if pd.notna(exit_price):
-        annotations.append(f"Exit Price: ${exit_price:.2f}")
+        annotations.append(f"<b>Exit:</b> ${exit_price:.2f}")
     else:
-        annotations.append("Trade Status: Open")
+        annotations.append("<b>Trade Status:</b> Open")
 
-    annotations.append(f"Strike: ${strike_price:.2f}")
-    annotations.append(f"Initial Premium: ${initial_premium:.2f}")
+    annotations.append(f"<b>Strike:</b> ${strike_price:.2f}")
+    annotations.append(f"<b>Initial Premium:</b> ${initial_premium:.2f}")
 
-    # Join all annotations with newlines
-    title_text = " ".join(annotations)
+    # Join all annotations with <br> tags for newlines
+    title_text = " | ".join(annotations)
 
     fig.update_layout(
         title={
@@ -295,14 +295,14 @@ def update_figure_layout(fig, trade_id, trade_df, initial_premium):
         showlegend=False,
         legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
         hovermode="x unified",
-        height=900,  # Increased overall height
-        margin=dict(t=150),  # Increased top margin for title
+        height=700,  # Reduced overall height
+        margin=dict(t=50),  # Reduced top margin for title
     )
 
     # Update y-axis domains for better spacing
-    fig.update_yaxes(domain=[0.7, 1.0], row=1, col=1)  # Price Movement
+    fig.update_yaxes(domain=[0.65, 1.0], row=1, col=1)  # Price Movement
     fig.update_yaxes(domain=[0.35, 0.6], row=2, col=1)  # Option Values
-    fig.update_yaxes(domain=[0.0, 0.25], row=3, col=1)  # Total Premium
+    fig.update_yaxes(domain=[0.0, 0.3], row=3, col=1)  # Total Premium
 
 
 def update_axes(fig):
@@ -401,7 +401,7 @@ def create_app(database_path, weeks_window=2):
     app.layout = html.Div(
         [
             html.H1(
-                "Options Straddle Trade Analysis",
+                "Short Straddle Trades",
                 style={"textAlign": "center", "marginBottom": 30},
             ),
             html.Div(
@@ -432,22 +432,13 @@ def create_app(database_path, weeks_window=2):
                                 id="pause-button",
                                 style={"marginRight": "10px"},
                             ),
-                            dcc.Input(
-                                id="interval-input",
-                                type="number",
-                                value=10,
-                                min=1,
-                                max=60,
-                                style={"width": "80px", "margin": "0 10px"},
-                            ),
-                            html.Span("seconds per trade"),
                         ],
                         style={"marginTop": "10px", "marginBottom": "20px"},
                     ),
                 ],
                 style={"width": "80%", "margin": "auto"},
             ),
-            dcc.Graph(id="trade-graph"),
+            dcc.Graph(id="trade-graph", config={"displayModeBar": False}),
             dcc.Store(id="database-path", data=database_path),
             dcc.Store(id="weeks-window", data=weeks_window),
             dcc.Store(
@@ -456,7 +447,7 @@ def create_app(database_path, weeks_window=2):
             ),
             dcc.Interval(
                 id="auto-cycle-interval",
-                interval=1000,  # 1 second
+                interval=2000,
                 n_intervals=0,
             ),
         ]
@@ -519,20 +510,17 @@ def create_app(database_path, weeks_window=2):
         Output("trade-selector", "value"),
         Input("auto-cycle-interval", "n_intervals"),
         State("auto-cycle-state", "data"),
-        State("interval-input", "value"),
         State("trade-selector", "value"),
         State("trade-selector", "options"),
     )
-    def update_selected_trade(
-        n_intervals, auto_cycle_state, interval_seconds, current_trade, options
-    ):
+    def update_selected_trade(n_intervals, auto_cycle_state, current_trade, options):
         if not auto_cycle_state["running"] or auto_cycle_state["paused"]:
             return current_trade
 
         current_time = time.time()
         last_update = auto_cycle_state["last_update"]
 
-        if last_update is None or (current_time - last_update) < interval_seconds:
+        if last_update is None or (current_time - last_update) < 1:
             return current_trade
 
         # Find next trade in the sequence
