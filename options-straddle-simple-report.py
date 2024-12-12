@@ -302,35 +302,6 @@ def update_figure_layout(fig, trade_id, trade_df, initial_premium):
     fig.update_yaxes(domain=[0.35, 0.6], row=2, col=1)  # Option Values
     fig.update_yaxes(domain=[0.0, 0.25], row=3, col=1)  # Total Premium
 
-    # Add subplot titles
-    fig.add_annotation(
-        text="Price Movement",
-        xref="paper",
-        yref="paper",
-        x=0,
-        y=1.0,
-        showarrow=False,
-        xanchor="left",
-    )
-    fig.add_annotation(
-        text="Option Values",
-        xref="paper",
-        yref="paper",
-        x=0,
-        y=0.6,
-        showarrow=False,
-        xanchor="left",
-    )
-    fig.add_annotation(
-        text="Total Premium",
-        xref="paper",
-        yref="paper",
-        x=0,
-        y=0.25,
-        showarrow=False,
-        xanchor="left",
-    )
-
 
 def update_axes(fig):
     """Update all axes properties."""
