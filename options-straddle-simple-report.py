@@ -27,13 +27,14 @@ Arguments:
 
 import logging
 import sqlite3
+import time
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, dcc, html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 from plotly.subplots import make_subplots
 
 
@@ -418,15 +419,80 @@ def create_app(database_path, weeks_window=2):
                         value=trades_df["TradeId"].iloc[0],
                         style={"width": "100%", "marginBottom": 20},
                     ),
+                    html.Div(
+                        [
+                            html.Button(
+                                "Start Auto-Cycle",
+                                id="auto-cycle-button",
+                                style={"marginRight": "10px"},
+                            ),
+                            dcc.Input(
+                                id="interval-input",
+                                type="number",
+                                value=10,
+                                min=1,
+                                max=60,
+                                style={"width": "80px", "margin": "0 10px"},
+                            ),
+                            html.Span("seconds per trade"),
+                        ],
+                        style={"marginTop": "10px", "marginBottom": "20px"},
+                    ),
                 ],
                 style={"width": "80%", "margin": "auto"},
             ),
             dcc.Graph(id="trade-graph"),
-            # Store the database path in a hidden div
             dcc.Store(id="database-path", data=database_path),
             dcc.Store(id="weeks-window", data=weeks_window),
+            dcc.Store(
+                id="auto-cycle-state", data={"running": False, "last_update": None}
+            ),
+            dcc.Interval(
+                id="auto-cycle-interval",
+                interval=1000,  # 1 second
+                n_intervals=0,
+            ),
         ]
     )
+
+    @app.callback(
+        Output("auto-cycle-state", "data"),
+        Output("auto-cycle-button", "children"),
+        Input("auto-cycle-button", "n_clicks"),
+        State("auto-cycle-state", "data"),
+        prevent_initial_call=True,
+    )
+    def toggle_auto_cycle(n_clicks, current_state):
+        if current_state["running"]:
+            return {"running": False, "last_update": None}, "Start Auto-Cycle"
+        else:
+            return {"running": True, "last_update": time.time()}, "Stop Auto-Cycle"
+
+    @app.callback(
+        Output("trade-selector", "value"),
+        Input("auto-cycle-interval", "n_intervals"),
+        State("auto-cycle-state", "data"),
+        State("interval-input", "value"),
+        State("trade-selector", "value"),
+        State("trade-selector", "options"),
+    )
+    def update_selected_trade(
+        n_intervals, auto_cycle_state, interval_seconds, current_trade, options
+    ):
+        if not auto_cycle_state["running"]:
+            return current_trade
+
+        current_time = time.time()
+        last_update = auto_cycle_state["last_update"]
+
+        if last_update is None or (current_time - last_update) < interval_seconds:
+            return current_trade
+
+        # Find next trade in the sequence
+        trade_ids = [opt["value"] for opt in options]
+        current_index = trade_ids.index(current_trade)
+        next_index = (current_index + 1) % len(trade_ids)
+        return trade_ids[next_index]
 
     @app.callback(
         Output("trade-graph", "figure"),
