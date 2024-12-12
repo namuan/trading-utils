@@ -3,6 +3,7 @@
 # dependencies = [
 #   "pandas",
 #   "plotly",
+#   "dash",
 # ]
 # ///
 """
@@ -13,14 +14,13 @@ along with market context for the weeks before and after the trade.
 
 Usage:
 ./options-straddle-simple-report.py -h  # Show help
-./options-straddle-simple-report.py -d path/to/database.db -t trade_id  # Show trade with default 2-week window
-./options-straddle-simple-report.py -d path/to/database.db -t trade_id -w 4  # Show trade with 4-week window
-./options-straddle-simple-report.py -d path/to/database.db -t trade_id -v  # To log INFO messages
-./options-straddle-simple-report.py -d path/to/database.db -t trade_id -vv  # To log DEBUG messages
+./options-straddle-simple-report.py -d path/to/database.db  # Show trades with default 2-week window
+./options-straddle-simple-report.py -d path/to/database.db -w 4  # Show trades with 4-week window
+./options-straddle-simple-report.py -d path/to/database.db -v  # To log INFO messages
+./options-straddle-simple-report.py -d path/to/database.db -vv  # To log DEBUG messages
 
 Arguments:
     -d, --database : Path to SQLite database file
-    -t, --trade-id : Trade ID to visualize
     -w, --weeks    : Number of weeks to show before and after the trade (default: 2)
     -v, --verbose  : Increase logging verbosity
 """
@@ -32,6 +32,8 @@ from datetime import timedelta
 
 import pandas as pd
 import plotly.graph_objects as go
+from dash import Dash, dcc, html
+from dash.dependencies import Input, Output
 from plotly.subplots import make_subplots
 
 
@@ -72,13 +74,6 @@ def parse_args():
         help="Path to the SQLite database file",
     )
     parser.add_argument(
-        "-t",
-        "--trade-id",
-        type=int,
-        required=True,
-        help="Trade ID to visualize",
-    )
-    parser.add_argument(
         "-w",
         "--weeks",
         type=int,
@@ -86,6 +81,18 @@ def parse_args():
         help="Number of weeks to show before and after the trade (default: 2)",
     )
     return parser.parse_args()
+
+
+def get_all_trades(conn):
+    """Fetch all trades from the database."""
+    query = """
+    SELECT TradeId, Date, Status, StrikePrice, UnderlyingPriceOpen
+    FROM trades
+    ORDER BY Date ASC
+    """
+    trades_df = pd.read_sql_query(query, conn)
+    trades_df["Date"] = pd.to_datetime(trades_df["Date"]).dt.strftime("%Y-%m-%d")
+    return trades_df
 
 
 def get_trade_data(trade_id, conn):
@@ -136,11 +143,6 @@ def create_base_figure():
     return make_subplots(
         rows=3,
         cols=1,
-        subplot_titles=(
-            "Underlying Price Movement",
-            "Option Prices",
-            "Premium Analysis",
-        ),
         vertical_spacing=0.1,
         row_heights=[0.5, 0.25, 0.25],
     )
@@ -199,7 +201,7 @@ def add_entry_exit_lines(fig, trade_start_date, trade_end_date, y_range):
                 mode="lines",
                 name=name,
                 line=dict(color=color, width=2, dash="dash"),
-                showlegend=True,
+                showlegend=False,
             ),
             row=1,
             col=1,
@@ -258,39 +260,75 @@ def add_premium_traces(fig, history_df, initial_premium, window_start, window_en
 
 
 def update_figure_layout(fig, trade_id, trade_df, initial_premium):
-    """Update the overall figure layout."""
+    """Update the figure layout with trade details."""
+    entry_price = trade_df.UnderlyingPriceOpen.iloc[0]
+    exit_price = trade_df.UnderlyingPriceClose.iloc[0]
+    strike_price = trade_df.StrikePrice.iloc[0]
+
+    # Create annotations list
+    annotations = [
+        f"Entry: ${entry_price:.2f}",
+    ]
+
+    # Add exit price only if trade is closed
+    if pd.notna(exit_price):
+        annotations.append(f"Exit Price: ${exit_price:.2f}")
+    else:
+        annotations.append("Trade Status: Open")
+
+    annotations.append(f"Strike: ${strike_price:.2f}")
+    annotations.append(f"Initial Premium: ${initial_premium:.2f}")
+
+    # Join all annotations with newlines
+    title_text = " ".join(annotations)
+
     fig.update_layout(
-        title_text=(
-            f"Trade Analysis (ID: {trade_id}, Strike: {trade_df.StrikePrice.iloc[0]}, "
-            f"Initial Premium: ${initial_premium:.2f})"
-        ),
-        showlegend=True,
-        height=1000,
-        plot_bgcolor="white",
-        paper_bgcolor="white",
-        annotations=[
-            dict(
-                x=0,
-                y=-0.35,
-                showarrow=False,
-                text=(
-                    f"Status: {trade_df.Status.iloc[0]}<br>"
-                    f"DTE: {trade_df.DTE.iloc[0]}<br>"
-                    f"Entry Date: {trade_df.Date.iloc[0]}<br>"
-                    f"Exit Date: {trade_df.ClosedTradeAt.iloc[0]}<br>"
-                    f"Initial Premium: ${initial_premium:.2f}<br>"
-                    f"Premium Captured: ${trade_df.PremiumCaptured.iloc[0]:.2f}<br>"
-                    f"Entry Price: ${trade_df.UnderlyingPriceOpen.iloc[0]:.2f}<br>"
-                    f"Exit Price: ${trade_df.UnderlyingPriceClose.iloc[0]:.2f}"
-                ),
-                xref="paper",
-                yref="paper",
-                align="left",
-                bgcolor="white",
-                bordercolor="black",
-                borderwidth=1,
-            )
-        ],
+        title={
+            "text": title_text,
+            "y": 0.98,
+            "x": 0.5,
+            "xanchor": "center",
+            "yanchor": "top",
+        },
+        showlegend=False,
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+        hovermode="x unified",
+        height=900,  # Increased overall height
+        margin=dict(t=150),  # Increased top margin for title
+    )
+
+    # Update y-axis domains for better spacing
+    fig.update_yaxes(domain=[0.7, 1.0], row=1, col=1)  # Price Movement
+    fig.update_yaxes(domain=[0.35, 0.6], row=2, col=1)  # Option Values
+    fig.update_yaxes(domain=[0.0, 0.25], row=3, col=1)  # Total Premium
+
+    # Add subplot titles
+    fig.add_annotation(
+        text="Price Movement",
+        xref="paper",
+        yref="paper",
+        x=0,
+        y=1.0,
+        showarrow=False,
+        xanchor="left",
+    )
+    fig.add_annotation(
+        text="Option Values",
+        xref="paper",
+        yref="paper",
+        x=0,
+        y=0.6,
+        showarrow=False,
+        xanchor="left",
+    )
+    fig.add_annotation(
+        text="Total Premium",
+        xref="paper",
+        yref="paper",
+        x=0,
+        y=0.25,
+        showarrow=False,
+        xanchor="left",
     )
 
 
@@ -334,11 +372,18 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
     # Get trade data
     trade_df = get_trade_data(trade_id, conn)
     if trade_df is None:
-        return None
+        return {}  # Return empty figure if no data
 
     # Calculate dates and windows
     trade_start_date = pd.to_datetime(trade_df.Date.iloc[0])
-    trade_end_date = pd.to_datetime(trade_df.ClosedTradeAt.iloc[0])
+
+    # Handle both open and closed trades
+    trade_end_date = (
+        pd.to_datetime(trade_df.ClosedTradeAt.iloc[0])
+        if pd.notna(trade_df.ClosedTradeAt.iloc[0])
+        else pd.Timestamp.now()
+    )
+
     window_start = trade_start_date - timedelta(days=weeks_window * 7)
     window_end = trade_end_date + timedelta(days=weeks_window * 7)
 
@@ -346,7 +391,7 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
     market_df = get_market_context(conn, window_start, window_end)
     history_df = get_trade_history(trade_id, conn)
     if history_df is None:
-        return None
+        return {}
 
     # Calculate initial premium
     initial_premium = history_df["TotalOptionValue"].iloc[0]
@@ -373,16 +418,66 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
     return fig
 
 
+def create_app(database_path, weeks_window=2):
+    app = Dash(__name__)
+
+    # Get all trades for the dropdown
+    with sqlite3.connect(database_path) as conn:
+        trades_df = get_all_trades(conn)
+
+    app.layout = html.Div(
+        [
+            html.H1(
+                "Options Straddle Trade Analysis",
+                style={"textAlign": "center", "marginBottom": 30},
+            ),
+            html.Div(
+                [
+                    dcc.Dropdown(
+                        id="trade-selector",
+                        options=[
+                            {
+                                "label": f"Trade {row['TradeId']} - {row['Date']} "
+                                f"(Strike: ${row['StrikePrice']:.2f}, "
+                                f"Status: {row['Status']})",
+                                "value": row["TradeId"],
+                            }
+                            for _, row in trades_df.iterrows()
+                        ],
+                        value=trades_df["TradeId"].iloc[0],
+                        style={"width": "100%", "marginBottom": 20},
+                    ),
+                ],
+                style={"width": "80%", "margin": "auto"},
+            ),
+            dcc.Graph(id="trade-graph"),
+            # Store the database path in a hidden div
+            dcc.Store(id="database-path", data=database_path),
+            dcc.Store(id="weeks-window", data=weeks_window),
+        ]
+    )
+
+    @app.callback(
+        Output("trade-graph", "figure"),
+        Input("trade-selector", "value"),
+        Input("database-path", "data"),
+        Input("weeks-window", "data"),
+    )
+    def update_graph(selected_trade_id, database_path, weeks_window):
+        with sqlite3.connect(database_path) as conn:
+            return plot_trade_history(selected_trade_id, conn, weeks_window)
+
+    return app
+
+
 def main(args):
+    setup_logging(args.verbose)
     logging.info(f"Connecting to database: {args.database}")
-    conn = sqlite3.connect(args.database)
-    fig = plot_trade_history(args.trade_id, conn, args.weeks)
-    if fig:
-        fig.show(renderer="browser")
-    conn.close()
+
+    app = create_app(args.database, args.weeks)
+    app.run_server(debug=True)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    setup_logging(args.verbose)
     main(args)
