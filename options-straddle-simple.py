@@ -109,6 +109,9 @@ class OptionsDatabase:
         dte,
     ):
         """Create a new short straddle trade"""
+        logging.info(
+            f"Creating trade for {date} with {strike_price=}, {call_price=}, {put_price=}, {underlying_price=}"
+        )
         insert_sql = """
         INSERT INTO trades (
             Date, ExpireDate, DTE, StrikePrice, Status,
@@ -293,8 +296,15 @@ class OptionsDatabase:
             f"Fetching options by delta criteria for {quote_date}/{expiry_date}"
         )
 
+        logging.debug(
+            f"Call query: {call_query} with params: {quote_date=}, {expiry_date=}"
+        )
         call_df = pd.read_sql_query(
             call_query, self.conn, params=(quote_date, expiry_date)
+        )
+
+        logging.debug(
+            f"Put query: {call_query} with params: {quote_date=}, {expiry_date=}"
         )
         put_df = pd.read_sql_query(
             put_query, self.conn, params=(quote_date, expiry_date)
@@ -314,34 +324,6 @@ class OptionsDatabase:
             )
 
         return call_df, put_df
-
-    def get_trade_history(self):
-        """Get complete trade history with P&L tracking"""
-        query = """
-        SELECT
-            t.TradeId,
-            t.Date as OpenDate,
-            t.ExpireDate,
-            t.StrikePrice,
-            t.Status,
-            t.UnderlyingPriceOpen,
-            t.CallPriceOpen + t.PutPriceOpen as TotalPremiumOpen,
-            t.ClosingPremium,
-            th.Date as TrackingDate,
-            th.UnderlyingPrice as CurrentUnderlyingPrice,
-            th.CallPrice + th.PutPrice as CurrentPremium,
-            ROUND(((t.CallPriceOpen + t.PutPriceOpen) - (th.CallPrice + th.PutPrice)) / (t.CallPriceOpen + t.PutPriceOpen) * 100, 2) as PremiumDecayPercent,
-            th.UnderlyingPrice - t.UnderlyingPriceOpen as UnderlyingPriceChange,
-            ROUND((th.UnderlyingPrice - t.UnderlyingPriceOpen) / t.UnderlyingPriceOpen * 100, 2) as UnderlyingPriceChangePercent,
-            CASE
-                WHEN t.Status = 'EXPIRED' AND th.Date = t.ExpireDate THEN 'Final'
-                ELSE 'Tracking'
-            END as RecordType
-        FROM trades t
-        LEFT JOIN trade_history th ON t.TradeId = th.TradeId
-        ORDER BY t.TradeId, th.Date
-        """
-        return pd.read_sql_query(query, self.conn)
 
 
 def setup_logging(verbosity):
@@ -429,57 +411,7 @@ def main(args):
     db.connect()
 
     try:
-        if args.show_history:
-            history_df = db.get_trade_history()
-            if history_df.empty:
-                print("No trade history found in database")
-            else:
-                pd.set_option("display.max_rows", None)
-                pd.set_option("display.float_format", lambda x: "%.2f" % x)
-
-                # Print summary statistics
-                print("\nTrade Summary:")
-                print("-" * 50)
-                trades_summary = (
-                    history_df.groupby("TradeId")
-                    .agg(
-                        {
-                            "OpenDate": "first",
-                            "ExpireDate": "first",
-                            "Status": "first",
-                            "StrikePrice": "first",
-                            "TotalPremiumOpen": "first",
-                            "CurrentPremium": "last",
-                            "PremiumDecayPercent": "last",
-                        }
-                    )
-                    .round(2)
-                )
-                print(trades_summary)
-
-                print("\nDetailed Trade History:")
-                print("-" * 50)
-                print(history_df.to_string())
-
-                # Print aggregate statistics
-                print("\nAggregate Statistics:")
-                print("-" * 50)
-                expired_trades = history_df[history_df["RecordType"] == "Final"]
-                if not expired_trades.empty:
-                    print(f"Total Completed Trades: {len(expired_trades)}")
-                    print(
-                        f"Average Premium Decay: {expired_trades['PremiumDecayPercent'].mean():.2f}%"
-                    )
-                    print(
-                        f"Best Trade: {expired_trades['PremiumDecayPercent'].max():.2f}%"
-                    )
-                    print(
-                        f"Worst Trade: {expired_trades['PremiumDecayPercent'].min():.2f}%"
-                    )
-            return
-
-        # Original trade creation logic
-        db.setup_trades_table()  # Only called if not showing history
+        db.setup_trades_table()
         quote_dates = db.get_quote_dates()
 
         for quote_date in quote_dates:
@@ -506,6 +438,12 @@ def main(args):
                     strike_price = call_df["CALL_STRIKE"].iloc[0]
                     call_price = call_df["CALL_C_LAST"].iloc[0]
                     put_price = put_df["PUT_P_LAST"].iloc[0]
+
+                    if not call_price or not put_price:
+                        logging.warning(
+                            f"Not creating trade. Call Price {call_price} or Put Price {put_price} is missing"
+                        )
+                        continue
 
                     trade_id = db.create_trade(
                         quote_date,
