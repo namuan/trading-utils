@@ -465,6 +465,7 @@ def create_app(database_path, weeks_window=2):
     @app.callback(
         Output("auto-cycle-state", "data"),
         Output("auto-cycle-button", "children"),
+        Output("pause-button", "children"),
         Input("auto-cycle-button", "n_clicks"),
         Input("pause-button", "n_clicks"),
         State("auto-cycle-state", "data"),
@@ -473,33 +474,46 @@ def create_app(database_path, weeks_window=2):
     def toggle_auto_cycle(start_clicks, pause_clicks, current_state):
         ctx = dash.callback_context
         if not ctx.triggered:
-            return current_state, "Start Auto-Cycle"
+            return current_state, "Start Auto-Cycle", "Pause"
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
         if trigger_id == "auto-cycle-button":
             if current_state["running"]:
-                return {
-                    "running": False,
-                    "last_update": None,
-                    "paused": False,
-                }, "Start Auto-Cycle"
+                return (
+                    {
+                        "running": False,
+                        "last_update": None,
+                        "paused": False,
+                    },
+                    "Start Auto-Cycle",
+                    "Pause",
+                )
             else:
-                return {
-                    "running": True,
-                    "last_update": time.time(),
-                    "paused": False,
-                }, "Stop Auto-Cycle"
+                return (
+                    {
+                        "running": True,
+                        "last_update": time.time(),
+                        "paused": False,
+                    },
+                    "Stop Auto-Cycle",
+                    "Pause",
+                )
 
         elif trigger_id == "pause-button":
             if current_state["running"]:
-                return {
-                    "running": True,
-                    "last_update": current_state["last_update"],
-                    "paused": not current_state["paused"],
-                }, "Stop Auto-Cycle"
+                new_paused_state = not current_state["paused"]
+                return (
+                    {
+                        "running": True,
+                        "last_update": current_state["last_update"],
+                        "paused": new_paused_state,
+                    },
+                    "Stop Auto-Cycle",
+                    "Resume" if new_paused_state else "Pause",
+                )
             else:
-                return current_state, "Start Auto-Cycle"
+                return current_state, "Start Auto-Cycle", "Pause"
 
     @app.callback(
         Output("trade-selector", "value"),
