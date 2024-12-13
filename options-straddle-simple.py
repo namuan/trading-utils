@@ -26,10 +26,13 @@ pd.set_option("display.float_format", lambda x: "%.4f" % x)
 
 
 class OptionsDatabase:
-    def __init__(self, db_path):
+    def __init__(self, db_path, dte):
         self.db_path = db_path
+        self.dte = dte
         self.conn = None
         self.cursor = None
+        self.trades_table = f"trades_dte_{int(self.dte)}"
+        self.trade_history_table = f"trade_history_dte_{int(self.dte)}"
 
     def connect(self):
         """Establish database connection"""
@@ -38,19 +41,19 @@ class OptionsDatabase:
         self.cursor = self.conn.cursor()
 
     def setup_trades_table(self):
-        """Drop and recreate trades and trade_history tables"""
+        """Drop and recreate trades and trade_history tables with DTE suffix"""
         # Drop existing tables (trade_history first due to foreign key constraint)
         drop_tables_sql = [
-            "DROP TABLE IF EXISTS trade_history",
-            "DROP TABLE IF EXISTS trades",
+            f"DROP TABLE IF EXISTS {self.trade_history_table}",
+            f"DROP TABLE IF EXISTS {self.trades_table}",
         ]
 
         for drop_sql in drop_tables_sql:
             self.cursor.execute(drop_sql)
 
         # Create trades table
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS trades (
+        create_table_sql = f"""
+        CREATE TABLE IF NOT EXISTS {self.trades_table} (
             TradeId INTEGER PRIMARY KEY,
             Date DATE,
             ExpireDate DATE,
@@ -69,15 +72,15 @@ class OptionsDatabase:
         )
         """
         # Create trade_history table to track daily prices
-        create_history_table_sql = """
-        CREATE TABLE IF NOT EXISTS trade_history (
+        create_history_table_sql = f"""
+        CREATE TABLE IF NOT EXISTS {self.trade_history_table} (
             HistoryId INTEGER PRIMARY KEY,
             TradeId INTEGER,
             Date DATE,
             UnderlyingPrice REAL,
             CallPrice REAL,
             PutPrice REAL,
-            FOREIGN KEY(TradeId) REFERENCES trades(TradeId)
+            FOREIGN KEY(TradeId) REFERENCES {self.trades_table}(TradeId)
         )
         """
         self.cursor.execute(create_table_sql)
@@ -112,8 +115,8 @@ class OptionsDatabase:
         logging.info(
             f"Creating trade for {date} with {strike_price=}, {call_price=}, {put_price=}, {underlying_price=}"
         )
-        insert_sql = """
-        INSERT INTO trades (
+        insert_sql = f"""
+        INSERT INTO {self.trades_table} (
             Date, ExpireDate, DTE, StrikePrice, Status,
             UnderlyingPriceOpen, CallPriceOpen, PutPriceOpen, PremiumCaptured
         ) VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?, ?)
@@ -147,8 +150,8 @@ class OptionsDatabase:
         self, trade_id, date, underlying_price, call_price, put_price
     ):
         """Add a history record for a trade"""
-        insert_sql = """
-        INSERT INTO trade_history (TradeId, Date, UnderlyingPrice, CallPrice, PutPrice)
+        insert_sql = f"""
+        INSERT INTO {self.trade_history_table} (TradeId, Date, UnderlyingPrice, CallPrice, PutPrice)
         VALUES (?, ?, ?, ?, ?)
         """
         self.cursor.execute(
@@ -158,9 +161,9 @@ class OptionsDatabase:
 
     def get_open_trades(self):
         """Get all open trades"""
-        query = """
+        query = f"""
             SELECT TradeId, Date, ExpireDate, StrikePrice, Status
-            FROM trades
+            FROM {self.trades_table}
             WHERE Status = 'OPEN'
             """
         return pd.read_sql_query(query, self.conn)
@@ -189,8 +192,8 @@ class OptionsDatabase:
     ):
         """Update trade with closing prices and status"""
         closing_premium = call_price + put_price
-        update_sql = """
-        UPDATE trades
+        update_sql = f"""
+        UPDATE {self.trades_table}
         SET Status = ?,
             UnderlyingPriceClose = ?,
             CallPriceClose = ?,
@@ -407,7 +410,7 @@ def parse_args():
 
 
 def main(args):
-    db = OptionsDatabase(args.db_path)
+    db = OptionsDatabase(args.db_path, args.dte)
     db.connect()
 
     try:

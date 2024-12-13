@@ -82,14 +82,22 @@ def parse_args():
         default=2,
         help="Number of weeks to show before and after the trade (default: 2)",
     )
+    parser.add_argument(
+        "-t",
+        "--dte",
+        type=int,
+        required=True,
+        help="DTE data to analyse",
+    )
     return parser.parse_args()
 
 
-def get_all_trades(conn):
+def get_all_trades(conn, dte):
     """Fetch all trades from the database."""
-    query = """
+    trades_table = f"trades_dte_{int(dte)}"
+    query = f"""
     SELECT TradeId, Date, Status, StrikePrice, UnderlyingPriceOpen
-    FROM trades
+    FROM {trades_table}
     ORDER BY Date ASC
     """
     trades_df = pd.read_sql_query(query, conn)
@@ -97,9 +105,10 @@ def get_all_trades(conn):
     return trades_df
 
 
-def get_trade_data(trade_id, conn):
+def get_trade_data(trade_id, conn, dte):
     """Fetch trade details from the database."""
-    trade_query = "SELECT * FROM trades WHERE TradeId = ?"
+    trades_table = f"trades_dte_{int(dte)}"
+    trade_query = f"SELECT * FROM {trades_table} WHERE TradeId = ?"
     trade_df = pd.read_sql_query(trade_query, conn, params=(trade_id,))
 
     if trade_df.empty:
@@ -109,11 +118,12 @@ def get_trade_data(trade_id, conn):
     return trade_df
 
 
-def get_market_context(conn, window_start, window_end):
+def get_market_context(conn, window_start, window_end, dte):
     """Fetch market context data within the specified window."""
-    market_query = """
+    trade_history_table = f"trade_history_dte_{int(dte)}"
+    market_query = f"""
     SELECT th.Date, th.UnderlyingPrice, th.TradeId
-    FROM trade_history th
+    FROM {trade_history_table} th
     WHERE th.Date BETWEEN ? AND ?
     ORDER BY th.Date
     """
@@ -126,9 +136,12 @@ def get_market_context(conn, window_start, window_end):
     return market_df
 
 
-def get_trade_history(trade_id, conn):
+def get_trade_history(trade_id, conn, dte):
     """Fetch detailed trade history."""
-    history_query = "SELECT * FROM trade_history WHERE TradeId = ? ORDER BY Date"
+    trade_history_table = f"trade_history_dte_{int(dte)}"
+    history_query = (
+        f"SELECT * FROM {trade_history_table} WHERE TradeId = ? ORDER BY Date"
+    )
     history_df = pd.read_sql_query(history_query, conn, params=(trade_id,))
 
     if history_df.empty:
@@ -348,12 +361,12 @@ def update_axes(fig):
     )
 
 
-def plot_trade_history(trade_id, conn, weeks_window=2):
+def plot_trade_history(trade_id, conn, dte, weeks_window):
     """Main function to create the trade history visualization."""
     logging.info(f"Plotting trade history for Trade ID: {trade_id}")
 
     # Get trade data
-    trade_df = get_trade_data(trade_id, conn)
+    trade_df = get_trade_data(trade_id, conn, dte)
     if trade_df is None:
         return {}  # Return empty figure if no data
 
@@ -371,8 +384,8 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
     window_end = trade_end_date + timedelta(days=weeks_window * 7)
 
     # Get market and trade history data
-    market_df = get_market_context(conn, window_start, window_end)
-    history_df = get_trade_history(trade_id, conn)
+    market_df = get_market_context(conn, window_start, window_end, dte)
+    history_df = get_trade_history(trade_id, conn, dte)
     if history_df is None:
         return {}
 
@@ -402,17 +415,17 @@ def plot_trade_history(trade_id, conn, weeks_window=2):
     return fig
 
 
-def create_app(database_path, weeks_window=2):
+def create_app(database_path, dte, weeks_window=2):
     app = Dash(__name__)
 
     # Get all trades for the dropdown
     with sqlite3.connect(database_path) as conn:
-        trades_df = get_all_trades(conn)
+        trades_df = get_all_trades(conn, dte)
 
     app.layout = html.Div(
         [
             html.H1(
-                "Short Straddle Trades",
+                f"{dte} DTE Short Straddle Trades",
                 style={"textAlign": "center", "marginBottom": 30},
             ),
             html.Div(
@@ -548,16 +561,18 @@ def create_app(database_path, weeks_window=2):
     )
     def update_graph(selected_trade_id, database_path, weeks_window):
         with sqlite3.connect(database_path) as conn:
-            return plot_trade_history(selected_trade_id, conn, weeks_window)
+            return plot_trade_history(selected_trade_id, conn, dte, weeks_window)
 
     return app
 
 
 def main(args):
     setup_logging(args.verbose)
-    logging.info(f"Connecting to database: {args.database}")
+    logging.info(
+        f"Connecting to database: {args.database} and analysing data with {args.dte} dte"
+    )
 
-    app = create_app(args.database, args.weeks)
+    app = create_app(args.database, args.dte, args.weeks)
     app.run_server(debug=True)
 
 
