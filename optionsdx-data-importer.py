@@ -237,9 +237,9 @@ def read_data_file(file_path):
 
 
 def import_csv_files(directory_path, db_connection):
-    data_files = glob.glob(os.path.join(directory_path, "*.csv")) + glob.glob(
-        os.path.join(directory_path, "*.txt")
-    )
+    data_files = glob.glob(
+        os.path.join(directory_path, "**/*.csv"), recursive=True
+    ) + glob.glob(os.path.join(directory_path, "**/*.txt"), recursive=True)
 
     if not data_files:
         logging.warning(f"No CSV/TXT files found in directory: {directory_path}")
