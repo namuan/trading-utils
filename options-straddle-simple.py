@@ -68,7 +68,8 @@ class OptionsDatabase:
             UnderlyingPriceClose REAL,
             PremiumCaptured REAL,
             ClosingPremium REAL,
-            ClosedTradeAt DATE
+            ClosedTradeAt DATE,
+            CloseReason TEXT
         )
         """
         # Create trade_history table to track daily prices
@@ -189,6 +190,7 @@ class OptionsDatabase:
         put_price,
         quote_date,
         status="CLOSED",
+        close_reason=None,
     ):
         """Update trade with closing prices and status"""
         closing_premium = call_price + put_price
@@ -199,7 +201,8 @@ class OptionsDatabase:
             CallPriceClose = ?,
             PutPriceClose = ?,
             ClosingPremium = ?,
-            ClosedTradeAt = ?
+            ClosedTradeAt = ?,
+            CloseReason = ?
         WHERE TradeId = ?
         """
         self.cursor.execute(
@@ -211,6 +214,7 @@ class OptionsDatabase:
                 put_price,
                 closing_premium,
                 quote_date,
+                close_reason,
                 trade_id,
             ),
         )
@@ -374,6 +378,7 @@ def update_open_trades(db, quote_date):
                     put_price,
                     quote_date,
                     "EXPIRED",
+                    close_reason="Option Expired",
                 )
                 logging.info(f"Closed trade {trade['TradeId']} at expiry")
 
