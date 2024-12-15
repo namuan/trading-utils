@@ -351,7 +351,12 @@ def setup_logging(verbosity):
 
 
 def can_close_trade(
-    open_trade, current_underlying_price, current_call_price, current_put_price
+    open_trade,
+    current_underlying_price,
+    current_call_price,
+    current_put_price,
+    profit_take,
+    stop_loss,
 ):
     total_premium_received = open_trade["PremiumCaptured"]
     current_premium_value = current_call_price + current_put_price
@@ -362,18 +367,18 @@ def can_close_trade(
     # Calculate percentage gain/loss
     premium_diff_pct = (premium_diff / total_premium_received) * 100
 
-    # Profit take: If we've captured 30% of the premium received
-    if premium_diff_pct >= 30:
+    # Profit take: If we've captured the specified percentage of the premium received
+    if premium_diff_pct >= profit_take:
         return True, "PROFIT_TAKE"
 
-    # Stop loss: If we've lost 100% of the premium received
-    if premium_diff_pct <= -100:
+    # Stop loss: If we've lost the specified percentage of the premium received
+    if premium_diff_pct <= -stop_loss:
         return True, "STOP_LOSS"
 
     return False, ""
 
 
-def update_open_trades(db, quote_date):
+def update_open_trades(db, quote_date, profit_take, stop_loss):
     """Update all open trades with current prices"""
     open_trades = db.get_open_trades()
 
@@ -392,7 +397,7 @@ def update_open_trades(db, quote_date):
             )
 
             trade_can_be_closed, closing_reason = can_close_trade(
-                trade, underlying_price, call_price, put_price
+                trade, underlying_price, call_price, put_price, profit_take, stop_loss
             )
             if quote_date >= trade["ExpireDate"] or trade_can_be_closed:
                 db.update_trade_status(
@@ -437,6 +442,18 @@ def parse_args():
         action="store_true",
         help="Show trade history without recreating trades",
     )
+    parser.add_argument(
+        "--profit-take",
+        type=float,
+        default=30.0,
+        help="Close position when profit reaches this percentage of premium received",
+    )
+    parser.add_argument(
+        "--stop-loss",
+        type=float,
+        default=100.0,
+        help="Close position when loss reaches this percentage of premium received",
+    )
     return parser.parse_args()
 
 
@@ -450,7 +467,7 @@ def main(args):
 
         for quote_date in quote_dates:
             # Update existing open trades
-            update_open_trades(db, quote_date)
+            update_open_trades(db, quote_date, args.profit_take, args.stop_loss)
 
             # Look for new trade opportunities
             result = db.get_next_expiry_by_dte(quote_date, args.dte)
