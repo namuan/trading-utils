@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!uv run
+# /// script
+# dependencies = [
+#   "backtrader[plotting]",
+# ]
+# ///
 """
 Backtest using RSI strategy
 
@@ -6,6 +11,7 @@ Usage:
 To test over a range and find the best parameters:
 $ py bt_rsi_scale_in_strategy.py | python -c "import sys; print(max((line for line in sys.stdin.read().split('\n') if 'Percent Gain' in line), key=lambda x: float(x.split('Percent Gain')[1].strip().rstrip('%'))))"
 """
+
 import argparse
 import datetime
 import math

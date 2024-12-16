@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!uv run
+# /// script
+# dependencies = [
+#   "backtrader[plotting]",
+# ]
+# ///
 """
 Pct Change Strategy
 
@@ -6,6 +11,7 @@ Usage:
 To test over a range and find the best parameters:
 $ py bt_spy_pct_change_strategy.py
 """
+
 import argparse
 import os
 import subprocess
