@@ -199,7 +199,6 @@ def main(args):
 
     cerebro.adddata(data)
     cerebro.broker.setcash(initial_investment)
-    cerebro.broker.setcommission(commission=0.001)
 
     print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
     cerebro.run()
