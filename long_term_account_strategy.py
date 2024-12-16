@@ -1,14 +1,23 @@
+#!uv run
+# /// script
+# dependencies = [
+#   "stockstats",
+#   "yfinance",
+#   "python-dotenv",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 Long term account strategy
 
 https://app.composer.trade/symphony/iptXKvpNqUuYcUwH8mIB
 """
-from datetime import datetime
-from datetime import timedelta
+
+from datetime import datetime, timedelta
 
 from stockstats import StockDataFrame
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 from common.tele_notifier import pushover_send_message
 
 
