@@ -46,11 +46,11 @@ def calculate_portfolio_positions(df, initial_investment):
     for index, row in df.iterrows():
         portfolio["Date"].append(row["Date"])
 
-        ief_target = row["IEF"]
-        spxl_target = row["SPXL"]
+        ief_target = row["IEF_Next_Day_Signal"]
+        spxl_target = row["SPXL_Next_Day_Signal"]
         if index > 0:
-            ief_prev_target = df.loc[index - 1, "IEF"]
-            spxl_prev_target = df.loc[index - 1, "SPXL"]
+            ief_prev_target = df.loc[index - 1, "IEF_Next_Day_Signal"]
+            spxl_prev_target = df.loc[index - 1, "SPXL_Next_Day_Signal"]
         else:
             ief_prev_target = 0
             spxl_prev_target = 0
@@ -74,7 +74,8 @@ def calculate_portfolio_positions(df, initial_investment):
 
         ief_value = ief_shares * ief_price
         spxl_value = spxl_shares * spxl_price
-        total_value = ief_value + spxl_value
+        if ief_shares > 0 or spxl_shares > 0:
+            total_value = ief_value + spxl_value
 
         portfolio["IEF_shares"].append(ief_shares)
         portfolio["IEF_value"].append(round(ief_value, 2))
@@ -83,7 +84,6 @@ def calculate_portfolio_positions(df, initial_investment):
         portfolio["total_value"].append(round(total_value, 2))
 
     result_df = pd.DataFrame(portfolio)
-    print("Portfolio DataFrame columns:", result_df.columns.tolist())
     return result_df
 
 
@@ -94,8 +94,6 @@ def process_portfolio_data(csv_file_path, initial_investment=100000):
     """
     # Load the CSV into a pandas DataFrame
     df = pd.read_csv(csv_file_path)
-    print("Input DataFrame columns:", df.columns.tolist())
-
     # Convert 'Date' column to datetime objects
     df["Date"] = pd.to_datetime(df["Date"])
 
@@ -126,7 +124,11 @@ def process_portfolio_data(csv_file_path, initial_investment=100000):
     end_date = df["Date"].max()
 
     # List of tickers from the CSV file (exclude non-ticker columns)
-    non_ticker_columns = ["Date", "$USD"]  # Add any other non-ticker columns here
+    non_ticker_columns = [
+        "Date",
+        "Day Traded",
+        "$USD",
+    ]  # Add any other non-ticker columns here
     tickers = [
         col
         for col in df.columns
@@ -159,10 +161,13 @@ def process_portfolio_data(csv_file_path, initial_investment=100000):
         if not col.endswith("_Close"):  # Skip Close price columns
             df[col] = df[col].apply(round_numbers)
 
+    df["IEF_Next_Day_Signal"] = df["IEF"].shift(1).fillna(0)
+    df["SPXL_Next_Day_Signal"] = df["SPXL"].shift(1).fillna(0)
+
+    df = df.fillna(method="ffill")
+
     # Calculate portfolio positions
     portfolio_df = calculate_portfolio_positions(df, initial_investment)
-    print("Before merge - df Date type:", df["Date"].dtype)
-    print("Before merge - portfolio_df Date type:", portfolio_df["Date"].dtype)
 
     # Convert both Date columns to datetime if they aren't already
     df["Date"] = pd.to_datetime(df["Date"])
