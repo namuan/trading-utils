@@ -214,8 +214,6 @@ def main():
             if not df.empty:
                 dfs_dict[dte] = df
                 metrics_dict[dte] = calculate_portfolio_metrics(df)
-                print(f"\nData preview for DTE {dte}:")
-                print(df.head())
 
         if not dfs_dict:
             print("No data found in any of the tables.")
