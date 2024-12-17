@@ -26,10 +26,13 @@ Arguments:
 """
 
 import logging
+import os
 import sqlite3
 import time
+import webbrowser
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import timedelta
+from threading import Timer
 
 import dash
 import pandas as pd
@@ -572,7 +575,12 @@ def main(args):
         f"Connecting to database: {args.database} and analysing data with {args.dte} dte"
     )
 
+    def open_browser(port=8050):
+        if not os.environ.get("WERKZEUG_RUN_MAIN"):
+            webbrowser.open_new(f"http://localhost:{port}")
+
     app = create_app(args.database, args.dte, args.weeks)
+    Timer(1, open_browser).start()
     app.run_server(debug=True)
 
 
