@@ -383,7 +383,7 @@ def can_close_trade(
     return False, ""
 
 
-def update_open_trades(db, quote_date, profit_take, stop_loss):
+def update_open_trades(db, quote_date, close_at_expiry, profit_take, stop_loss):
     """Update all open trades with current prices"""
     open_trades = db.get_open_trades()
 
@@ -401,9 +401,18 @@ def update_open_trades(db, quote_date, profit_take, stop_loss):
                 trade["TradeId"], quote_date, underlying_price, call_price, put_price
             )
 
-            trade_can_be_closed, closing_reason = can_close_trade(
-                trade, underlying_price, call_price, put_price, profit_take, stop_loss
-            )
+            if close_at_expiry:
+                trade_can_be_closed = False
+                closing_reason = None
+            else:
+                trade_can_be_closed, closing_reason = can_close_trade(
+                    trade,
+                    underlying_price,
+                    call_price,
+                    put_price,
+                    profit_take,
+                    stop_loss,
+                )
             if quote_date >= trade["ExpireDate"] or trade_can_be_closed:
                 db.update_trade_status(
                     trade["TradeId"],
@@ -441,6 +450,12 @@ def parse_args():
         type=float,
         default=30,
         help="Find next expiration with DTE greater than this value",
+    )
+    parser.add_argument(
+        "--close-at-expiry",
+        action="store_true",
+        default=False,
+        help="Close trades on expiry without checking profit take and stop loss thresholds",
     )
     parser.add_argument(
         "--profit-take",
@@ -487,7 +502,9 @@ def main(args):
 
         for quote_date in quote_dates:
             # Update existing open trades
-            update_open_trades(db, quote_date, args.profit_take, args.stop_loss)
+            update_open_trades(
+                db, quote_date, args.close_at_expiry, args.profit_take, args.stop_loss
+            )
 
             # Look for new trade opportunities
             result = db.get_next_expiry_by_dte(quote_date, args.dte)
