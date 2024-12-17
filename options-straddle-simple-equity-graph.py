@@ -56,6 +56,7 @@ def calculate_portfolio_metrics(df):
         expectancy_ratio = 0
 
     # Store metrics with proper formatting
+    metrics["Total Trades"] = total_trades
     metrics["Win Rate"] = f"{win_rate:.2f}%"
     metrics["Avg Winner ($)"] = f"${avg_winner:.2f}"
     metrics["Max Winner ($)"] = f"${max_winner:.2f}"
