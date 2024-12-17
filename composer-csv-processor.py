@@ -1,7 +1,6 @@
 import argparse
 import os
 
-import numpy as np
 import pandas as pd
 
 from common.market_data import download_ticker_data
@@ -9,21 +8,6 @@ from common.market_data import download_ticker_data
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_colwidth", None)
-
-
-def round_numbers(x):
-    """
-    Custom rounding function:
-    - Rounds numbers above 0.99 to 1
-    - Rounds numbers below 0.01 to 0
-    - Leaves other numbers as they are
-    """
-    if isinstance(x, (int, float)):
-        if x > 0.99:
-            return 1.0
-        elif x < 0.01:
-            return 0.0
-    return x
 
 
 def calculate_portfolio_positions(df, initial_investment):
@@ -87,7 +71,7 @@ def calculate_portfolio_positions(df, initial_investment):
     return result_df
 
 
-def process_portfolio_data(csv_file_path, initial_investment=100000):
+def process_portfolio_data(csv_file_path, initial_investment):
     """
     Loads portfolio data from CSV, fetches stock data using download_ticker_data,
     adds close prices, calculates cumulative returns, portfolio value, and sorts by date.
@@ -112,8 +96,6 @@ def process_portfolio_data(csv_file_path, initial_investment=100000):
             # Check if column contains percentage values
             if df[col].str.contains("%", na=False).any():
                 df[col] = df[col].str.rstrip("%").astype(float) / 100
-                # Apply rounding logic
-                df[col] = df[col].apply(round_numbers)
 
     # Sort the DataFrame by the 'Date' column in ascending order
     df = df.sort_values(by="Date", ascending=True)
@@ -155,16 +137,10 @@ def process_portfolio_data(csv_file_path, initial_investment=100000):
         else:
             raise KeyError(f"{stock_data['ticker']} is None")
 
-    # Apply rounding to all numeric columns (except Date and Close prices)
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        if not col.endswith("_Close"):  # Skip Close price columns
-            df[col] = df[col].apply(round_numbers)
+    df = df.ffill()
 
     df["IEF_Next_Day_Signal"] = df["IEF"].shift(1).fillna(0)
     df["SPXL_Next_Day_Signal"] = df["SPXL"].shift(1).fillna(0)
-
-    df = df.fillna(method="ffill")
 
     # Calculate portfolio positions
     portfolio_df = calculate_portfolio_positions(df, initial_investment)
@@ -217,5 +193,3 @@ if __name__ == "__main__":
     print(
         f"Final SPXL Shares: {portfolio_df['SPXL_shares'].iloc[-1]:,.0f} (${portfolio_df['SPXL_value'].iloc[-1]:,.2f})"
     )
-    print("\nDataFrame preview:")
-    print(portfolio_df.to_string())
