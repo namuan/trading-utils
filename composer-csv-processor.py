@@ -26,22 +26,75 @@ def round_numbers(x):
     return x
 
 
+def calculate_portfolio_positions(df, initial_investment):
+    """
+    Calculate portfolio positions, shares bought for each date.
+    """
+    portfolio = {
+        "Date": [],
+        "IEF_shares": [],
+        "IEF_value": [],
+        "SPXL_shares": [],
+        "SPXL_value": [],
+        "total_value": [],
+    }
+
+    ief_prev_shares = 0
+    spxl_prev_shares = 0
+    total_value = initial_investment
+
+    for index, row in df.iterrows():
+        portfolio["Date"].append(row["Date"])
+
+        ief_target = row["IEF"]
+        spxl_target = row["SPXL"]
+        if index > 0:
+            ief_prev_target = df.loc[index - 1, "IEF"]
+            spxl_prev_target = df.loc[index - 1, "SPXL"]
+        else:
+            ief_prev_target = 0
+            spxl_prev_target = 0
+
+        ief_price = row["IEF_Close"]
+        spxl_price = row["SPXL_Close"]
+
+        if ief_target == 0.0:
+            ief_shares = 0
+        elif ief_target != ief_prev_target:
+            ief_shares = ief_prev_shares = total_value / ief_price
+        else:
+            ief_shares = ief_prev_shares
+
+        if spxl_target == 0.0:
+            spxl_shares = 0
+        elif spxl_target != spxl_prev_target:
+            spxl_shares = spxl_prev_shares = total_value / spxl_price
+        else:
+            spxl_shares = spxl_prev_shares
+
+        ief_value = ief_shares * ief_price
+        spxl_value = spxl_shares * spxl_price
+        total_value = ief_value + spxl_value
+
+        portfolio["IEF_shares"].append(ief_shares)
+        portfolio["IEF_value"].append(round(ief_value, 2))
+        portfolio["SPXL_shares"].append(spxl_shares)
+        portfolio["SPXL_value"].append(round(spxl_value, 2))
+        portfolio["total_value"].append(round(total_value, 2))
+
+    result_df = pd.DataFrame(portfolio)
+    print("Portfolio DataFrame columns:", result_df.columns.tolist())
+    return result_df
+
+
 def process_portfolio_data(csv_file_path, initial_investment=100000):
     """
     Loads portfolio data from CSV, fetches stock data using download_ticker_data,
     adds close prices, calculates cumulative returns, portfolio value, and sorts by date.
-
-    Args:
-        csv_file_path (str): Path to the CSV file.
-        initial_investment (float): The initial investment amount.
-
-    Returns:
-        pandas.DataFrame: DataFrame with portfolio data, added close prices,
-                         cumulative returns, portfolio value, and sorted by date.
     """
-
     # Load the CSV into a pandas DataFrame
     df = pd.read_csv(csv_file_path)
+    print("Input DataFrame columns:", df.columns.tolist())
 
     # Convert 'Date' column to datetime objects
     df["Date"] = pd.to_datetime(df["Date"])
@@ -106,7 +159,19 @@ def process_portfolio_data(csv_file_path, initial_investment=100000):
         if not col.endswith("_Close"):  # Skip Close price columns
             df[col] = df[col].apply(round_numbers)
 
-    return df
+    # Calculate portfolio positions
+    portfolio_df = calculate_portfolio_positions(df, initial_investment)
+    print("Before merge - df Date type:", df["Date"].dtype)
+    print("Before merge - portfolio_df Date type:", portfolio_df["Date"].dtype)
+
+    # Convert both Date columns to datetime if they aren't already
+    df["Date"] = pd.to_datetime(df["Date"])
+    portfolio_df["Date"] = pd.to_datetime(portfolio_df["Date"])
+
+    # Merge the original dataframe with the portfolio calculations
+    result_df = pd.merge(df, portfolio_df, on="Date", how="left")
+
+    return result_df
 
 
 if __name__ == "__main__":
@@ -132,11 +197,20 @@ if __name__ == "__main__":
     portfolio_df = process_portfolio_data(args.csv_file, args.initial_investment)
 
     # Export to CSV
-    output_path = args.output
-    if output_path:
+    if args.output:
+        output_path = args.output
         portfolio_df.to_csv(output_path, index=False)
         print("\nDataFrame exported to CSV successfully!")
         print(f"Output file: {os.path.abspath(output_path)}")
 
+    print("\nPortfolio Summary:")
+    print(f"Initial Investment: ${args.initial_investment:,.2f}")
+    print(f"Final Portfolio Value: ${portfolio_df['total_value'].iloc[-1]:,.2f}")
+    print(
+        f"Final IEF Shares: {portfolio_df['IEF_shares'].iloc[-1]:,.0f} (${portfolio_df['IEF_value'].iloc[-1]:,.2f})"
+    )
+    print(
+        f"Final SPXL Shares: {portfolio_df['SPXL_shares'].iloc[-1]:,.0f} (${portfolio_df['SPXL_value'].iloc[-1]:,.2f})"
+    )
     print("\nDataFrame preview:")
     print(portfolio_df.to_string())
