@@ -383,7 +383,9 @@ def can_close_trade(
     return False, ""
 
 
-def update_open_trades(db, quote_date, close_at_expiry, profit_take, stop_loss):
+def update_open_trades(
+    db, quote_date, close_at_expiry, profit_take, stop_loss, high_vol_regime
+):
     """Update all open trades with current prices"""
     open_trades = db.get_open_trades()
 
@@ -404,6 +406,9 @@ def update_open_trades(db, quote_date, close_at_expiry, profit_take, stop_loss):
             if close_at_expiry:
                 trade_can_be_closed = False
                 closing_reason = None
+            elif high_vol_regime:
+                trade_can_be_closed = True
+                closing_reason = "High Vol"
             else:
                 trade_can_be_closed, closing_reason = can_close_trade(
                     trade,
@@ -501,10 +506,32 @@ def main(args):
         df[f"Signal_Med{window2}"] = (df[f"IVTS_Med{window2}"] < 1).astype(int) * 2 - 1
 
         for quote_date in quote_dates:
+            high_vol_regime = False
+            try:
+                signal_raw_value = df.loc[quote_date, "Signal_Raw"]
+                if signal_raw_value == 1:
+                    print(f"The Signal_Raw value for {quote_date} is 1.")
+                    high_vol_regime = False
+                else:
+                    print(
+                        f"High Vol environment. The Signal_Raw value for {quote_date} is not 1. It is {signal_raw_value}"
+                    )
+                    high_vol_regime = True
+            except KeyError:
+                print(f"Date {quote_date} not found in DataFrame.")
+
             # Update existing open trades
             update_open_trades(
-                db, quote_date, args.close_at_expiry, args.profit_take, args.stop_loss
+                db,
+                quote_date,
+                args.close_at_expiry,
+                args.profit_take,
+                args.stop_loss,
+                high_vol_regime,
             )
+
+            if high_vol_regime:
+                continue
 
             # Look for new trade opportunities
             result = db.get_next_expiry_by_dte(quote_date, args.dte)
@@ -532,18 +559,6 @@ def main(args):
                             f"Not creating trade. Call Price {call_price} or Put Price {put_price} is missing"
                         )
                         continue
-
-                    try:
-                        signal_raw_value = df.loc[quote_date, "Signal_Raw"]
-                        if signal_raw_value == 1:
-                            print(f"The Signal_Raw value for {quote_date} is 1.")
-                        else:
-                            print(
-                                f"High Vol environment. The Signal_Raw value for {quote_date} is not 1. It is {signal_raw_value}"
-                            )
-                            continue
-                    except KeyError:
-                        print(f"Date {quote_date} not found in DataFrame.")
 
                     trade_id = db.create_trade(
                         quote_date,
