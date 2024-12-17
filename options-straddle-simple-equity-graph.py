@@ -43,6 +43,10 @@ def calculate_portfolio_metrics(df):
     avg_winner = float(winners["PremiumKept"].mean()) if len(winners) > 0 else 0
     avg_loser = abs(float(losers["PremiumKept"].mean())) if len(losers) > 0 else 0
 
+    # Maximum winner and loser
+    max_winner = float(winners["PremiumKept"].max()) if len(winners) > 0 else 0
+    max_loser = abs(float(losers["PremiumKept"].min())) if len(losers) > 0 else 0
+
     # Calculate Expectancy Ratio
     if avg_loser > 0:
         expectancy_ratio = (
@@ -54,8 +58,10 @@ def calculate_portfolio_metrics(df):
     # Store metrics with proper formatting
     metrics["Win Rate"] = f"{win_rate:.2f}%"
     metrics["Avg Winner ($)"] = f"${avg_winner:.2f}"
+    metrics["Max Winner ($)"] = f"${max_winner:.2f}"
     metrics["Loss Rate"] = f"{loss_rate:.2f}%"
     metrics["Avg Loser ($)"] = f"${avg_loser:.2f}"
+    metrics["Max Loser ($)"] = f"${max_loser:.2f}"
     metrics["Expectancy Ratio"] = f"{expectancy_ratio:.2f}"
 
     return metrics
