@@ -174,7 +174,7 @@ def calculate_total_subplot_heights(dfs_dict):
         equity_graph_height
         + metrics_table_height
         + total_win_rates_height
-        + 200 * (num_dtes + 2)  # Increased padding from 150 to 200
+        + 50 * (num_dtes + 2)  # Reduced padding from 100 to 50
     )
 
     return {
@@ -205,9 +205,7 @@ def plot_equity_graph(dfs_dict, title):
     row_heights = [heights["equity"] / total_height, heights["metrics"] / total_height]
     row_heights.extend([h / total_height for h in heights["win_rates"]])
 
-    # Calculate vertical spacing based on number of rows
-    total_rows = 2 + num_win_rate_tables  # equity + metrics + win rate tables
-    vertical_spacing = min(0.015, 1.0 / (total_rows * 2))
+    vertical_spacing = 0.01  # Fixed vertical spacing instead of dynamic calculation
 
     # Create subplot titles
     subplot_titles = [title, "Performance Metrics by DTE"]
