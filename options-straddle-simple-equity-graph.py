@@ -176,6 +176,7 @@ def plot_equity_graph(dfs_dict, title):
         (21, 30): "#47B39C",
         (31, 40): "#9747B3",
         (41, 50): "#FF8C1A",
+        (51, 60): "#7E57C2",
     }
 
     sorted_dtes = sorted(dfs_dict.keys())
@@ -331,47 +332,41 @@ def main():
     args = parse_arguments()
 
     print(f"\nFetching data from database: {args.db_path}")
+    dte_tables = get_dte_tables(args.db_path)
 
-    try:
-        dte_tables = get_dte_tables(args.db_path)
-
-        if not dte_tables:
-            print("No trades_dte tables found in the database.")
-            return
-
-        print(f"\nFound tables: {', '.join(dte_tables)}")
-
-        dfs_dict = {}
-        metrics_dict = {}
-
-        for table in dte_tables:
-            dte = int(table.split("_")[-1])
-            df = fetch_data(args.db_path, table)
-
-            if not df.empty:
-                dfs_dict[dte] = df
-                metrics_dict[dte] = calculate_portfolio_metrics(df)
-
-        if not dfs_dict:
-            print("No data found in any of the tables.")
-            return
-
-        display_metrics_table(metrics_dict)
-
-        fig = plot_equity_graph(dfs_dict, args.title)
-        fig = add_metrics_to_figure(fig, metrics_dict)
-
-        fig.show()
-
-        if args.output:
-            html_content = create_html_output(fig)
-            with open(args.output, "w", encoding="utf-8") as f:
-                f.write(html_content)
-            print(f"\nEquity graph and metrics saved to: {args.output}")
-
-    except Exception as e:
-        print(f"\nError: {str(e)}")
+    if not dte_tables:
+        print("No trades_dte tables found in the database.")
         return
+
+    print(f"\nFound tables: {', '.join(dte_tables)}")
+
+    dfs_dict = {}
+    metrics_dict = {}
+
+    for table in dte_tables:
+        dte = int(table.split("_")[-1])
+        df = fetch_data(args.db_path, table)
+
+        if not df.empty:
+            dfs_dict[dte] = df
+            metrics_dict[dte] = calculate_portfolio_metrics(df)
+
+    if not dfs_dict:
+        print("No data found in any of the tables.")
+        return
+
+    display_metrics_table(metrics_dict)
+
+    fig = plot_equity_graph(dfs_dict, args.title)
+    fig = add_metrics_to_figure(fig, metrics_dict)
+
+    fig.show()
+
+    if args.output:
+        html_content = create_html_output(fig)
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        print(f"\nEquity graph and metrics saved to: {args.output}")
 
 
 if __name__ == "__main__":
