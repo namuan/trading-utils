@@ -282,6 +282,7 @@ def update_figure_layout(fig, trade_id, trade_df, initial_premium, final_premium
     entry_price = trade_df.UnderlyingPriceOpen.iloc[0]
     exit_price = trade_df.UnderlyingPriceClose.iloc[0]
     strike_price = trade_df.StrikePrice.iloc[0]
+    close_reason = trade_df.CloseReason.iloc[0]
 
     # Create annotations list with HTML formatting
     annotations = [
@@ -304,7 +305,7 @@ def update_figure_layout(fig, trade_id, trade_df, initial_premium, final_premium
     else:
         gain_loss_color = "red"
     annotations.append(
-        f'<b>Gain/Loss:</b> <span style="color:{gain_loss_color};">${premium_gain_loss:.2f}</span>'
+        f'<b>Gain/Loss:</b> <span style="color:{gain_loss_color};">${premium_gain_loss:.2f}</span> ({close_reason})'
     )
 
     # Join all annotations with <br> tags for newlines
