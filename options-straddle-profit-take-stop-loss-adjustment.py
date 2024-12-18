@@ -130,6 +130,12 @@ def parse_args():
         default=100.0,
         help="Close position when loss reaches this percentage of premium received",
     )
+    parser.add_argument(
+        "--max-open-trades",
+        type=int,
+        default=99,
+        help="Maximum number of open trades allowed at a given time",
+    )
     return parser.parse_args()
 
 
@@ -169,6 +175,14 @@ def main(args):
                     if not call_price or not put_price:
                         logging.warning(
                             f"Not creating trade. Call Price {call_price} or Put Price {put_price} is missing"
+                        )
+                        continue
+
+                    # Check if maximum number of open trades has been reached
+                    open_trades = db.get_open_trades()
+                    if len(open_trades) >= args.max_open_trades:
+                        logging.debug(
+                            f"Maximum number of open trades ({args.max_open_trades}) reached. Skipping new trade creation."
                         )
                         continue
 

@@ -95,7 +95,7 @@ def parse_args():
     parser.add_argument(
         "--max-open-trades",
         type=int,
-        default=1,
+        default=99,
         help="Maximum number of open trades allowed at a given time",
     )
     return parser.parse_args()
