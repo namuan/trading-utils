@@ -14,7 +14,7 @@ uvr optionsdx-data-importer.py --input $(pwd)/data/spy_eod --output data/spy_eod
 ### Vol check, Profit Take 15%, Stop Loss 100% of Credit
 
 ```shell
-for dte in {14..45}; do
+for dte in {7..60}; do
     echo "Running for DTE: $dte"
     uvr --no-progress options-straddle-low-vol-trades.py --db-path data/spx_eod.db --dte $dte --profit-take 15 --stop-loss 100
 done
@@ -35,7 +35,7 @@ uvr options-straddle-simple-equity-graph.py --db-path data/spx_eod_vol_filter.db
 ### What if we keep all trades with given profit take and stop loss
 
 ```shell
-for dte in {14..45}; do
+for dte in {7..60}; do
     echo "Running for DTE: $dte"
     uvr --no-progress options-straddle-profit-take-stop-loss-adjustment.py --db-path data/spx_eod.db --dte $dte --profit-take 15 --stop-loss 50
 done
@@ -56,7 +56,7 @@ uvr options-straddle-simple-equity-graph.py --db-path data/spx_eod_profit_loss_a
 ### What if we keep all trades all the time
 
 ```shell
-for dte in {14..45}; do
+for dte in {7..60}; do
     echo "Running for DTE: $dte"
     uvr --no-progress options-straddle-simple.py --db-path data/spx_eod.db --dte $dte
 done
