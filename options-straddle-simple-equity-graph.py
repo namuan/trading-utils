@@ -327,6 +327,34 @@ def add_metrics_to_figure(fig, metrics_dict):
 
 
 def add_win_rates_to_figure(fig, win_rates_df, row_number):
+    # Function to determine cell color based on premium value
+    def get_cell_color(value):
+        if value == "-":
+            return "lavender"
+        # Remove "$" and convert to float
+        try:
+            amount = float(value.replace("$", ""))
+            if amount > 0:
+                # Green scale for positive values
+                intensity = min(
+                    abs(amount) / 1000, 1
+                )  # Adjust 1000 to change color intensity scaling
+                return f"rgba(0, 255, 0, {0.1 + intensity * 0.3})"
+            else:
+                # Red scale for negative values
+                intensity = min(
+                    abs(amount) / 1000, 1
+                )  # Adjust 1000 to change color intensity scaling
+                return f"rgba(255, 0, 0, {0.1 + intensity * 0.3})"
+        except:
+            return "lavender"
+
+    # Create cell colors for each column
+    cell_colors = []
+    for col in win_rates_df.columns:
+        col_colors = [get_cell_color(val) for val in win_rates_df[col]]
+        cell_colors.append(col_colors)
+
     fig.add_trace(
         go.Table(
             header=dict(
@@ -339,7 +367,8 @@ def add_win_rates_to_figure(fig, win_rates_df, row_number):
             cells=dict(
                 values=[win_rates_df.index]
                 + [win_rates_df[col] for col in win_rates_df.columns],
-                fill_color="lavender",
+                fill_color=["lavender"]
+                + cell_colors,  # First column (Year) stays lavender
                 align="center",
                 font=dict(size=11),
                 height=30,
