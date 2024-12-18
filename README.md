@@ -13,6 +13,7 @@ Collection of scripts and utilities for stock market analysis, strategies etc
 ## Options Analysis
 
 [short-straddle-1-max-position-close-at-expiry](https://namuan.github.io/trading-utils/short-straddles/short-straddle-1-max-position-close-at-expiry.html)
+[short-straddle-5-max-position-30-profit-100-loss-close-at-expiry](https://namuan.github.io/trading-utils/short-straddles/short-straddle-5-max-position-30-profit-100-loss-close-at-expiry.html)
 
 ## Setup virtual environment
 
