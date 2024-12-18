@@ -14,7 +14,7 @@ input:
     - Optional: Graph title
 output:
     - Interactive equity graph showing the cumulative premium kept over time for different DTEs
-    - Portfolio performance metrics table in console
+    - Portfolio performance metrics table in console and HTML
 """
 
 import argparse
@@ -67,6 +67,43 @@ def calculate_portfolio_metrics(df):
     metrics["Expectancy Ratio"] = f"{expectancy_ratio:.2f}"
 
     return metrics
+
+
+def create_metrics_table(metrics_dict):
+    # Convert metrics dictionary to DataFrame with metrics as columns
+    metrics_df = pd.DataFrame.from_dict(metrics_dict, orient="index")
+
+    # Rename the index to show "DTE" prefix
+    metrics_df.index = [dte for dte in metrics_df.index]
+
+    # Create table figure
+    table = go.Figure(
+        data=[
+            go.Table(
+                header=dict(
+                    values=["DTE"] + list(metrics_df.columns),
+                    fill_color="paleturquoise",
+                    align="left",
+                    font=dict(size=12),
+                ),
+                cells=dict(
+                    values=[metrics_df.index]
+                    + [metrics_df[col] for col in metrics_df.columns],
+                    fill_color="lavender",
+                    align="left",
+                    font=dict(size=11),
+                ),
+            )
+        ]
+    )
+
+    table.update_layout(
+        title="Trading Performance Metrics by DTE",
+        height=len(metrics_df) * 30 + 100,  # Adjust height based on number of rows
+        margin=dict(l=0, r=0, t=30, b=0),
+    )
+
+    return table
 
 
 def display_metrics_table(metrics_dict):
@@ -181,6 +218,52 @@ def plot_equity_graph(dfs_dict, title):
     return fig
 
 
+def create_html_output(equity_fig, metrics_dict):
+    metrics_by_dte = {}
+    for dte, metrics in metrics_dict.items():
+        metrics_by_dte[f"DTE {dte}"] = metrics
+
+    metrics_table = create_metrics_table(metrics_by_dte)
+
+    html_content = f"""
+    <html>
+    <head>
+        <title>Trading Analysis</title>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                max-width: 1200px;
+                margin: 0 auto;
+                background-color: white;
+                padding: 20px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                border-radius: 5px;
+            }}
+            .graph-container {{
+                margin-bottom: 30px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="graph-container">
+                {equity_fig.to_html(full_html=False, include_plotlyjs=False)}
+            </div>
+            <div class="graph-container">
+                {metrics_table.to_html(full_html=False, include_plotlyjs=False)}
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Generate equity graphs and calculate portfolio metrics based on trades data from an SQLite database.",
@@ -241,8 +324,10 @@ def main():
         fig.show()
 
         if args.output:
-            fig.write_html(args.output)
-            print(f"\nEquity graph saved to: {args.output}")
+            html_content = create_html_output(fig, metrics_dict)
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            print(f"\nEquity graph and metrics saved to: {args.output}")
 
     except Exception as e:
         print(f"\nError: {str(e)}")
