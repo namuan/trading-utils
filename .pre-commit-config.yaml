@@ -6,6 +6,7 @@ repos:
       - id: check-ast
       - id: check-builtin-literals
       - id: check-added-large-files
+        exclude: ^docs/.*\.html$
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-docstring-first
