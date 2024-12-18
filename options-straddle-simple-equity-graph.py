@@ -154,7 +154,21 @@ def fetch_data(db_path, table_name):
 
 
 def plot_equity_graph(dfs_dict, title):
-    fig = make_subplots(rows=1, cols=1)
+    # Calculate required height for table based on number of rows
+    num_rows = len(dfs_dict)
+    table_height = (num_rows + 1) * 40  # +1 for header, 40px per row
+    graph_height = 800
+    total_height = graph_height + table_height + 100  # 100px for padding and titles
+
+    # Create subplot with 2 rows: equity graph on top, metrics table on bottom
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        row_heights=[graph_height / total_height, table_height / total_height],
+        vertical_spacing=0.05,
+        specs=[[{"type": "xy"}], [{"type": "table"}]],
+        subplot_titles=(title, "Performance Metrics by DTE"),
+    )
 
     dte_groups = {
         (0, 10): "#FF4D4D",
@@ -194,16 +208,15 @@ def plot_equity_graph(dfs_dict, title):
                 + "<b>Cumulative Premium:</b> $%{y:.2f}<br>"
                 + f"<b>DTE:</b> {dte}<br>"
                 + "<extra></extra>",
-            )
+            ),
+            row=1,
+            col=1,
         )
 
     fig.update_layout(
-        title=title,
-        xaxis_title="Date",
-        yaxis_title="Cumulative Premium Kept ($)",
         showlegend=True,
         template="plotly_white",
-        height=800,
+        height=total_height,
         width=1200,
         legend=dict(
             yanchor="middle",
@@ -212,19 +225,47 @@ def plot_equity_graph(dfs_dict, title):
             x=1.02,
             bgcolor="rgba(255, 255, 255, 0.8)",
         ),
-        margin=dict(r=150),
+        margin=dict(r=150, t=100, b=20),
+    )
+
+    fig.update_xaxes(title_text="Date", row=1, col=1)
+    fig.update_yaxes(title_text="Cumulative Premium Kept ($)", row=1, col=1)
+
+    return fig
+
+
+def add_metrics_to_figure(fig, metrics_dict):
+    # Convert metrics dictionary to DataFrame with metrics as columns
+    metrics_df = pd.DataFrame.from_dict(metrics_dict, orient="index")
+
+    # Rename the index to show "DTE" prefix
+    metrics_df.index = [f"DTE {dte}" for dte in metrics_df.index]
+
+    # Add table trace
+    fig.add_trace(
+        go.Table(
+            header=dict(
+                values=["DTE"] + list(metrics_df.columns),
+                fill_color="paleturquoise",
+                align="left",
+                font=dict(size=12),
+            ),
+            cells=dict(
+                values=[metrics_df.index]
+                + [metrics_df[col] for col in metrics_df.columns],
+                fill_color="lavender",
+                align="left",
+                font=dict(size=11),
+            ),
+        ),
+        row=2,
+        col=1,
     )
 
     return fig
 
 
-def create_html_output(equity_fig, metrics_dict):
-    metrics_by_dte = {}
-    for dte, metrics in metrics_dict.items():
-        metrics_by_dte[f"DTE {dte}"] = metrics
-
-    metrics_table = create_metrics_table(metrics_by_dte)
-
+def create_html_output(fig):
     html_content = f"""
     <html>
     <head>
@@ -252,10 +293,7 @@ def create_html_output(equity_fig, metrics_dict):
     <body>
         <div class="container">
             <div class="graph-container">
-                {equity_fig.to_html(full_html=False, include_plotlyjs=False)}
-            </div>
-            <div class="graph-container">
-                {metrics_table.to_html(full_html=False, include_plotlyjs=False)}
+                {fig.to_html(full_html=False, include_plotlyjs=False)}
             </div>
         </div>
     </body>
@@ -320,11 +358,12 @@ def main():
         display_metrics_table(metrics_dict)
 
         fig = plot_equity_graph(dfs_dict, args.title)
+        fig = add_metrics_to_figure(fig, metrics_dict)
 
         fig.show()
 
         if args.output:
-            html_content = create_html_output(fig, metrics_dict)
+            html_content = create_html_output(fig)
             with open(args.output, "w", encoding="utf-8") as f:
                 f.write(html_content)
             print(f"\nEquity graph and metrics saved to: {args.output}")
