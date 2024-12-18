@@ -153,23 +153,82 @@ def fetch_data(db_path, table_name):
     return df
 
 
-def plot_equity_graph(dfs_dict, title):
-    # Calculate required height for table based on number of rows
-    num_rows = len(dfs_dict)
-    table_height = (num_rows + 1) * 40  # +1 for header, 40px per row
-    graph_height = 800
-    total_height = graph_height + table_height + 100  # 100px for padding and titles
+def calculate_total_subplot_heights(dfs_dict):
+    num_dtes = len(dfs_dict)
 
-    # Create subplot with 2 rows: equity graph on top, metrics table on bottom
-    fig = make_subplots(
-        rows=2,
-        cols=1,
-        row_heights=[graph_height / total_height, table_height / total_height],
-        vertical_spacing=0.05,
-        specs=[[{"type": "xy"}], [{"type": "table"}]],
-        subplot_titles=(title, "Performance Metrics by DTE"),
+    # Heights for different components
+    equity_graph_height = 800
+    metrics_table_height = (num_dtes + 1) * 40  # +1 for header
+
+    # Calculate win rates table heights
+    win_rates_table_heights = []
+    for dte in dfs_dict.keys():
+        num_years = len(set(pd.to_datetime(dfs_dict[dte]["Date"]).dt.year))
+        table_height = (num_years + 1) * 40  # +1 for header
+        win_rates_table_heights.append(table_height)
+
+    total_win_rates_height = sum(win_rates_table_heights)
+
+    # Total height including padding
+    total_height = (
+        equity_graph_height
+        + metrics_table_height
+        + total_win_rates_height
+        + 100 * (num_dtes + 2)
+    )  # padding
+
+    return {
+        "total": total_height,
+        "equity": equity_graph_height,
+        "metrics": metrics_table_height,
+        "win_rates": win_rates_table_heights,
+    }
+
+
+def plot_equity_graph(dfs_dict, title):
+    # Calculate required heights
+    heights = calculate_total_subplot_heights(dfs_dict)
+    num_win_rate_tables = len(dfs_dict)
+
+    # Create subplot specs
+    specs = [
+        [{"type": "xy"}],  # Equity graph
+        [{"type": "table"}],
+    ]  # Metrics table
+
+    # Add specs for each DTE's win rate table
+    for _ in range(num_win_rate_tables):
+        specs.append([{"type": "table"}])
+
+    # Calculate row heights as proportions
+    total_height = heights["total"]
+    row_heights = [heights["equity"] / total_height, heights["metrics"] / total_height]
+    row_heights.extend([h / total_height for h in heights["win_rates"]])
+
+    # Calculate vertical spacing based on number of rows
+    # Use a smaller spacing when there are many rows
+    total_rows = 2 + num_win_rate_tables  # equity + metrics + win rate tables
+    vertical_spacing = min(
+        0.015, 1.0 / (total_rows * 2)
+    )  # Ensure spacing is small enough
+
+    # Create subplot titles
+    subplot_titles = [title, "Performance Metrics by DTE"]
+    subplot_titles.extend(
+        [f"Monthly Win Rates - DTE {dte}" for dte in sorted(dfs_dict.keys())]
     )
 
+    # Create subplots
+    fig = make_subplots(
+        rows=len(specs),
+        cols=1,
+        row_heights=row_heights,
+        vertical_spacing=vertical_spacing,
+        specs=specs,
+        subplot_titles=subplot_titles,
+    )
+
+    # Plot equity lines
     dte_groups = {
         (0, 10): "#FF4D4D",
         (11, 20): "#4D94FF",
@@ -180,8 +239,8 @@ def plot_equity_graph(dfs_dict, title):
     }
 
     sorted_dtes = sorted(dfs_dict.keys())
-
     dte_colors = {}
+
     for dte in sorted_dtes:
         for (lower, upper), base_color in dte_groups.items():
             if lower <= dte <= upper:
@@ -220,12 +279,12 @@ def plot_equity_graph(dfs_dict, title):
         height=total_height,
         width=1200,
         legend=dict(
-            yanchor="top",  # Changed from "middle" to "top"
-            y=0.95,  # Changed from 0.5 to 0.95
+            yanchor="top",
+            y=0.95,
             xanchor="left",
             x=1.02,
             bgcolor="rgba(255, 255, 255, 0.8)",
-            tracegroupgap=0,  # Reduce gap between legend items
+            tracegroupgap=0,
         ),
         margin=dict(r=150, t=100, b=20),
     )
@@ -267,6 +326,31 @@ def add_metrics_to_figure(fig, metrics_dict):
     return fig
 
 
+def add_win_rates_to_figure(fig, win_rates_df, row_number):
+    fig.add_trace(
+        go.Table(
+            header=dict(
+                values=["Year"] + list(win_rates_df.columns),
+                fill_color="paleturquoise",
+                align="center",
+                font=dict(size=12),
+                height=30,
+            ),
+            cells=dict(
+                values=[win_rates_df.index]
+                + [win_rates_df[col] for col in win_rates_df.columns],
+                fill_color="lavender",
+                align="center",
+                font=dict(size=11),
+                height=30,
+            ),
+        ),
+        row=row_number,
+        col=1,
+    )
+    return fig
+
+
 def create_html_output(fig):
     html_content = f"""
     <html>
@@ -302,6 +386,48 @@ def create_html_output(fig):
     </html>
     """
     return html_content
+
+
+def calculate_monthly_win_rates_per_dte(dfs_dict):
+    monthly_win_rates_dict = {}
+
+    for dte, df in dfs_dict.items():
+        df = df.copy()
+        # Convert Date to datetime if it's not already
+        df["Date"] = pd.to_datetime(df["Date"])
+
+        # Add year and month columns
+        df["Year"] = df["Date"].dt.year
+        df["Month"] = df["Date"].dt.month
+
+        # Calculate premium difference
+        df["PremiumDiff"] = df["PremiumCaptured"] - df["ClosingPremium"]
+
+        # Group by year and month and calculate total premium difference
+        monthly_stats = (
+            df.groupby(["Year", "Month"])
+            .agg(premium_diff=("PremiumDiff", lambda x: f"${x.sum():.2f}"))
+            .reset_index()
+        )
+
+        # Pivot the data to create the desired table format
+        stats_table = monthly_stats.pivot(
+            index="Year", columns="Month", values="premium_diff"
+        )
+
+        # Create a formatted table with premium differences
+        formatted_table = pd.DataFrame(index=stats_table.index)
+        for month in range(1, 13):
+            if month in stats_table.columns:
+                formatted_table[f"{pd.Timestamp(2024, month, 1).strftime('%b')}"] = (
+                    stats_table[month]
+                )
+            else:
+                formatted_table[f"{pd.Timestamp(2024, month, 1).strftime('%b')}"] = "-"
+
+        monthly_win_rates_dict[dte] = formatted_table
+
+    return monthly_win_rates_dict
 
 
 def parse_arguments():
@@ -357,8 +483,25 @@ def main():
 
     display_metrics_table(metrics_dict)
 
+    # Calculate monthly win rates for each DTE
+    monthly_win_rates_dict = calculate_monthly_win_rates_per_dte(dfs_dict)
+
+    # Create main figure with equity graph
     fig = plot_equity_graph(dfs_dict, args.title)
+
+    # Add metrics table
     fig = add_metrics_to_figure(fig, metrics_dict)
+
+    # Add win rate tables for each DTE
+    current_row = 3  # Starting after equity graph and metrics table
+    for dte in sorted(dfs_dict.keys()):
+        fig = add_win_rates_to_figure(fig, monthly_win_rates_dict[dte], current_row)
+        current_row += 1
+
+        print(f"\nMonthly Win Rates for DTE {dte}:")
+        print("=" * 100)
+        print(monthly_win_rates_dict[dte].to_string())
+        print("=" * 100)
 
     fig.show()
 
