@@ -439,6 +439,13 @@ def calculate_monthly_win_rates_per_dte(dfs_dict):
             .reset_index()
         )
 
+        # Calculate yearly totals
+        yearly_totals = (
+            df.groupby("Year")
+            .agg(yearly_total=("PremiumDiff", lambda x: f"${x.sum():.2f}"))
+            .reset_index()
+        )
+
         # Pivot the data to create the desired table format
         stats_table = monthly_stats.pivot(
             index="Year", columns="Month", values="premium_diff"
@@ -453,6 +460,9 @@ def calculate_monthly_win_rates_per_dte(dfs_dict):
                 )
             else:
                 formatted_table[f"{pd.Timestamp(2024, month, 1).strftime('%b')}"] = "-"
+
+        # Add yearly total column
+        formatted_table["Total"] = yearly_totals.set_index("Year")["yearly_total"]
 
         monthly_win_rates_dict[dte] = formatted_table
 
