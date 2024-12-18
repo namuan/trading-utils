@@ -133,7 +133,7 @@ def main(args):
                     put_price = put_df["PUT_P_LAST"].iloc[0]
 
                     if not call_price or not put_price:
-                        logging.warning(
+                        logging.debug(
                             f"Not creating trade. Call Price {call_price} or Put Price {put_price} is missing"
                         )
                         continue
