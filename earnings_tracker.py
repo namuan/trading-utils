@@ -1,7 +1,6 @@
 import time
 from argparse import ArgumentParser
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
@@ -83,7 +82,7 @@ if __name__ == "__main__":
         for company in companies_list
     ]
     md_file_content += "\n".join(md_companies_table)
-    earnings_output_folder = Path().cwd().joinpath("docs").joinpath("earnings")
+    earnings_output_folder = Path().cwd().joinpath("assets").joinpath("earnings")
     earnings_output_folder.mkdir(parents=True, exist_ok=True)
     earnings_output_folder.joinpath(f"earnings-{earnings_date}.md").write_text(
         md_file_content
