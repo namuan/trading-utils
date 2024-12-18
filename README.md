@@ -10,6 +10,10 @@ Collection of scripts and utilities for stock market analysis, strategies etc
 
 [Profit Take](https://namuan.github.io/bin-utils/profit-take.html)
 
+## Options Analysis
+
+[short-straddle-1-max-position-close-at-expiry](https://namuan.github.io/trading-utils/short-straddles/short-straddle-1-max-position-close-at-expiry.html)
+
 ## Setup virtual environment
 
 ```shell
