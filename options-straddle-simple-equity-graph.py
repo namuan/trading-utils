@@ -11,6 +11,7 @@ Additionally, calculates and displays portfolio performance metrics for each DTE
 
 input:
     - Path to SQLite database file
+    - Optional: Graph title
 output:
     - Interactive equity graph showing the cumulative premium kept over time for different DTEs
     - Portfolio performance metrics table in console
@@ -115,7 +116,7 @@ def fetch_data(db_path, table_name):
     return df
 
 
-def plot_equity_graph(dfs_dict):
+def plot_equity_graph(dfs_dict, title):
     fig = make_subplots(rows=1, cols=1)
 
     dte_groups = {
@@ -160,7 +161,7 @@ def plot_equity_graph(dfs_dict):
         )
 
     fig.update_layout(
-        title="Short Straddles - Cumulative Premium Kept by DTE",
+        title=title,
         xaxis_title="Date",
         yaxis_title="Cumulative Premium Kept ($)",
         showlegend=True,
@@ -192,6 +193,13 @@ def parse_arguments():
 
     parser.add_argument(
         "--output", type=str, help="Optional: Path to save the equity graph HTML file"
+    )
+
+    parser.add_argument(
+        "--title",
+        type=str,
+        default="Short Straddles - Cumulative Premium Kept by DTE",
+        help="Optional: Title for the equity graph",
     )
 
     return parser.parse_args()
@@ -228,7 +236,7 @@ def main():
 
         display_metrics_table(metrics_dict)
 
-        fig = plot_equity_graph(dfs_dict)
+        fig = plot_equity_graph(dfs_dict, args.title)
 
         fig.show()
 
