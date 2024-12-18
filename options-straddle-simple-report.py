@@ -279,6 +279,8 @@ def add_premium_traces(fig, history_df, initial_premium, window_start, window_en
 
 def update_figure_layout(fig, trade_id, trade_df, initial_premium, final_premium):
     """Update the figure layout with trade details."""
+    annotation_font_size = "12px"
+
     entry_price = trade_df.UnderlyingPriceOpen.iloc[0]
     exit_price = trade_df.UnderlyingPriceClose.iloc[0]
     strike_price = trade_df.StrikePrice.iloc[0]
@@ -286,26 +288,36 @@ def update_figure_layout(fig, trade_id, trade_df, initial_premium, final_premium
 
     # Create annotations list with HTML formatting
     annotations = [
-        f"<b>Entry:</b> ${entry_price:.2f}",
+        f'<span style="font-size: {annotation_font_size};"><b>Entry:</b> ${entry_price:.2f}</span>',
     ]
 
     # Add exit price only if trade is closed
     if pd.notna(exit_price):
-        annotations.append(f"<b>Exit:</b> ${exit_price:.2f}")
+        annotations.append(
+            f'<span style="font-size: {annotation_font_size};"><b>Exit:</b> ${exit_price:.2f}</span>'
+        )
     else:
-        annotations.append("<b>Trade Status:</b> Open")
+        annotations.append(
+            f'<span style="font-size: {annotation_font_size};"><b>Trade Status:</b> Open</span>'
+        )
 
-    annotations.append(f"<b>Strike:</b> ${strike_price:.2f}")
+    annotations.append(
+        f'<span style="font-size: {annotation_font_size};"><b>Strike:</b> ${strike_price:.2f}</span>'
+    )
 
     premium_gain_loss = initial_premium - final_premium
-    annotations.append(f"<b>Entry Premium:</b> ${initial_premium:.2f}")
-    annotations.append(f"<b>Exit Premium:</b> ${final_premium:.2f}")
+    annotations.append(
+        f'<span style="font-size: {annotation_font_size};"><b>Entry Premium:</b> ${initial_premium:.2f}</span>'
+    )
+    annotations.append(
+        f'<span style="font-size: {annotation_font_size};"><b>Exit Premium:</b> ${final_premium:.2f}</span>'
+    )
     if premium_gain_loss >= 0:
         gain_loss_color = "green"
     else:
         gain_loss_color = "red"
     annotations.append(
-        f'<b>Gain/Loss:</b> <span style="color:{gain_loss_color};">${premium_gain_loss:.2f}</span> ({close_reason})'
+        f'<span style="font-size: {annotation_font_size};"><b>Gain/Loss:</b> <span style="color:{gain_loss_color};">${premium_gain_loss:.2f}</span> ({close_reason})</span>'
     )
 
     # Join all annotations with <br> tags for newlines
