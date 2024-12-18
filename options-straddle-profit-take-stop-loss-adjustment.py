@@ -155,17 +155,15 @@ def main(args):
             result = db.get_next_expiry_by_dte(quote_date, args.dte)
             if result:
                 expiry_date, dte = result
-                print(
-                    f"\nQuote date: {quote_date} -> Next expiry: {expiry_date} (DTE: {dte:.1f})"
+                logging.info(
+                    f"Quote date: {quote_date} -> Next expiry: {expiry_date} (DTE: {dte:.1f})"
                 )
 
                 call_df, put_df = db.get_options_by_delta(quote_date, expiry_date)
 
                 if not call_df.empty and not put_df.empty:
-                    print("\nCALL OPTION:")
-                    print(call_df.to_string(index=False))
-                    print("\nPUT OPTION:")
-                    print(put_df.to_string(index=False))
+                    logging.debug(f"CALL OPTION: \n {call_df.to_string(index=False)}")
+                    logging.debug(f"PUT OPTION: \n {put_df.to_string(index=False)}")
 
                     underlying_price = call_df["UNDERLYING_LAST"].iloc[0]
                     strike_price = call_df["CALL_STRIKE"].iloc[0]
@@ -173,7 +171,7 @@ def main(args):
                     put_price = put_df["PUT_P_LAST"].iloc[0]
 
                     if not call_price or not put_price:
-                        logging.warning(
+                        logging.debug(
                             f"Not creating trade. Call Price {call_price} or Put Price {put_price} is missing"
                         )
                         continue
@@ -195,11 +193,13 @@ def main(args):
                         expiry_date,
                         dte,
                     )
-                    print(f"\nTrade {trade_id} created in database")
+                    logging.info(f"Trade {trade_id} created in database")
                 else:
-                    print("No options matching delta criteria found")
+                    logging.info("No options matching delta criteria found")
             else:
-                print(f"\nQuote date: {quote_date} -> No valid expiration found")
+                logging.warning(
+                    f"Quote date: {quote_date} -> No valid expiration found"
+                )
 
     finally:
         db.disconnect()
