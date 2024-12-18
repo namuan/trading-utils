@@ -57,7 +57,7 @@ $ make weekend
 
 Once the analysis is complete, it'll open up [DTale](https://pypi.org/project/dtale/) in your default browser.
 
-![DTale](docs/images/dtale.gif)
+![DTale](assets/images/dtale.gif)
 
 ## Reporting
 
@@ -73,7 +73,7 @@ Sample report for finding mean-reversion setups
 $ py report_by_query.py -o monthly_gains_3 -c 20 -t "Short Term Mean Reversion" -q "(last_close < 100) and (last_close > ma_50) and (monthly_gains_3 > 0) and (rsi_2 < 10)"
 ```
 
-![Scanner Reporting](docs/images/stocks-scanner-reporting.gif)
+![Scanner Reporting](assets/images/stocks-scanner-reporting.gif)
 
 ## Sectors Analysis
 
@@ -87,7 +87,7 @@ Generate Multiple Moving Average charts for different sectors
 $ py report_sectors_mma.py
 ```
 
-![Sectors MMA](docs/images/sectors-mma.gif)
+![Sectors MMA](assets/images/sectors-mma.gif)
 
 #### Relative Strength (not RSI) using Price Momentum Oscillator
 
@@ -128,7 +128,7 @@ py tele_links
 Send quick analysis on SPY during market hours.
 See `outside_trading_hours()` in [trading_hours](common/trading_hours.py) for changing schedule.
 
-![SPY Bot](docs/images/telegram-spy-bot.png)
+![SPY Bot](assets/images/telegram-spy-bot.png)
 
 ```shell
 py tele_spy_trade_bot.py
@@ -157,7 +157,7 @@ Get tweets from your favourite twitter furus in your own telegram channel 🚀.
 The notification includes the original tweet along with a chart 📈 and links to several websites 🌎.
 It also keeps the tweets in a database to hold them accountable 👺.
 
-![](docs/images/twitter-pumps-sample.png)
+![](assets/images/twitter-pumps-sample.png)
 
 It requires setting up a file `twitter_furus_accounts.txt` with a list of individual twitter handles on each line (See `twitter_furus_accounts.txt.example`).
 
@@ -199,15 +199,15 @@ py options_price_tracker.py -t SPX,XHB,XLC,XLY,XLP,XLE,XLF,XLV,XLI,XLB,XLR,XLK,X
 
 Two tables are created for each symbol.
 
-![](docs/images/options_price_tracker_tables.png)
+![](assets/images/options_price_tracker_tables.png)
 
 `{ticker-name}_options` table contains options data.
 
-![](docs/images/options_price_tracker_options_table.png)
+![](assets/images/options_price_tracker_options_table.png)
 
 `{ticker-name}_stocks` table contains corresponding data for underlying along with the technical analysis.
 
-![](docs/images/options_price_tracker_stock_table.png)
+![](assets/images/options_price_tracker_stock_table.png)
 
 I usually run this on a server so there is a task in the [Makefile](Makefile) to copy the data from remote server to local home folder.
 

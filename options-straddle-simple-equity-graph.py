@@ -219,11 +219,12 @@ def plot_equity_graph(dfs_dict, title):
         height=total_height,
         width=1200,
         legend=dict(
-            yanchor="middle",
-            y=0.5,
+            yanchor="top",  # Changed from "middle" to "top"
+            y=0.95,  # Changed from 0.5 to 0.95
             xanchor="left",
             x=1.02,
             bgcolor="rgba(255, 255, 255, 0.8)",
+            tracegroupgap=0,  # Reduce gap between legend items
         ),
         margin=dict(r=150, t=100, b=20),
     )
