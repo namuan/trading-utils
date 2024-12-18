@@ -193,8 +193,8 @@ def plot_equity_graph(dfs_dict, title):
     # Create subplot specs
     specs = [
         [{"type": "xy"}],  # Equity graph
-        [{"type": "table"}],
-    ]  # Metrics table
+        [{"type": "table"}],  # Metrics table
+    ]
 
     # Add specs for each DTE's win rate table
     for _ in range(num_win_rate_tables):
@@ -206,11 +206,8 @@ def plot_equity_graph(dfs_dict, title):
     row_heights.extend([h / total_height for h in heights["win_rates"]])
 
     # Calculate vertical spacing based on number of rows
-    # Use a smaller spacing when there are many rows
     total_rows = 2 + num_win_rate_tables  # equity + metrics + win rate tables
-    vertical_spacing = min(
-        0.015, 1.0 / (total_rows * 2)
-    )  # Ensure spacing is small enough
+    vertical_spacing = min(0.015, 1.0 / (total_rows * 2))
 
     # Create subplot titles
     subplot_titles = [title, "Performance Metrics by DTE"]
@@ -279,14 +276,20 @@ def plot_equity_graph(dfs_dict, title):
         height=total_height,
         width=1200,
         legend=dict(
-            yanchor="top",
-            y=0.95,
-            xanchor="left",
-            x=1.02,
+            orientation="h",  # Horizontal orientation
+            yanchor="bottom",
+            y=1.002,  # Minimal space above the plot
+            xanchor="center",
+            x=0.5,  # Center horizontally
             bgcolor="rgba(255, 255, 255, 0.8)",
-            tracegroupgap=0,
         ),
-        margin=dict(r=150, t=100, b=20),
+        margin=dict(r=50, t=120, b=20),  # Reduced top margin further
+        title=dict(
+            y=0.98,  # Adjusted title position
+            x=0.5,
+            xanchor="center",
+            yanchor="top",
+        ),
     )
 
     fig.update_xaxes(title_text="Date", row=1, col=1)
@@ -520,8 +523,6 @@ def main():
         print("No data found in any of the tables.")
         return
 
-    display_metrics_table(metrics_dict)
-
     # Calculate monthly win rates for each DTE
     monthly_win_rates_dict = calculate_monthly_win_rates_per_dte(dfs_dict)
 
@@ -536,11 +537,6 @@ def main():
     for dte in sorted(dfs_dict.keys()):
         fig = add_win_rates_to_figure(fig, monthly_win_rates_dict[dte], current_row)
         current_row += 1
-
-        print(f"\nMonthly Win Rates for DTE {dte}:")
-        print("=" * 100)
-        print(monthly_win_rates_dict[dte].to_string())
-        print("=" * 100)
 
     fig.show()
 
