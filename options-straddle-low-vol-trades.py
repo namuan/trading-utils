@@ -149,6 +149,12 @@ def parse_args():
         default=100.0,
         help="Close position when loss reaches this percentage of premium received",
     )
+    parser.add_argument(
+        "--max-open-trades",
+        type=int,
+        default=99,
+        help="Maximum number of open trades allowed at a given time",
+    )
     return parser.parse_args()
 
 
@@ -185,15 +191,14 @@ def main(args):
             try:
                 signal_raw_value = df.loc[quote_date, "Signal_Raw"]
                 if signal_raw_value == 1:
-                    print(f"The Signal_Raw value for {quote_date} is 1.")
                     high_vol_regime = False
                 else:
-                    print(
+                    logging.info(
                         f"High Vol environment. The Signal_Raw value for {quote_date} is not 1. It is {signal_raw_value}"
                     )
                     high_vol_regime = True
             except KeyError:
-                print(f"Date {quote_date} not found in DataFrame.")
+                logging.debug(f"Date {quote_date} not found in DataFrame.")
 
             # Update existing open trades
             update_open_trades(
@@ -212,17 +217,15 @@ def main(args):
             result = db.get_next_expiry_by_dte(quote_date, args.dte)
             if result:
                 expiry_date, dte = result
-                print(
-                    f"\nQuote date: {quote_date} -> Next expiry: {expiry_date} (DTE: {dte:.1f})"
+                logging.info(
+                    f"Quote date: {quote_date} -> Next expiry: {expiry_date} (DTE: {dte:.1f})"
                 )
 
                 call_df, put_df = db.get_options_by_delta(quote_date, expiry_date)
 
                 if not call_df.empty and not put_df.empty:
-                    print("\nCALL OPTION:")
-                    print(call_df.to_string(index=False))
-                    print("\nPUT OPTION:")
-                    print(put_df.to_string(index=False))
+                    logging.debug(f"CALL OPTION: \n {call_df.to_string(index=False)}")
+                    logging.debug(f"PUT OPTION: \n {put_df.to_string(index=False)}")
 
                     underlying_price = call_df["UNDERLYING_LAST"].iloc[0]
                     strike_price = call_df["CALL_STRIKE"].iloc[0]
@@ -235,6 +238,14 @@ def main(args):
                         )
                         continue
 
+                    # Check if maximum number of open trades has been reached
+                    open_trades = db.get_open_trades()
+                    if len(open_trades) >= args.max_open_trades:
+                        logging.debug(
+                            f"Maximum number of open trades ({args.max_open_trades}) reached. Skipping new trade creation."
+                        )
+                        continue
+
                     trade_id = db.create_trade(
                         quote_date,
                         strike_price,
@@ -244,11 +255,13 @@ def main(args):
                         expiry_date,
                         dte,
                     )
-                    print(f"\nTrade {trade_id} created in database")
+                    logging.info(f"Trade {trade_id} created in database")
                 else:
-                    print("No options matching delta criteria found")
+                    logging.debug("No options matching delta criteria found")
             else:
-                print(f"\nQuote date: {quote_date} -> No valid expiration found")
+                logging.warning(
+                    f"Quote date: {quote_date} -> No valid expiration found"
+                )
 
     finally:
         db.disconnect()

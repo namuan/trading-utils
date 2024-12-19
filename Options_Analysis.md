@@ -16,7 +16,7 @@ uvr optionsdx-data-importer.py --input $(pwd)/data/spy_eod --output data/spy_eod
 ```shell
 for dte in {7..60}; do
     echo "Running for DTE: $dte"
-    uvr --no-progress options-straddle-low-vol-trades.py --db-path data/spx_eod.db --dte $dte --profit-take 15 --stop-loss 100
+    uvr --no-progress options-straddle-low-vol-trades.py --db-path data/spx_eod.db --dte $dte --profit-take 15 --stop-loss 100 --max-open-trades 5 -v
 done
 ```
 
