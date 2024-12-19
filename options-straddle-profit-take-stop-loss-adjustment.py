@@ -43,6 +43,9 @@ def can_close_trade_for_profit_take_stop_loss(
 
     # Calculate percentage gain/loss
     premium_diff_pct = (premium_diff / total_premium_received) * 100
+    logging.info(
+        f"Trade {open_trade["TradeId"]}: Premium Diff: {premium_diff=}/{total_premium_received=} * 100 = {premium_diff_pct=}"
+    )
 
     # Profit take: If we've captured the specified percentage of the premium received
     if premium_diff_pct >= profit_take:
