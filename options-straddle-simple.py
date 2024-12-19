@@ -1,4 +1,4 @@
-#!uv run
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
 #   "pandas"
@@ -14,10 +14,12 @@ Usage:
 ./options-straddle-simple.py -vv # To log DEBUG messages
 ./options-straddle-simple.py --db-path path/to/database.db # Specify database path
 ./options-straddle-simple.py --dte 30 # Find next expiration with DTE > 30 for each quote date
+./options-straddle-simple.py --trade-delay 7 # Wait 7 days between new trades
 """
 
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from datetime import datetime
 
 import pandas as pd
 
@@ -69,6 +71,36 @@ def update_open_trades(db, quote_date):
             )
 
 
+def can_create_new_trade(db, quote_date, trade_delay_days):
+    """Check if enough time has passed since the last trade"""
+    if trade_delay_days < 0:
+        return True
+
+    last_open_trade = db.get_last_open_trade()
+
+    if last_open_trade.empty:
+        logging.debug("No open trades found. Can create new trade.")
+        return True
+
+    last_trade_date = last_open_trade["Date"].iloc[0]
+
+    last_trade_date = datetime.strptime(last_trade_date, "%Y-%m-%d").date()
+    quote_date = datetime.strptime(quote_date, "%Y-%m-%d").date()
+
+    days_since_last_trade = (quote_date - last_trade_date).days
+
+    if days_since_last_trade >= trade_delay_days:
+        logging.info(
+            f"Days since last trade: {days_since_last_trade}. Can create new trade."
+        )
+        return True
+    else:
+        logging.debug(
+            f"Only {days_since_last_trade} days since last trade. Waiting for {trade_delay_days} days."
+        )
+        return False
+
+
 def parse_args():
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
@@ -98,6 +130,12 @@ def parse_args():
         default=99,
         help="Maximum number of open trades allowed at a given time",
     )
+    parser.add_argument(
+        "--trade-delay",
+        type=int,
+        default=-1,
+        help="Minimum number of days to wait between new trades",
+    )
     return parser.parse_args()
 
 
@@ -112,6 +150,10 @@ def main(args):
         for quote_date in quote_dates:
             # Update existing open trades
             update_open_trades(db, quote_date)
+
+            # Check if enough time has passed since last trade
+            if not can_create_new_trade(db, quote_date, args.trade_delay):
+                continue
 
             # Look for new trade opportunities
             result = db.get_next_expiry_by_dte(quote_date, args.dte)

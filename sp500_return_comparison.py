@@ -1,4 +1,4 @@
-#!uv run
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
 #   "pandas",
@@ -10,7 +10,6 @@
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
-#!uv run
 """
 S&P 500 Daily Return Comparison Script with Day-by-Day Analysis
 

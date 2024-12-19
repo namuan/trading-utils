@@ -1,4 +1,4 @@
-#!uv run
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
 #   "ib_async",

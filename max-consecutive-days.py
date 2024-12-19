@@ -1,4 +1,4 @@
-#!uv run
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
 #   "pandas",
@@ -6,7 +6,6 @@
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
-#!uv run
 """
 Stock Data Analysis Script
 

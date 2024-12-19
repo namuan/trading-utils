@@ -148,6 +148,15 @@ class OptionsDatabase:
             """
         return pd.read_sql_query(query, self.conn)
 
+    def get_last_open_trade(self):
+        query = f"""
+            SELECT *
+            FROM {self.trades_table}
+            WHERE Status = 'OPEN'
+            ORDER BY DATE DESC LIMIT 1;
+        """
+        return pd.read_sql_query(query, self.conn)
+
     def get_current_prices(self, quote_date, strike_price, expire_date):
         """Get current prices for a specific strike and expiration"""
         query = """
