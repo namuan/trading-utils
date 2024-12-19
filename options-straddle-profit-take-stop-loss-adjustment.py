@@ -17,6 +17,7 @@ Usage:
 
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from datetime import datetime
 
 import pandas as pd
 
@@ -26,7 +27,7 @@ from common.options_analysis import OptionsDatabase
 pd.set_option("display.float_format", lambda x: "%.4f" % x)
 
 
-def can_close_trade(
+def can_close_trade_for_profit_take_stop_loss(
     open_trade,
     current_underlying_price,
     current_call_price,
@@ -54,6 +55,23 @@ def can_close_trade(
     return False, ""
 
 
+def can_close_trade_for_adjustment(call_price, put_price):
+    # Handle cases where either price is 0 to avoid division by zero
+    if not call_price or not put_price or call_price == 0 or put_price == 0:
+        return False, ""
+
+    # Calculate ratios both ways
+    call_to_put_ratio = call_price / put_price
+    put_to_call_ratio = put_price / call_price
+
+    # Check if either ratio exceeds 4
+    require_adjustment = call_to_put_ratio > 4 or put_to_call_ratio > 4
+    if require_adjustment:
+        return True, "REQUIRE_ADJUSTMENT"
+    else:
+        return False, ""
+
+
 def update_open_trades(db, quote_date, profit_take, stop_loss):
     """Update all open trades with current prices"""
     open_trades = db.get_open_trades()
@@ -72,9 +90,22 @@ def update_open_trades(db, quote_date, profit_take, stop_loss):
                 trade["TradeId"], quote_date, underlying_price, call_price, put_price
             )
 
-            trade_can_be_closed, closing_reason = can_close_trade(
-                trade, underlying_price, call_price, put_price, profit_take, stop_loss
+            trade_can_be_closed, closing_reason = (
+                can_close_trade_for_profit_take_stop_loss(
+                    trade,
+                    underlying_price,
+                    call_price,
+                    put_price,
+                    profit_take,
+                    stop_loss,
+                )
             )
+            if not trade_can_be_closed:
+                trade_can_be_closed, closing_reason = can_close_trade_for_adjustment(
+                    call_price, put_price
+                )
+                # pass
+
             if quote_date >= trade["ExpireDate"] or trade_can_be_closed:
                 db.update_trade_status(
                     trade["TradeId"],
@@ -88,6 +119,36 @@ def update_open_trades(db, quote_date, profit_take, stop_loss):
                     else "Option Expired",
                 )
                 logging.info(f"Closed trade {trade['TradeId']} at expiry")
+
+
+def can_create_new_trade(db, quote_date, trade_delay_days):
+    """Check if enough time has passed since the last trade"""
+    if trade_delay_days < 0:
+        return True
+
+    last_open_trade = db.get_last_open_trade()
+
+    if last_open_trade.empty:
+        logging.debug("No open trades found. Can create new trade.")
+        return True
+
+    last_trade_date = last_open_trade["Date"].iloc[0]
+
+    last_trade_date = datetime.strptime(last_trade_date, "%Y-%m-%d").date()
+    quote_date = datetime.strptime(quote_date, "%Y-%m-%d").date()
+
+    days_since_last_trade = (quote_date - last_trade_date).days
+
+    if days_since_last_trade >= trade_delay_days:
+        logging.info(
+            f"Days since last trade: {days_since_last_trade}. Can create new trade."
+        )
+        return True
+    else:
+        logging.debug(
+            f"Only {days_since_last_trade} days since last trade. Waiting for {trade_delay_days} days."
+        )
+        return False
 
 
 def parse_args():
@@ -136,6 +197,12 @@ def parse_args():
         default=99,
         help="Maximum number of open trades allowed at a given time",
     )
+    parser.add_argument(
+        "--trade-delay",
+        type=int,
+        default=-1,
+        help="Minimum number of days to wait between new trades",
+    )
     return parser.parse_args()
 
 
@@ -150,6 +217,10 @@ def main(args):
         for quote_date in quote_dates:
             # Update existing open trades
             update_open_trades(db, quote_date, args.profit_take, args.stop_loss)
+
+            # Check if enough time has passed since last trade
+            if not can_create_new_trade(db, quote_date, args.trade_delay):
+                continue
 
             # Look for new trade opportunities
             result = db.get_next_expiry_by_dte(quote_date, args.dte)
