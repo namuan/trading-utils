@@ -104,7 +104,6 @@ def update_open_trades(db, quote_date, profit_take, stop_loss):
                 trade_can_be_closed, closing_reason = can_close_trade_for_adjustment(
                     call_price, put_price
                 )
-                # pass
 
             if quote_date >= trade["ExpireDate"] or trade_can_be_closed:
                 db.update_trade_status(
