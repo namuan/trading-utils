@@ -56,6 +56,9 @@ def calculate_portfolio_metrics(df):
     else:
         expectancy_ratio = 0
 
+    # Calculate total cumulative premium
+    total_premium = float(df["PremiumKept"].sum())
+
     # Store metrics with proper formatting
     metrics["Total Trades"] = total_trades
     metrics["Win Rate"] = f"{win_rate:.2f}%"
@@ -65,6 +68,7 @@ def calculate_portfolio_metrics(df):
     metrics["Avg Loser ($)"] = f"${avg_loser:.2f}"
     metrics["Max Loser ($)"] = f"${max_loser:.2f}"
     metrics["Expectancy Ratio"] = f"{expectancy_ratio:.2f}"
+    metrics["Total Cumulative ($)"] = f"${total_premium:.2f}"
 
     return metrics
 
