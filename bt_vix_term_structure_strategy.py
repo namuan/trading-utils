@@ -178,6 +178,7 @@ def display_results(results, metrics, trades):
         shared_xaxes=True,
         vertical_spacing=0.05,
         subplot_titles=("Portfolio Value vs SPY", "VIX Term Structure", "Position"),
+        row_heights=[0.4, 0.3, 0.3],
     )
 
     # Portfolio Value vs SPY
@@ -223,6 +224,9 @@ def display_results(results, metrics, trades):
             col=1,
         )
 
+    # Create metrics table as annotations
+    metrics_text = "<br>".join([f"{k}: {v:.2f}" for k, v in metrics.items()])
+
     # Update layout for charts
     fig.update_layout(
         height=900,
@@ -230,6 +234,21 @@ def display_results(results, metrics, trades):
         showlegend=True,
         title_x=0.5,
         title_font_size=20,
+        annotations=[
+            dict(
+                text=f"<b>Performance Metrics</b><br>{metrics_text}",
+                align="left",
+                showarrow=False,
+                xref="paper",
+                yref="paper",
+                x=1.02,
+                y=0.5,
+                bordercolor="black",
+                borderwidth=1,
+                borderpad=10,
+                bgcolor="white",
+            )
+        ],
     )
 
     # Update y-axes labels
@@ -237,36 +256,8 @@ def display_results(results, metrics, trades):
     fig.update_yaxes(title_text="VIX Index", row=2, col=1)
     fig.update_yaxes(title_text="Position", row=3, col=1)
 
-    # Create separate figure for metrics table
-    metrics_table = go.Figure(
-        data=[
-            go.Table(
-                header=dict(
-                    values=["<b>Metric</b>", "<b>Value</b>"],
-                    font=dict(size=12),
-                    fill_color="paleturquoise",
-                    align="left",
-                ),
-                cells=dict(
-                    values=[
-                        list(metrics.keys()),
-                        [f"{value:.2f}" for value in metrics.values()],
-                    ],
-                    font=dict(size=11),
-                    fill_color="lavender",
-                    align="left",
-                ),
-            )
-        ]
-    )
-
-    metrics_table.update_layout(
-        title_text="Performance Metrics", height=200, margin=dict(l=0, r=0, t=30, b=0)
-    )
-
-    # Show both figures in browser
+    # Show the combined figure
     fig.show()
-    metrics_table.show()
 
 
 def main(args):
