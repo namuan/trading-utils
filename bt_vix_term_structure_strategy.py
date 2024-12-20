@@ -79,34 +79,47 @@ class TradingStrategy(ABC):
 
 
 class VIXTermStructureStrategy(TradingStrategy):
+    # Strategy-specific symbols
+    SYMBOL_SPY = "SPY"
+    SYMBOL_VIX_9D = "^VIX9D"
+    SYMBOL_VIX_3M = "^VIX3M"
+
+    # Column names in the prepared DataFrame
+    COL_SPY = "SPY"
+    COL_VIX_9D = "VIX9D"
+    COL_VIX_3M = "VIX3M"
+    COL_IVTS = "IVTS"
+
     def __init__(self, initial_capital: float, window1: int = 5):
         super().__init__(initial_capital)
         self.window1 = window1
 
     def get_required_tickers(self) -> List[str]:
-        return ["SPY", "^VIX9D", "^VIX3M"]
+        return [self.SYMBOL_SPY, self.SYMBOL_VIX_9D, self.SYMBOL_VIX_3M]
 
     def prepare_backtest_data(self, data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
         # Align all data on the same index
         common_idx = (
-            data["SPY"]
-            .index.intersection(data["^VIX9D"].index)
-            .intersection(data["^VIX3M"].index)
+            data[self.SYMBOL_SPY]
+            .index.intersection(data[self.SYMBOL_VIX_9D].index)
+            .intersection(data[self.SYMBOL_VIX_3M].index)
         )
 
         df = pd.DataFrame(
             {
-                "SPY": data["SPY"].loc[common_idx]["Close"],
-                "VIX9D": data["^VIX9D"].loc[common_idx]["Close"],
-                "VIX3M": data["^VIX3M"].loc[common_idx]["Close"],
+                self.COL_SPY: data[self.SYMBOL_SPY].loc[common_idx]["Close"],
+                self.COL_VIX_9D: data[self.SYMBOL_VIX_9D].loc[common_idx]["Close"],
+                self.COL_VIX_3M: data[self.SYMBOL_VIX_3M].loc[common_idx]["Close"],
             }
         )
 
         # Calculate IVTS
-        df["IVTS"] = df["VIX9D"] / df["VIX3M"]
+        df[self.COL_IVTS] = df[self.COL_VIX_9D] / df[self.COL_VIX_3M]
 
         # Calculate median
-        df[f"IVTS_Med{self.window1}"] = df["IVTS"].rolling(window=self.window1).median()
+        df[f"IVTS_Med{self.window1}"] = (
+            df[self.COL_IVTS].rolling(window=self.window1).median()
+        )
 
         return df
 
@@ -130,8 +143,8 @@ class VIXTermStructureStrategy(TradingStrategy):
                 {
                     "row": 2,
                     "traces": [
-                        {"name": "VIX9D", "column": "VIX9D"},
-                        {"name": "VIX3M", "column": "VIX3M"},
+                        {"name": "VIX9D", "column": self.COL_VIX_9D},
+                        {"name": "VIX3M", "column": self.COL_VIX_3M},
                     ],
                 },
             ],
@@ -158,7 +171,7 @@ class Backtest:
         trades = []
 
         for i, date in enumerate(self.data.index):
-            spy_price = self.data["SPY"].iloc[i]
+            spy_price = self.data[self.strategy.COL_SPY].iloc[i]
 
             # Trading logic
             if position == 0 and buy_signals.iloc[i]:  # Buy signal
@@ -209,13 +222,16 @@ class PerformanceAnalyzer:
             * 100
         )
         buy_hold_return = (
-            (self.results.SPY.iloc[-1] - self.results.SPY.iloc[0])
-            / self.results.SPY.iloc[0]
+            (
+                self.results[VIXTermStructureStrategy.COL_SPY].iloc[-1]
+                - self.results[VIXTermStructureStrategy.COL_SPY].iloc[0]
+            )
+            / self.results[VIXTermStructureStrategy.COL_SPY].iloc[0]
             * 100
         )
 
         strategy_daily_returns = self.results.Portfolio_Value.pct_change()
-        spy_daily_returns = self.results.SPY.pct_change()
+        spy_daily_returns = self.results[VIXTermStructureStrategy.COL_SPY].pct_change()
 
         # Calculate metrics
         metrics = self._calculate_detailed_metrics(
