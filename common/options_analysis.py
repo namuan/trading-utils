@@ -5,13 +5,12 @@ import pandas as pd
 
 
 class OptionsDatabase:
-    def __init__(self, db_path, dte):
+    def __init__(self, db_path, table_tag):
         self.db_path = db_path
-        self.dte = dte
         self.conn = None
         self.cursor = None
-        self.trades_table = f"trades_dte_{int(self.dte)}"
-        self.trade_history_table = f"trade_history_dte_{int(self.dte)}"
+        self.trades_table = f"trades_dte_{table_tag}"
+        self.trade_history_table = f"trade_history_dte_{table_tag}"
 
     def connect(self):
         """Establish database connection"""
@@ -28,6 +27,7 @@ class OptionsDatabase:
         ]
 
         for drop_sql in drop_tables_sql:
+            print("Dropping table:", drop_sql)
             self.cursor.execute(drop_sql)
 
         # Create trades table

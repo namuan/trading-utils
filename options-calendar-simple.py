@@ -119,10 +119,16 @@ def parse_args():
         help="Path to the SQLite database file",
     )
     parser.add_argument(
-        "--dte",
+        "--front-dte",
         type=int,
         default=30,
-        help="Find next expiration with DTE greater than this value",
+        help="Front Option DTE",
+    )
+    parser.add_argument(
+        "--back-dte",
+        type=int,
+        default=60,
+        help="Back Option DTE",
     )
     parser.add_argument(
         "--max-open-trades",
@@ -140,7 +146,8 @@ def parse_args():
 
 
 def main(args):
-    db = OptionsDatabase(args.db_path, args.dte)
+    table_tag = f"{args.front_dte}_{args.back_dte}"
+    db = OptionsDatabase(args.db_path, table_tag)
     db.connect()
 
     try:
@@ -148,62 +155,7 @@ def main(args):
         quote_dates = db.get_quote_dates()
 
         for quote_date in quote_dates:
-            # Update existing open trades
-            update_open_trades(db, quote_date)
-
-            # Check if enough time has passed since last trade
-            if not can_create_new_trade(db, quote_date, args.trade_delay):
-                continue
-
-            # Look for new trade opportunities
-            result = db.get_next_expiry_by_dte(quote_date, args.dte)
-            if result:
-                expiry_date, dte = result
-                logging.info(
-                    f"Quote date: {quote_date} -> Next expiry: {expiry_date} (DTE: {dte:.1f})"
-                )
-
-                call_df, put_df = db.get_options_by_delta(quote_date, expiry_date)
-
-                if not call_df.empty and not put_df.empty:
-                    logging.debug(f"CALL OPTION: \n {call_df.to_string(index=False)}")
-                    logging.debug(f"PUT OPTION: \n {put_df.to_string(index=False)}")
-
-                    underlying_price = call_df["UNDERLYING_LAST"].iloc[0]
-                    strike_price = call_df["CALL_STRIKE"].iloc[0]
-                    call_price = call_df["CALL_C_LAST"].iloc[0]
-                    put_price = put_df["PUT_P_LAST"].iloc[0]
-
-                    if not call_price or not put_price:
-                        logging.debug(
-                            f"Not creating trade. Call Price {call_price} or Put Price {put_price} is missing"
-                        )
-                        continue
-
-                    # Check if maximum number of open trades has been reached
-                    open_trades = db.get_open_trades()
-                    if len(open_trades) >= args.max_open_trades:
-                        logging.debug(
-                            f"Maximum number of open trades ({args.max_open_trades}) reached. Skipping new trade creation."
-                        )
-                        continue
-
-                    trade_id = db.create_trade(
-                        quote_date,
-                        strike_price,
-                        call_price,
-                        put_price,
-                        underlying_price,
-                        expiry_date,
-                        dte,
-                    )
-                    logging.info(f"Trade {trade_id} created in database")
-                else:
-                    logging.warning("No options matching delta criteria found")
-            else:
-                logging.warning(
-                    f"Quote date: {quote_date} -> No valid expiration found"
-                )
+            logging.info(f"Processing {quote_date}")
 
     finally:
         db.disconnect()

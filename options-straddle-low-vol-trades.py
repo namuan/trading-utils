@@ -127,7 +127,7 @@ def parse_args():
     )
     parser.add_argument(
         "--dte",
-        type=float,
+        type=int,
         default=30,
         help="Find next expiration with DTE greater than this value",
     )
