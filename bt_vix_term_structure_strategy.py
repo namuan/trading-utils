@@ -168,13 +168,34 @@ def calculate_performance_metrics(results, initial_capital):
     )
     buy_hold_sharpe = np.sqrt(252) * spy_excess_returns.mean() / spy_daily_returns.std()
 
+    # Calculate Sortino Ratio
+    # Only consider negative returns for downside deviation
+    strategy_downside_returns = strategy_daily_returns[strategy_daily_returns < 0]
+    spy_downside_returns = spy_daily_returns[spy_daily_returns < 0]
+
+    strategy_downside_std = strategy_downside_returns.std() * np.sqrt(252)
+    spy_downside_std = spy_downside_returns.std() * np.sqrt(252)
+
+    strategy_sortino = (
+        np.sqrt(252)
+        * (strategy_daily_returns.mean() - risk_free_rate / 252)
+        / strategy_downside_std
+    )
+    buy_hold_sortino = (
+        np.sqrt(252)
+        * (spy_daily_returns.mean() - risk_free_rate / 252)
+        / spy_downside_std
+    )
+
     metrics = {
         "Strategy Total Return (%)": total_return,
         "Strategy Volatility (%)": strategy_vol,
         "Strategy Sharpe Ratio": strategy_sharpe,
+        "Strategy Sortino Ratio": strategy_sortino,
         "Buy & Hold Return (%)": buy_hold_return,
         "Buy & Hold Volatility (%)": buy_hold_vol,
         "Buy & Hold Sharpe Ratio": buy_hold_sharpe,
+        "Buy & Hold Sortino Ratio": buy_hold_sortino,
         "Final Portfolio Value ($)": results.Portfolio_Value.iloc[-1],
     }
 
