@@ -58,8 +58,12 @@ class TradingStrategy(ABC):
         self.trades: List[Trade] = []
 
     @abstractmethod
-    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
-        """Generate trading signals based on the strategy logic"""
+    def generate_buy_signals(self, data: pd.DataFrame) -> pd.Series:
+        """Generate buy signals based on the strategy logic"""
+
+    @abstractmethod
+    def generate_sell_signals(self, data: pd.DataFrame) -> pd.Series:
+        """Generate sell signals based on the strategy logic"""
 
     @abstractmethod
     def get_required_tickers(self) -> List[str]:
@@ -75,6 +79,10 @@ class TradingStrategy(ABC):
 
 
 class VIXTermStructureStrategy(TradingStrategy):
+    def __init__(self, initial_capital: float, window1: int = 5):
+        super().__init__(initial_capital)
+        self.window1 = window1
+
     def get_required_tickers(self) -> List[str]:
         return ["SPY", "^VIX9D", "^VIX3M"]
 
@@ -86,7 +94,7 @@ class VIXTermStructureStrategy(TradingStrategy):
             .intersection(data["^VIX3M"].index)
         )
 
-        return pd.DataFrame(
+        df = pd.DataFrame(
             {
                 "SPY": data["SPY"].loc[common_idx]["Close"],
                 "VIX9D": data["^VIX9D"].loc[common_idx]["Close"],
@@ -94,8 +102,23 @@ class VIXTermStructureStrategy(TradingStrategy):
             }
         )
 
-    def generate_signals(self, data: pd.DataFrame) -> pd.Series:
-        return (data["VIX9D"] < data["VIX3M"]).astype(int)
+        # Calculate IVTS
+        df["IVTS"] = df["VIX9D"] / df["VIX3M"]
+
+        # Calculate median
+        df[f"IVTS_Med{self.window1}"] = df["IVTS"].rolling(window=self.window1).median()
+
+        return df
+
+    def generate_buy_signals(self, data: pd.DataFrame) -> pd.Series:
+        # Convert -1 to 0 for sell signal, keep 1 for buy signal
+        signals = ((data[f"IVTS_Med{self.window1}"] < 1).astype(int) * 2 - 1) == 1
+        return signals
+
+    def generate_sell_signals(self, data: pd.DataFrame) -> pd.Series:
+        # Convert -1 to 1 for sell signal, 1 to 0 for buy signal
+        signals = ((data[f"IVTS_Med{self.window1}"] < 1).astype(int) * 2 - 1) == -1
+        return signals
 
     def get_plot_config(self) -> Dict:
         return {
@@ -125,7 +148,8 @@ class Backtest:
     def run(self) -> Tuple[pd.DataFrame, List[Trade]]:
         logging.info("Starting backtest...")
 
-        signals = self.strategy.generate_signals(self.data)
+        buy_signals = self.strategy.generate_buy_signals(self.data)
+        sell_signals = self.strategy.generate_sell_signals(self.data)
         position = 0
         positions = []
         portfolio_value = []
@@ -137,7 +161,7 @@ class Backtest:
             spy_price = self.data["SPY"].iloc[i]
 
             # Trading logic
-            if position == 0 and signals.iloc[i] == 1:  # Buy signal
+            if position == 0 and buy_signals.iloc[i]:  # Buy signal
                 shares = cash // spy_price
                 cash -= shares * spy_price
                 position = 1
@@ -146,7 +170,7 @@ class Backtest:
                     Trade(date=date, type="BUY", price=spy_price, shares=shares)
                 )
 
-            elif position == 1 and signals.iloc[i] == 0:  # Sell signal
+            elif position == 1 and sell_signals.iloc[i]:  # Sell signal
                 cash += shares * spy_price
                 shares = 0
                 position = 0
@@ -439,8 +463,7 @@ def parse_args():
 
 
 def main(args):
-    # Initialize strategy
-    strategy = VIXTermStructureStrategy(args.initial_capital)
+    strategy = VIXTermStructureStrategy(args.initial_capital, window1=5)
 
     # Download data for all required tickers
     data = {}
