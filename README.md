@@ -16,6 +16,7 @@ Collection of scripts and utilities for stock market analysis, strategies etc
 * [short-straddle-5-max-position-30-profit-100-loss-close-at-expiry](https://namuan.github.io/trading-utils/short-straddles/short-straddle-5-max-position-30-profit-100-loss-close-at-expiry.html)
 * [short-straddle-low-vol-5-max-pos-30-pt-100-sl-close-at-expiry](https://namuan.github.io/trading-utils/short-straddles/short-straddle-low-vol-5-max-pos-30-pt-100-sl-close-at-expiry.html)
 * [short-straddle-5-max-pt-10-sl-75-with-adjustment](https://namuan.github.io/trading-utils/short-straddles/short-straddle-5-max-pt-10-sl-75-with-adjustment.html)
+* [short-straddle-1-max-pt-10-sl-75-with-adjustment](https://namuan.github.io/trading-utils/short-straddles/short-straddle-1-max-pt-10-sl-75-with-adjustment.html)
 
 ## Setup virtual environment
 
