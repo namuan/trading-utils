@@ -142,7 +142,7 @@ def backtest_vix_spread_strategy(data_spy, data_vix9d, data_vix3m, initial_capit
 
 def calculate_performance_metrics(results, initial_capital):
     """Calculate performance metrics for the strategy"""
-    # Use .iloc for positional indexing
+    # Calculate returns
     total_return = (
         (results.Portfolio_Value.iloc[-1] - initial_capital) / initial_capital * 100
     )
@@ -150,19 +150,31 @@ def calculate_performance_metrics(results, initial_capital):
         (results.SPY.iloc[-1] - results.SPY.iloc[0]) / results.SPY.iloc[0] * 100
     )
 
-    # Calculate annualized volatility
-    daily_returns = results.Portfolio_Value.pct_change()
-    annualized_vol = daily_returns.std() * np.sqrt(252) * 100
+    # Calculate daily returns for both strategy and buy & hold
+    strategy_daily_returns = results.Portfolio_Value.pct_change()
+    spy_daily_returns = results.SPY.pct_change()
 
-    # Calculate Sharpe Ratio (assuming risk-free rate of 2%)
-    excess_returns = daily_returns - 0.02 / 252
-    sharpe_ratio = np.sqrt(252) * excess_returns.mean() / daily_returns.std()
+    # Calculate annualized volatility for both
+    strategy_vol = strategy_daily_returns.std() * np.sqrt(252) * 100
+    buy_hold_vol = spy_daily_returns.std() * np.sqrt(252) * 100
+
+    # Calculate Sharpe Ratio for both (assuming risk-free rate of 2%)
+    risk_free_rate = 0.02
+    strategy_excess_returns = strategy_daily_returns - risk_free_rate / 252
+    spy_excess_returns = spy_daily_returns - risk_free_rate / 252
+
+    strategy_sharpe = (
+        np.sqrt(252) * strategy_excess_returns.mean() / strategy_daily_returns.std()
+    )
+    buy_hold_sharpe = np.sqrt(252) * spy_excess_returns.mean() / spy_daily_returns.std()
 
     metrics = {
-        "Total Return (%)": total_return,
+        "Strategy Total Return (%)": total_return,
+        "Strategy Volatility (%)": strategy_vol,
+        "Strategy Sharpe Ratio": strategy_sharpe,
         "Buy & Hold Return (%)": buy_hold_return,
-        "Annualized Volatility (%)": annualized_vol,
-        "Sharpe Ratio": sharpe_ratio,
+        "Buy & Hold Volatility (%)": buy_hold_vol,
+        "Buy & Hold Sharpe Ratio": buy_hold_sharpe,
         "Final Portfolio Value ($)": results.Portfolio_Value.iloc[-1],
     }
 
@@ -171,6 +183,9 @@ def calculate_performance_metrics(results, initial_capital):
 
 def display_results(results, metrics, trades):
     """Display interactive visualization using Plotly"""
+    # Create metrics text
+    metrics_text = "<br>".join([f"{k}: {v:.2f}" for k, v in metrics.items()])
+
     # Create main figure with subplots for charts
     fig = make_subplots(
         rows=3,
@@ -219,13 +234,12 @@ def display_results(results, metrics, trades):
                 mode="markers",
                 name=f"{trade['type']} - {trade['date'].strftime('%Y-%m-%d')}",
                 marker=dict(size=10, symbol=marker_symbol, color=marker_color),
+                showlegend=False,
+                hovertemplate=f"{trade['type']}: {trade['date'].strftime('%Y-%m-%d')}<br>Price: ${trade['price']:.2f}<extra></extra>",
             ),
             row=1,
             col=1,
         )
-
-    # Create metrics table as annotations
-    metrics_text = "<br>".join([f"{k}: {v:.2f}" for k, v in metrics.items()])
 
     # Update layout for charts
     fig.update_layout(
@@ -233,28 +247,48 @@ def display_results(results, metrics, trades):
         title_text="VIX Term Structure Strategy Backtest Results",
         showlegend=True,
         title_x=0.5,
+        title_y=0.95,
         title_font_size=20,
-        annotations=[
-            dict(
-                text=f"<b>Performance Metrics</b><br>{metrics_text}",
-                align="left",
-                showarrow=False,
-                xref="paper",
-                yref="paper",
-                x=1.02,
-                y=0.5,
-                bordercolor="black",
-                borderwidth=1,
-                borderpad=10,
-                bgcolor="white",
-            )
-        ],
+        legend=dict(
+            yanchor="top",
+            y=0.98,
+            xanchor="left",
+            x=1.02,
+            bgcolor="rgba(255, 255, 255, 0.9)",
+            bordercolor="black",
+            borderwidth=1,
+        ),
+        margin=dict(r=300, t=100),  # Reduced top margin
+    )
+
+    # Add metrics annotation
+    fig.add_annotation(
+        text=f"<b>Performance Metrics</b><br>{metrics_text}",
+        align="left",
+        showarrow=False,
+        xref="paper",
+        yref="paper",
+        x=1.0,
+        y=0.5,
+        xanchor="left",
+        yanchor="middle",
+        bordercolor="black",
+        borderwidth=1,
+        borderpad=10,
+        bgcolor="white",
     )
 
     # Update y-axes labels
     fig.update_yaxes(title_text="Value ($)", row=1, col=1)
     fig.update_yaxes(title_text="VIX Index", row=2, col=1)
     fig.update_yaxes(title_text="Position", row=3, col=1)
+
+    # Update subplot spacing
+    fig.update_layout(
+        yaxis=dict(domain=[0.65, 0.95]),  # Portfolio Value
+        yaxis2=dict(domain=[0.35, 0.60]),  # VIX Term Structure
+        yaxis3=dict(domain=[0.05, 0.30]),  # Position
+    )
 
     # Show the combined figure
     fig.show()
