@@ -24,7 +24,14 @@ from datetime import datetime
 import pandas as pd
 
 from common.logger import setup_logging
-from common.options_analysis import OptionsDatabase
+from common.options_analysis import (
+    ContractType,
+    Leg,
+    LegType,
+    OptionsDatabase,
+    PositionType,
+    Trade,
+)
 
 pd.set_option("display.float_format", lambda x: "%.4f" % x)
 
@@ -34,37 +41,40 @@ def update_open_trades(db, quote_date):
     open_trades = db.get_open_trades()
 
     for _, trade in open_trades.iterrows():
-        # Get current prices
-        underlying_price, call_price, put_price = db.get_current_prices(
-            quote_date, trade["StrikePrice"], trade["ExpireDate"]
-        )
-
-        # Add to trade history
-        db.add_trade_history(
-            trade["TradeId"], quote_date, underlying_price, call_price, put_price
-        )
-
-        # Only if unable to find the latest prices in the data
-        if underlying_price == 0:
-            close_reason = "Invalid Close"
-        else:
-            close_reason = "Option Expired"
+        existing_trade_id = trade["TradeId"]
+        existing_trade = db.load_trade_with_multiple_legs(existing_trade_id)
+        updated_legs = []
+        for leg in existing_trade.legs:
+            underlying_price, call_price, put_price = db.get_current_prices(
+                quote_date, leg.strike_price, trade["ExpireDate"]
+            )
+            updated_leg = Leg(
+                contract_type=leg.contract_type,
+                position_type=leg.position_type,
+                strike_price=leg.strike_price,
+                underlying_price_open=leg.underlying_price_open,
+                premium_open=leg.premium_open,
+                underlying_price_current=underlying_price,
+                premium_current=put_price,
+                leg_type=LegType.TRADE_AUDIT,
+            )
+            updated_legs.append(updated_leg)
+            db.update_trade_leg(existing_trade_id, quote_date, updated_leg)
 
         # If trade has reached expiry date, close it
         if quote_date >= trade["ExpireDate"]:
             logging.info(
                 f"Trying to close trade {trade['TradeId']} at expiry {quote_date}"
             )
-            db.update_trade_status(
-                trade["TradeId"],
-                underlying_price,
-                call_price,
-                put_price,
-                quote_date,
-                "EXPIRED",
-                close_reason=close_reason,
+            existing_trade.closing_premium = sum(
+                l.premium_current for l in updated_legs
             )
-            logging.info(f"Closed trade {trade['TradeId']} at expiry")
+            existing_trade.closed_trade_at = quote_date
+            existing_trade.close_reason = "EXPIRED"
+            db.close_trade(existing_trade_id, existing_trade)
+            logging.info(
+                f"Closed trade {trade['TradeId']} with {existing_trade.closing_premium} at expiry"
+            )
         else:
             logging.info(
                 f"Trade {trade['TradeId']} still open as {quote_date} < {trade['ExpireDate']}"
@@ -146,7 +156,9 @@ def parse_args():
 
 
 def main(args):
-    table_tag = f"{args.front_dte}_{args.back_dte}"
+    front_dte = args.front_dte
+    back_dte = args.back_dte
+    table_tag = f"{front_dte}_{back_dte}"
     db = OptionsDatabase(args.db_path, table_tag)
     db.connect()
 
@@ -156,6 +168,99 @@ def main(args):
 
         for quote_date in quote_dates:
             logging.info(f"Processing {quote_date}")
+
+            update_open_trades(db, quote_date)
+
+            # Check if maximum number of open trades has been reached
+            open_trades = db.get_open_trades()
+            if len(open_trades) >= args.max_open_trades:
+                logging.debug(
+                    f"Maximum number of open trades ({args.max_open_trades}) reached. Skipping new trade creation."
+                )
+                continue
+
+            expiry_front_dte, front_dte_found = db.get_next_expiry_by_dte(
+                quote_date, front_dte
+            )
+            expiry_back_dte, back_dte_found = db.get_next_expiry_by_dte(
+                quote_date, back_dte
+            )
+            if not expiry_front_dte or not expiry_back_dte:
+                logging.warning(
+                    f"⚠️ Unable to find front {front_dte} or back {back_dte} expiry. {expiry_front_dte=}, {expiry_back_dte=} "
+                )
+                continue
+
+            logging.info(
+                f"Quote date: {quote_date} -> {expiry_front_dte=} ({front_dte_found=:.1f}), "
+                f"{expiry_back_dte=} ({back_dte_found=:.1f})"
+            )
+            front_call_df, front_put_df = db.get_options_by_delta(
+                quote_date, expiry_front_dte
+            )
+            back_call_df, back_put_df = db.get_options_by_delta(
+                quote_date, expiry_back_dte
+            )
+
+            # Only look at PUTs For now. We are only looking at Calendar PUT Spread
+
+            logging.debug("Front Option")
+            logging.debug(f"=> PUT OPTION: \n {front_put_df.to_string(index=False)}")
+
+            logging.debug("Back Option")
+            logging.debug(f"=> PUT OPTION: \n {back_put_df.to_string(index=False)}")
+
+            if front_put_df.empty or back_put_df.empty:
+                logging.warning(
+                    "⚠️ One or more options are not valid. Re-run with debug to see options found for selected DTEs"
+                )
+                continue
+
+            front_underlying_price = front_call_df["UNDERLYING_LAST"].iloc[0]
+            front_strike_price = front_call_df["CALL_STRIKE"].iloc[0]
+            front_call_price = front_call_df["CALL_C_LAST"].iloc[0]
+            front_put_price = front_put_df["PUT_P_LAST"].iloc[0]
+
+            back_underlying_price = back_call_df["UNDERLYING_LAST"].iloc[0]
+            back_strike_price = back_call_df["CALL_STRIKE"].iloc[0]
+            back_call_price = back_call_df["CALL_C_LAST"].iloc[0]
+            back_put_price = back_put_df["PUT_P_LAST"].iloc[0]
+
+            logging.info(
+                f"Front Contract: Underlying Price={front_underlying_price:.2f}, Strike Price={front_strike_price:.2f}, Call Price={front_call_price:.2f}, Put Price={front_put_price:.2f}"
+            )
+            logging.info(
+                f"Back Contract: Underlying Price={back_underlying_price:.2f}, Strike Price={back_strike_price:.2f}, Call Price={back_call_price:.2f}, Put Price={back_put_price:.2f}"
+            )
+
+            # create a multi leg trade in database
+            trade_legs = [
+                Leg(
+                    position_type=PositionType.SHORT,
+                    contract_type=ContractType.PUT,
+                    strike_price=front_strike_price,
+                    underlying_price_open=front_underlying_price,
+                    premium_open=front_put_price,
+                ),
+                Leg(
+                    position_type=PositionType.LONG,
+                    contract_type=ContractType.PUT,
+                    strike_price=back_strike_price,
+                    underlying_price_open=back_underlying_price,
+                    premium_open=back_put_price,
+                ),
+            ]
+            premium_captured_calculated = sum(leg.premium_open for leg in trade_legs)
+            trade = Trade(
+                trade_date=quote_date,
+                expire_date=expiry_front_dte,
+                dte=front_dte,
+                status="OPEN",
+                premium_captured=premium_captured_calculated,
+                legs=trade_legs,
+            )
+            trade_id = db.create_trade_with_multiple_legs(trade)
+            logging.info(f"Trade {trade_id} created in database")
 
     finally:
         db.disconnect()
