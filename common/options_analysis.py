@@ -388,7 +388,7 @@ class OptionsDatabase:
         SELECT TradeId, Date, ExpireDate, DTE, Status, PremiumCaptured,
                ClosingPremium, ClosedTradeAt, CloseReason
         FROM {self.trades_table}
-        ORDER BY Date DESC
+        ORDER BY Date
         """
         self.cursor.execute(trades_sql)
         columns = [description[0] for description in self.cursor.description]
