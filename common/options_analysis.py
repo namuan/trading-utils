@@ -27,14 +27,15 @@ class LegType(Enum):
 class Leg:
     """Represents a single leg of a trade (call or put)."""
 
+    leg_date: date
     contract_type: ContractType
     position_type: PositionType
+    leg_type: LegType
     strike_price: float
     underlying_price_open: float
     premium_open: float = field(init=True)
     underlying_price_current: Optional[float] = None
     premium_current: Optional[float] = field(default=None)
-    leg_type: LegType = LegType.TRADE_OPEN
 
     def __post_init__(self):
         # Convert premiums after initialization
@@ -51,19 +52,24 @@ class Leg:
             )
 
     def __str__(self):
-        leg_str = (
-            f"\n    {self.position_type.value} {self.contract_type.value}"
-            f"\n      Strike: ${self.strike_price:,.2f}"
-            f"\n      Underlying Open: ${self.underlying_price_open:,.2f}"
-            f"\n      Premium Open: ${self.premium_open:,.2f}"
-        )
+        leg_str = [
+            f"\n    {self.position_type.value} {self.contract_type.value}",
+            f"\n      Date: {self.leg_date}",
+            f"\n      Strike: ${self.strike_price:,.2f}",
+            f"\n      Underlying Open: ${self.underlying_price_open:,.2f}",
+            f"\n      Premium Open: ${self.premium_open:,.2f}",
+            f"\n      Leg Type: {self.leg_type.value}",
+        ]
+
         if self.underlying_price_current is not None:
-            leg_str += (
+            leg_str.append(
                 f"\n      Underlying Current: ${self.underlying_price_current:,.2f}"
             )
+
         if self.premium_current is not None:
-            leg_str += f"\n      Premium Current: ${self.premium_current:,.2f}"
-        return leg_str
+            leg_str.append(f"\n      Premium Current: ${self.premium_current:,.2f}")
+
+        return "".join(leg_str)
 
 
 @dataclass
@@ -201,7 +207,7 @@ class OptionsDatabase:
 
         self.conn.commit()
 
-    def update_trade_leg(self, existing_trade_id, quote_date, updated_leg: Leg):
+    def update_trade_leg(self, existing_trade_id, updated_leg: Leg):
         update_leg_sql = f"""
         INSERT INTO {self.trade_legs_table} (
             TradeId, Date, StrikePrice, ContractType, PositionType, LegType,
@@ -211,7 +217,7 @@ class OptionsDatabase:
 
         params = (
             existing_trade_id,
-            quote_date,
+            updated_leg.leg_date,
             updated_leg.strike_price,
             updated_leg.contract_type.value,
             updated_leg.position_type.value,
@@ -272,7 +278,7 @@ class OptionsDatabase:
         return trade_id
 
     def load_trade_with_multiple_legs(
-        self, trade_id: int, leg_type: LegType = LegType.TRADE_OPEN
+        self, trade_id: int, leg_type: Optional[LegType] = None
     ) -> Trade:
         # First get the trade
         trade_sql = f"""
@@ -287,26 +293,33 @@ class OptionsDatabase:
         if not trade_row:
             raise ValueError(f"Trade with id {trade_id} not found")
 
-        # Then get all legs for this trade
-        legs_sql = f"""
-        SELECT StrikePrice, ContractType, PositionType, PremiumOpen,
-               PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent
-        FROM {self.trade_legs_table} WHERE TradeId = ? AND LegType = ?
-        """
-        self.cursor.execute(
-            legs_sql,
-            (
-                trade_id,
-                leg_type.value,
-            ),
-        )
+        # Then get legs for this trade
+        if leg_type is None:
+            legs_sql = f"""
+            SELECT Date, StrikePrice, ContractType, PositionType, PremiumOpen,
+                   PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType
+            FROM {self.trade_legs_table} WHERE TradeId = ?
+            """
+            params = (trade_id,)
+        else:
+            legs_sql = f"""
+            SELECT Date, StrikePrice, ContractType, PositionType, PremiumOpen,
+                   PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType
+            FROM {self.trade_legs_table} WHERE TradeId = ? AND LegType = ?
+            """
+            params = (trade_id, leg_type.value)
+
+        self.cursor.execute(legs_sql, params)
         columns = [description[0] for description in self.cursor.description]
         leg_rows = [dict(zip(columns, row)) for row in self.cursor.fetchall()]
 
         # Create legs
-        legs = []
+        trade_legs = []
+
         for leg_row in leg_rows:
             leg = Leg(
+                leg_date=leg_row["Date"],
+                leg_type=LegType(leg_row["LegType"]),
                 contract_type=ContractType(leg_row["ContractType"]),
                 position_type=PositionType(leg_row["PositionType"]),
                 strike_price=leg_row["StrikePrice"],
@@ -315,7 +328,7 @@ class OptionsDatabase:
                 underlying_price_current=leg_row["UnderlyingPriceCurrent"],
                 premium_current=leg_row["PremiumCurrent"],
             )
-            legs.append(leg)
+            trade_legs.append(leg)
 
         # Create and return trade
         return Trade(
@@ -327,7 +340,7 @@ class OptionsDatabase:
             closing_premium=trade_row["ClosingPremium"],
             closed_trade_at=trade_row["ClosedTradeAt"],
             close_reason=trade_row["CloseReason"],
-            legs=legs,
+            legs=trade_legs,
         )
 
     def close_trade(self, existing_trade_id, existing_trade: Trade):

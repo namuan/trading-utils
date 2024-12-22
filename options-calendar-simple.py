@@ -42,13 +42,16 @@ def update_open_trades(db, quote_date):
 
     for _, trade in open_trades.iterrows():
         existing_trade_id = trade["TradeId"]
-        existing_trade = db.load_trade_with_multiple_legs(existing_trade_id)
+        existing_trade = db.load_trade_with_multiple_legs(
+            existing_trade_id, leg_type=LegType.TRADE_OPEN
+        )
         updated_legs = []
         for leg in existing_trade.legs:
             underlying_price, call_price, put_price = db.get_current_prices(
                 quote_date, leg.strike_price, trade["ExpireDate"]
             )
             updated_leg = Leg(
+                leg_date=quote_date,
                 contract_type=leg.contract_type,
                 position_type=leg.position_type,
                 strike_price=leg.strike_price,
@@ -59,7 +62,7 @@ def update_open_trades(db, quote_date):
                 leg_type=LegType.TRADE_AUDIT,
             )
             updated_legs.append(updated_leg)
-            db.update_trade_leg(existing_trade_id, quote_date, updated_leg)
+            db.update_trade_leg(existing_trade_id, updated_leg)
 
         # If trade has reached expiry date, close it
         if quote_date >= trade["ExpireDate"]:
@@ -236,6 +239,8 @@ def main(args):
             # create a multi leg trade in database
             trade_legs = [
                 Leg(
+                    leg_date=quote_date,
+                    leg_type=LegType.TRADE_OPEN,
                     position_type=PositionType.SHORT,
                     contract_type=ContractType.PUT,
                     strike_price=front_strike_price,
@@ -243,6 +248,8 @@ def main(args):
                     premium_open=front_put_price,
                 ),
                 Leg(
+                    leg_date=quote_date,
+                    leg_type=LegType.TRADE_OPEN,
                     position_type=PositionType.LONG,
                     contract_type=ContractType.PUT,
                     strike_price=back_strike_price,
