@@ -19,7 +19,7 @@ import os
 import webbrowser
 from argparse import ArgumentParser
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from threading import Timer
 from typing import Dict, List
 
@@ -42,18 +42,20 @@ class TradeVisualizationData:
     long_premiums: List[float]
     total_premium_differences: List[float]  # Changed to store total differences
     trade_date: date
-    expire_date: date
+    front_leg_expiry: date
+    back_leg_expiry: date
 
     def __str__(self) -> str:
         return (
-            f"Trade from {self.trade_date} to {self.expire_date}\n"
+            f"Trade from {self.trade_date} to {self.front_leg_expiry}\n"
             f"Dates: {self.dates}\n"
             f"Underlying Prices: {self.underlying_prices}\n"
             f"Short Premiums: {self.short_premiums}\n"
             f"Long Premiums: {self.long_premiums}\n"
             f"Total Premium Differences: {self.total_premium_differences}\n"
             f"Trade Date: {self.trade_date}\n"
-            f"Expiration Date: {self.expire_date}"
+            f"Front Option Expiration: {self.front_leg_expiry}\n"
+            f"Back Option Expiration: {self.back_leg_expiry}"
         )
 
 
@@ -69,7 +71,16 @@ class TradeDataProcessor:
         short_diff_data = []
         long_diff_data = []
 
+        front_leg_expiry = None
+        back_leg_expiry = None
+
         for leg in trade.legs:
+            if leg.leg_type is LegType.TRADE_OPEN:
+                if leg.position_type is PositionType.SHORT:
+                    front_leg_expiry = leg.leg_expiry_date
+                else:
+                    back_leg_expiry = leg.leg_expiry_date
+
             current_date = leg.leg_quote_date
             current_price = (
                 leg.underlying_price_current
@@ -81,11 +92,7 @@ class TradeDataProcessor:
                 if leg.leg_type is not LegType.TRADE_OPEN
                 else leg.premium_open
             )
-            premium_diff = (
-                leg.premium_current - leg.premium_open
-                if leg.premium_current is not None
-                else 0
-            )
+            premium_diff = leg.premium_current - leg.premium_open
 
             if leg.position_type == PositionType.SHORT:
                 short_data.append((current_date, current_price, current_premium))
@@ -152,7 +159,8 @@ class TradeDataProcessor:
             long_premiums=long_premiums,
             total_premium_differences=total_premium_differences,
             trade_date=trade.trade_date,
-            expire_date=trade.expire_date,
+            front_leg_expiry=front_leg_expiry,
+            back_leg_expiry=back_leg_expiry,
         )
 
 
@@ -293,6 +301,11 @@ class DashTradeVisualizer:
             with self._get_db() as db:
                 return self.create_visualization(trade_id, db)
 
+    def calculate_days_between(self, date1_str, date2_str) -> int:
+        date1 = datetime.strptime(date1_str, "%Y-%m-%d").date()
+        date2 = datetime.strptime(date2_str, "%Y-%m-%d").date()
+        return (date1 - date2).days
+
     def create_visualization(self, trade_id: int, db: OptionsDatabase) -> go.Figure:
         # Load and process data using the provided database connection
         trade = db.load_trade_with_multiple_legs(trade_id)
@@ -378,8 +391,10 @@ class DashTradeVisualizer:
         )
 
         # Update layout
+        front_dte = self.calculate_days_between(data.front_leg_expiry, data.trade_date)
+        back_dte = self.calculate_days_between(data.back_leg_expiry, data.trade_date)
         fig.update_layout(
-            title=f"<b>Trade Date:</b> {data.trade_date} <b>Expiry:</b> {data.expire_date}",
+            title=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b> Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
             height=self.config.figure_height,
             showlegend=True,
             hovermode="x unified",
