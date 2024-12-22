@@ -249,6 +249,7 @@ def main(args):
                     strike_price=front_strike_price,
                     underlying_price_open=front_underlying_price,
                     premium_open=front_put_price,
+                    premium_current=0,
                 ),
                 Leg(
                     leg_quote_date=quote_date,
@@ -259,6 +260,7 @@ def main(args):
                     strike_price=back_strike_price,
                     underlying_price_open=back_underlying_price,
                     premium_open=back_put_price,
+                    premium_current=0,
                 ),
             ]
             premium_captured_calculated = sum(leg.premium_open for leg in trade_legs)
