@@ -3,23 +3,29 @@
 # dependencies = [
 #   "plotly",
 #   "pandas",
+#   "dash",
 # ]
 # ///
 """
 Options Trade Plotter
 
-A tool to visualize options trades from a database.
+A tool to visualize options trades from a database using Dash framework.
 
 Usage:
-    python options_trade_plotter.py --database path/to/database.db [--trade-id TRADE_ID]
+    python options_trade_plotter.py --database path/to/database.db
 """
 
+import os
+import webbrowser
 from argparse import ArgumentParser
 from dataclasses import dataclass
 from datetime import date
-from typing import List
+from threading import Timer
+from typing import Dict, List
 
 import plotly.graph_objects as go
+from dash import Dash, dcc, html
+from dash.dependencies import Input, Output
 from plotly.subplots import make_subplots
 
 from common.options_analysis import OptionsDatabase, PositionType, Trade
@@ -164,16 +170,71 @@ class PlotConfig:
         self.currency_format = "${:,.2f}"
 
 
-class TradeVisualizer:
-    """Main class for trade visualization"""
+class DashTradeVisualizer:
+    """Dash-based trade visualization"""
 
-    def __init__(self, db: OptionsDatabase):
-        self.db = db
+    def __init__(self, db_path: str):
+        self.db_path = db_path
         self.config = PlotConfig()
+        self.app = Dash(__name__)
+        self.trade_cache: Dict[int, Trade] = {}
 
-    def create_visualization(self, trade_id: int) -> go.Figure:
-        # Load and process data
-        trade = self.db.load_trade_with_multiple_legs(trade_id)
+        # Initialize trades at startup using a new database connection
+        self.trades = {}  # Initialize empty dict first
+        with OptionsDatabase(self.db_path, "14_30") as db:
+            self.trades = {
+                trade.id: f"Trade {trade.id} - {trade.trade_date} to {trade.expire_date}"
+                for trade in db.load_all_trades()
+            }
+
+        self.setup_layout()
+        self.setup_callbacks()
+
+    def _get_db(self) -> OptionsDatabase:
+        """Create a new database connection for the current thread"""
+        db = OptionsDatabase(self.db_path, "14_30")
+        db.connect()
+        return db
+
+    def setup_layout(self):
+        """Setup the Dash application layout"""
+        self.app.layout = html.Div(
+            [
+                html.Div(
+                    [
+                        dcc.Dropdown(
+                            id="trade-selector",
+                            options=[
+                                {"label": v, "value": k} for k, v in self.trades.items()
+                            ],
+                            value=list(self.trades.keys())[0] if self.trades else None,
+                            style={"width": "100%", "marginBottom": "20px"},
+                        )
+                    ],
+                    style={"width": "80%", "margin": "auto"},
+                ),
+                dcc.Graph(id="trade-plot", style={"height": "800px"}),
+            ],
+            style={"padding": "20px"},
+        )
+
+    def setup_callbacks(self):
+        """Setup the Dash callbacks"""
+
+        @self.app.callback(
+            Output("trade-plot", "figure"), [Input("trade-selector", "value")]
+        )
+        def update_graph(trade_id):
+            if trade_id is None:
+                return go.Figure()
+
+            # Create a new database connection for this callback
+            with self._get_db() as db:
+                return self.create_visualization(trade_id, db)
+
+    def create_visualization(self, trade_id: int, db: OptionsDatabase) -> go.Figure:
+        # Load and process data using the provided database connection
+        trade = db.load_trade_with_multiple_legs(trade_id)
         data = TradeDataProcessor.process_trade_data(trade)
 
         # Create figure with three subplots
@@ -277,30 +338,29 @@ class TradeVisualizer:
 
         return fig
 
+    def run(self, debug=False, port=8050):
+        """Run the Dash application"""
+
+        def open_browser(port=8050):
+            if not os.environ.get("WERKZEUG_RUN_MAIN"):
+                webbrowser.open_new(f"http://localhost:{port}")
+
+        Timer(1, open_browser).start()
+        self.app.run_server(debug=debug, port=port)
+
 
 def main():
     args = parse_args()
 
-    db = OptionsDatabase(args.db_path, "14_30")
-    db.connect()
-
-    visualizer = TradeVisualizer(db)
-    fig = visualizer.create_visualization(trade_id=args.trade_id)
-    fig.show()
-
-    db.disconnect()
+    # Create visualizer with database path instead of connection
+    visualizer = DashTradeVisualizer(args.db_path)
+    visualizer.run(debug=True)
 
 
 def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
         "--db-path", required=True, help="Path to the SQLite database file"
-    )
-    parser.add_argument(
-        "--trade-id",
-        type=int,
-        default=1,
-        help="ID of the trade to visualize (default: 1)",
     )
     return parser.parse_args()
 
