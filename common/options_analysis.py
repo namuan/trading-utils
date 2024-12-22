@@ -21,6 +21,7 @@ class PositionType(Enum):
 class LegType(Enum):
     TRADE_OPEN = "TradeOpen"
     TRADE_AUDIT = "TradeAudit"
+    TRADE_CLOSE = "TradeClose"
 
 
 @dataclass
@@ -41,15 +42,15 @@ class Leg:
     def __post_init__(self):
         # Convert premiums after initialization
         self.premium_open = (
-            -abs(self.premium_open)
+            abs(self.premium_open)
             if self.position_type == PositionType.LONG
-            else abs(self.premium_open)
+            else -abs(self.premium_open)
         )
         if self.premium_current is not None:
             self.premium_current = (
-                -abs(self.premium_current)
+                abs(self.premium_current)
                 if self.position_type == PositionType.LONG
-                else abs(self.premium_current)
+                else -abs(self.premium_current)
             )
 
     def __str__(self):

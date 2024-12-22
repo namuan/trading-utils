@@ -46,25 +46,7 @@ def update_open_trades(db, quote_date):
             existing_trade_id, leg_type=LegType.TRADE_OPEN
         )
         updated_legs = []
-        for leg in existing_trade.legs:
-            underlying_price, call_price, put_price = db.get_current_prices(
-                quote_date, leg.strike_price, leg.leg_expiry_date
-            )
-            updated_leg = Leg(
-                leg_quote_date=quote_date,
-                leg_expiry_date=leg.leg_expiry_date,
-                contract_type=leg.contract_type,
-                position_type=leg.position_type,
-                strike_price=leg.strike_price,
-                underlying_price_open=leg.underlying_price_open,
-                premium_open=leg.premium_open,
-                underlying_price_current=underlying_price,
-                premium_current=put_price,
-                leg_type=LegType.TRADE_AUDIT,
-            )
-            updated_legs.append(updated_leg)
-            db.update_trade_leg(existing_trade_id, updated_leg)
-
+        leg_type = LegType.TRADE_AUDIT
         # If trade has reached expiry date, close it
         if quote_date >= trade["ExpireDate"]:
             logging.info(
@@ -79,10 +61,30 @@ def update_open_trades(db, quote_date):
             logging.info(
                 f"Closed trade {trade['TradeId']} with {existing_trade.closing_premium} at expiry"
             )
+            leg_type = LegType.TRADE_CLOSE
         else:
             logging.info(
                 f"Trade {trade['TradeId']} still open as {quote_date} < {trade['ExpireDate']}"
             )
+
+        for leg in existing_trade.legs:
+            underlying_price, call_price, put_price = db.get_current_prices(
+                quote_date, leg.strike_price, leg.leg_expiry_date
+            )
+            updated_leg = Leg(
+                leg_quote_date=quote_date,
+                leg_expiry_date=leg.leg_expiry_date,
+                contract_type=leg.contract_type,
+                position_type=leg.position_type,
+                strike_price=leg.strike_price,
+                underlying_price_open=leg.underlying_price_open,
+                premium_open=leg.premium_open,
+                underlying_price_current=underlying_price,
+                premium_current=put_price,
+                leg_type=leg_type,
+            )
+            updated_legs.append(updated_leg)
+            db.update_trade_leg(existing_trade_id, updated_leg)
 
 
 def can_create_new_trade(db, quote_date, trade_delay_days):
