@@ -23,6 +23,7 @@ from datetime import date
 from threading import Timer
 from typing import Dict, List
 
+import dash
 import plotly.graph_objects as go
 from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
@@ -208,8 +209,40 @@ class DashTradeVisualizer:
                                 {"label": v, "value": k} for k, v in self.trades.items()
                             ],
                             value=list(self.trades.keys())[0] if self.trades else None,
-                            style={"width": "100%", "marginBottom": "20px"},
-                        )
+                            style={"width": "100%", "marginBottom": "10px"},
+                        ),
+                        html.Div(
+                            [
+                                html.Button(
+                                    "← Previous Trade",
+                                    id="prev-trade-btn",
+                                    style={
+                                        "marginRight": "10px",
+                                        "padding": "10px 20px",
+                                        "backgroundColor": "#f0f0f0",
+                                        "border": "1px solid #ddd",
+                                        "borderRadius": "4px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                                html.Button(
+                                    "Next Trade →",
+                                    id="next-trade-btn",
+                                    style={
+                                        "padding": "10px 20px",
+                                        "backgroundColor": "#f0f0f0",
+                                        "border": "1px solid #ddd",
+                                        "borderRadius": "4px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                            ],
+                            style={
+                                "display": "flex",
+                                "justifyContent": "center",
+                                "marginBottom": "20px",
+                            },
+                        ),
                     ],
                     style={"width": "80%", "margin": "auto"},
                 ),
@@ -222,13 +255,44 @@ class DashTradeVisualizer:
         """Setup the Dash callbacks"""
 
         @self.app.callback(
+            Output("trade-selector", "value"),
+            [
+                Input("prev-trade-btn", "n_clicks"),
+                Input("next-trade-btn", "n_clicks"),
+            ],
+            [Input("trade-selector", "value")],
+        )
+        def update_selected_trade(prev_clicks, next_clicks, current_trade_id):
+            if current_trade_id is None:
+                return list(self.trades.keys())[0] if self.trades else None
+
+            # Get list of trade IDs
+            trade_ids = list(self.trades.keys())
+            current_index = trade_ids.index(current_trade_id)
+
+            # Determine which button was clicked
+            ctx = dash.callback_context
+            if not ctx.triggered:
+                return current_trade_id
+
+            button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+            if button_id == "prev-trade-btn":
+                new_index = (current_index - 1) % len(trade_ids)
+            elif button_id == "next-trade-btn":
+                new_index = (current_index + 1) % len(trade_ids)
+            else:
+                return current_trade_id
+
+            return trade_ids[new_index]
+
+        @self.app.callback(
             Output("trade-plot", "figure"), [Input("trade-selector", "value")]
         )
         def update_graph(trade_id):
             if trade_id is None:
                 return go.Figure()
 
-            # Create a new database connection for this callback
             with self._get_db() as db:
                 return self.create_visualization(trade_id, db)
 
@@ -318,7 +382,7 @@ class DashTradeVisualizer:
 
         # Update layout
         fig.update_layout(
-            title=f"Trade Analysis - Trade Date: {data.trade_date}<br>Expiry: {data.expire_date}",
+            title=f"<b>Trade Date:</b> {data.trade_date} <b>Expiry:</b> {data.expire_date}",
             height=self.config.figure_height,
             showlegend=True,
             hovermode="x unified",
