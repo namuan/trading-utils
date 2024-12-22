@@ -59,7 +59,7 @@ class TradeDataProcessor:
         long_data = []
 
         for leg in trade.legs:
-            current_date = leg.leg_date
+            current_date = leg.leg_quote_date
             current_price = (
                 leg.underlying_price_current
                 if leg.underlying_price_current is not None

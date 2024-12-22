@@ -27,7 +27,8 @@ class LegType(Enum):
 class Leg:
     """Represents a single leg of a trade (call or put)."""
 
-    leg_date: date
+    leg_quote_date: date
+    leg_expiry_date: date
     contract_type: ContractType
     position_type: PositionType
     leg_type: LegType
@@ -54,7 +55,8 @@ class Leg:
     def __str__(self):
         leg_str = [
             f"\n    {self.position_type.value} {self.contract_type.value}",
-            f"\n      Date: {self.leg_date}",
+            f"\n      Date: {self.leg_quote_date}",
+            f"\n      Expiry Date: {self.leg_expiry_date}",
             f"\n      Strike: ${self.strike_price:,.2f}",
             f"\n      Underlying Open: ${self.underlying_price_open:,.2f}",
             f"\n      Premium Open: ${self.premium_open:,.2f}",
@@ -165,6 +167,7 @@ class OptionsDatabase:
             HistoryId INTEGER PRIMARY KEY,
             TradeId INTEGER,
             Date DATE,
+            ExpiryDate DATE,
             StrikePrice REAL,
             ContractType TEXT,
             PositionType TEXT,
@@ -210,14 +213,15 @@ class OptionsDatabase:
     def update_trade_leg(self, existing_trade_id, updated_leg: Leg):
         update_leg_sql = f"""
         INSERT INTO {self.trade_legs_table} (
-            TradeId, Date, StrikePrice, ContractType, PositionType, LegType,
+            TradeId, Date, ExpiryDate, StrikePrice, ContractType, PositionType, LegType,
             PremiumOpen, PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         params = (
             existing_trade_id,
-            updated_leg.leg_date,
+            updated_leg.leg_quote_date,
+            updated_leg.leg_expiry_date,
             updated_leg.strike_price,
             updated_leg.contract_type.value,
             updated_leg.position_type.value,
@@ -254,15 +258,16 @@ class OptionsDatabase:
 
         leg_sql = f"""
         INSERT INTO {self.trade_legs_table} (
-            TradeId, Date, StrikePrice, ContractType, PositionType, LegType,
+            TradeId, Date, ExpiryDate, StrikePrice, ContractType, PositionType, LegType,
             PremiumOpen, PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         for leg in trade.legs:
             leg_params = (
                 trade_id,
-                trade.trade_date,
+                leg.leg_quote_date,
+                leg.leg_expiry_date,
                 leg.strike_price,
                 leg.contract_type.value,
                 leg.position_type.value,
@@ -296,14 +301,14 @@ class OptionsDatabase:
         # Then get legs for this trade
         if leg_type is None:
             legs_sql = f"""
-            SELECT Date, StrikePrice, ContractType, PositionType, PremiumOpen,
+            SELECT Date, ExpiryDate, StrikePrice, ContractType, PositionType, PremiumOpen,
                    PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType
             FROM {self.trade_legs_table} WHERE TradeId = ?
             """
             params = (trade_id,)
         else:
             legs_sql = f"""
-            SELECT Date, StrikePrice, ContractType, PositionType, PremiumOpen,
+            SELECT Date, ExpiryDate, StrikePrice, ContractType, PositionType, PremiumOpen,
                    PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType
             FROM {self.trade_legs_table} WHERE TradeId = ? AND LegType = ?
             """
@@ -318,7 +323,8 @@ class OptionsDatabase:
 
         for leg_row in leg_rows:
             leg = Leg(
-                leg_date=leg_row["Date"],
+                leg_quote_date=leg_row["Date"],
+                leg_expiry_date=leg_row["ExpiryDate"],
                 leg_type=LegType(leg_row["LegType"]),
                 contract_type=ContractType(leg_row["ContractType"]),
                 position_type=PositionType(leg_row["PositionType"]),
@@ -452,6 +458,9 @@ class OptionsDatabase:
         """
         self.cursor.execute(query, (quote_date, strike_price, expire_date))
         result = self.cursor.fetchone()
+        logging.debug(
+            f"get_current_prices query:\n{query} ({quote_date}, {strike_price}, {expire_date}) => {result}"
+        )
         return result if result else (0, 0, 0)
 
     def update_trade_status(

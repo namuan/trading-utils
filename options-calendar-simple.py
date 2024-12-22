@@ -48,10 +48,11 @@ def update_open_trades(db, quote_date):
         updated_legs = []
         for leg in existing_trade.legs:
             underlying_price, call_price, put_price = db.get_current_prices(
-                quote_date, leg.strike_price, trade["ExpireDate"]
+                quote_date, leg.strike_price, leg.leg_expiry_date
             )
             updated_leg = Leg(
-                leg_date=quote_date,
+                leg_quote_date=quote_date,
+                leg_expiry_date=leg.leg_expiry_date,
                 contract_type=leg.contract_type,
                 position_type=leg.position_type,
                 strike_price=leg.strike_price,
@@ -206,7 +207,6 @@ def main(args):
             )
 
             # Only look at PUTs For now. We are only looking at Calendar PUT Spread
-
             logging.debug("Front Option")
             logging.debug(f"=> PUT OPTION: \n {front_put_df.to_string(index=False)}")
 
@@ -230,16 +230,17 @@ def main(args):
             back_put_price = back_put_df["PUT_P_LAST"].iloc[0]
 
             logging.info(
-                f"Front Contract: Underlying Price={front_underlying_price:.2f}, Strike Price={front_strike_price:.2f}, Call Price={front_call_price:.2f}, Put Price={front_put_price:.2f}"
+                f"Front Contract (Expiry {expiry_front_dte}): Underlying Price={front_underlying_price:.2f}, Strike Price={front_strike_price:.2f}, Call Price={front_call_price:.2f}, Put Price={front_put_price:.2f}"
             )
             logging.info(
-                f"Back Contract: Underlying Price={back_underlying_price:.2f}, Strike Price={back_strike_price:.2f}, Call Price={back_call_price:.2f}, Put Price={back_put_price:.2f}"
+                f"Back Contract (Expiry {expiry_back_dte}): Underlying Price={back_underlying_price:.2f}, Strike Price={back_strike_price:.2f}, Call Price={back_call_price:.2f}, Put Price={back_put_price:.2f}"
             )
 
             # create a multi leg trade in database
             trade_legs = [
                 Leg(
-                    leg_date=quote_date,
+                    leg_quote_date=quote_date,
+                    leg_expiry_date=expiry_front_dte,
                     leg_type=LegType.TRADE_OPEN,
                     position_type=PositionType.SHORT,
                     contract_type=ContractType.PUT,
@@ -248,7 +249,8 @@ def main(args):
                     premium_open=front_put_price,
                 ),
                 Leg(
-                    leg_date=quote_date,
+                    leg_quote_date=quote_date,
+                    leg_expiry_date=expiry_back_dte,
                     leg_type=LegType.TRADE_OPEN,
                     position_type=PositionType.LONG,
                     contract_type=ContractType.PUT,
