@@ -12,7 +12,7 @@ Options Trade Plotter
 A tool to visualize options trades from a database using Dash framework.
 
 Usage:
-    python options_trade_plotter.py --database path/to/database.db
+    ./options_trade_plotter.py --database path/to/database.db --front-dte 14 --back-dte 30
 """
 
 import os
@@ -29,7 +29,7 @@ from dash import Dash, dcc, html
 from dash.dependencies import Input, Output
 from plotly.subplots import make_subplots
 
-from common.options_analysis import OptionsDatabase, PositionType, Trade
+from common.options_analysis import LegType, OptionsDatabase, PositionType, Trade
 
 
 @dataclass
@@ -78,11 +78,9 @@ class TradeDataProcessor:
             )
             current_premium = (
                 leg.premium_current
-                if leg.premium_current is not None
+                if leg.leg_type is not LegType.TRADE_OPEN
                 else leg.premium_open
             )
-
-            # Calculate premium difference
             premium_diff = (
                 leg.premium_current - leg.premium_open
                 if leg.premium_current is not None
@@ -174,15 +172,16 @@ class PlotConfig:
 class DashTradeVisualizer:
     """Dash-based trade visualization"""
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, front_dte: int, back_dte: int):
         self.db_path = db_path
+        self.table_tag = f"{front_dte}_{back_dte}"
         self.config = PlotConfig()
         self.app = Dash(__name__)
         self.trade_cache: Dict[int, Trade] = {}
 
         # Initialize trades at startup using a new database connection
         self.trades = {}  # Initialize empty dict first
-        with OptionsDatabase(self.db_path, "14_30") as db:
+        with self._get_db() as db:
             self.trades = {
                 trade.id: f"Trade {trade.id} - {trade.trade_date} to {trade.expire_date}"
                 for trade in db.load_all_trades()
@@ -193,9 +192,7 @@ class DashTradeVisualizer:
 
     def _get_db(self) -> OptionsDatabase:
         """Create a new database connection for the current thread"""
-        db = OptionsDatabase(self.db_path, "14_30")
-        db.connect()
-        return db
+        return OptionsDatabase(self.db_path, self.table_tag)
 
     def setup_layout(self):
         """Setup the Dash application layout"""
@@ -417,7 +414,7 @@ def main():
     args = parse_args()
 
     # Create visualizer with database path instead of connection
-    visualizer = DashTradeVisualizer(args.db_path)
+    visualizer = DashTradeVisualizer(args.db_path, args.front_dte, args.back_dte)
     visualizer.run(debug=True)
 
 
@@ -425,6 +422,18 @@ def parse_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
         "--db-path", required=True, help="Path to the SQLite database file"
+    )
+    parser.add_argument(
+        "--front-dte",
+        type=int,
+        required=True,
+        help="Front days to expiration",
+    )
+    parser.add_argument(
+        "--back-dte",
+        type=int,
+        required=True,
+        help="Back days to expiration",
     )
     return parser.parse_args()
 
