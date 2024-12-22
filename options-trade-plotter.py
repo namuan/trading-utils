@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "matplotlib",
+#   "plotly",
 #   "pandas",
 # ]
 # ///
@@ -14,13 +14,13 @@ Usage:
     python options_trade_plotter.py --database path/to/database.db [--trade-id TRADE_ID]
 """
 
-from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from dataclasses import dataclass
 from datetime import date
 from typing import List
 
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from common.options_analysis import OptionsDatabase, PositionType, Trade
 
@@ -124,86 +124,13 @@ class PlotConfig:
     """Configuration for plot appearance"""
 
     def __init__(self):
-        self.figure_size = (12, 10)
-        self.height_ratios = [1, 1]
-        self.underlying_color = "g-"
-        self.short_put_color = "r-"
-        self.long_put_color = "b-"
-        self.marker_style = "o"
-        self.grid_style = "--"
-        self.grid_alpha = 0.7
-        self.rotation = 45
+        self.figure_height = 800
+        self.underlying_color = "blue"
+        self.short_put_color = "red"
+        self.long_put_color = "green"
+        self.marker_size = 8
+        self.grid_style = "dot"
         self.currency_format = "${:,.2f}"
-
-
-class BasePlot(ABC):
-    """Abstract base class for plots"""
-
-    def __init__(self, ax, config: PlotConfig):
-        self.ax = ax
-        self.config = config
-
-    @abstractmethod
-    def plot(self, data: TradeVisualizationData) -> None:
-        pass
-
-    def _setup_currency_formatter(self):
-        self.ax.yaxis.set_major_formatter(
-            plt.FuncFormatter(lambda x, p: self.config.currency_format.format(x))
-        )
-
-
-class UnderlyingPricePlot(BasePlot):
-    """Plot for underlying price"""
-
-    def plot(self, data: TradeVisualizationData) -> None:
-        self.ax.plot(
-            data.dates,
-            data.underlying_prices,
-            self.config.underlying_color,
-            label="Underlying Price",
-            marker=self.config.marker_style,
-        )
-        self.ax.set_ylabel("Price ($)")
-        self.ax.set_title("Underlying Price Movement")
-        self.ax.grid(
-            True, linestyle=self.config.grid_style, alpha=self.config.grid_alpha
-        )
-        self.ax.legend()
-        self.ax.tick_params(axis="x", rotation=self.config.rotation)
-        self._setup_currency_formatter()
-
-
-class PremiumPlot(BasePlot):
-    """Plot for option premiums"""
-
-    def plot(self, data: TradeVisualizationData) -> None:
-        if data.short_premiums:
-            self.ax.plot(
-                data.dates,
-                data.short_premiums,
-                self.config.short_put_color,
-                label="Short Put Premium",
-                marker=self.config.marker_style,
-            )
-        if data.long_premiums:
-            self.ax.plot(
-                data.dates,
-                data.long_premiums,
-                self.config.long_put_color,
-                label="Long Put Premium",
-                marker=self.config.marker_style,
-            )
-
-        self.ax.set_xlabel("Date")
-        self.ax.set_ylabel("Premium ($)")
-        self.ax.set_title("Put Option Premiums")
-        self.ax.grid(
-            True, linestyle=self.config.grid_style, alpha=self.config.grid_alpha
-        )
-        self.ax.legend()
-        self.ax.tick_params(axis="x", rotation=self.config.rotation)
-        self._setup_currency_formatter()
 
 
 class TradeVisualizer:
@@ -213,36 +140,82 @@ class TradeVisualizer:
         self.db = db
         self.config = PlotConfig()
 
-    def create_visualization(self, trade_id: int) -> plt.Figure:
+    def create_visualization(self, trade_id: int) -> go.Figure:
         # Load and process data
         trade = self.db.load_trade_with_multiple_legs(trade_id)
         data = TradeDataProcessor.process_trade_data(trade)
         print(data)
 
-        # Create figure and subplots
-        fig, (ax1, ax2) = plt.subplots(
-            2,
-            1,
-            figsize=self.config.figure_size,
-            height_ratios=self.config.height_ratios,
+        # Create figure with secondary y-axis
+        fig = make_subplots(
+            rows=2,
+            cols=1,
+            subplot_titles=("Underlying Price Movement", "Put Option Premiums"),
+            vertical_spacing=0.15,
         )
 
-        # Set main title
-        fig.suptitle(
-            f"Trade Analysis - Trade Date: {data.trade_date}\n"
-            f"Expiry: {data.expire_date}",
-            fontsize=12,
-            y=0.95,
+        # Add traces for underlying price
+        fig.add_trace(
+            go.Scatter(
+                x=data.dates,
+                y=data.underlying_prices,
+                name="Price",
+                line=dict(color=self.config.underlying_color),
+                mode="lines+markers",
+                marker=dict(size=self.config.marker_size),
+            ),
+            row=1,
+            col=1,
         )
 
-        # Create and plot subplots
-        underlying_plot = UnderlyingPricePlot(ax1, self.config)
-        premium_plot = PremiumPlot(ax2, self.config)
+        # Add traces for premiums
+        if data.short_premiums:
+            fig.add_trace(
+                go.Scatter(
+                    x=data.dates,
+                    y=data.short_premiums,
+                    name="Short Put",
+                    line=dict(color=self.config.short_put_color),
+                    mode="lines+markers",
+                    marker=dict(size=self.config.marker_size),
+                ),
+                row=2,
+                col=1,
+            )
 
-        underlying_plot.plot(data)
-        premium_plot.plot(data)
+        if data.long_premiums:
+            fig.add_trace(
+                go.Scatter(
+                    x=data.dates,
+                    y=data.long_premiums,
+                    name="Long Put",
+                    line=dict(color=self.config.long_put_color),
+                    mode="lines+markers",
+                    marker=dict(size=self.config.marker_size),
+                ),
+                row=2,
+                col=1,
+            )
 
-        plt.tight_layout()
+        # Update layout
+        fig.update_layout(
+            title=f"Trade Analysis - Trade Date: {data.trade_date}<br>Expiry: {data.expire_date}",
+            height=self.config.figure_height,
+            showlegend=True,
+            hovermode="x unified",
+        )
+
+        # Update y-axes labels
+        fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+        fig.update_yaxes(title_text="Premium ($)", row=2, col=1)
+
+        # Update x-axis labels
+        fig.update_xaxes(title_text="Date", row=2, col=1)
+
+        # Update grid style
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="LightGrey")
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGrey")
+
         return fig
 
 
@@ -254,7 +227,7 @@ def main():
 
     visualizer = TradeVisualizer(db)
     fig = visualizer.create_visualization(trade_id=args.trade_id)
-    plt.show()
+    fig.show()
 
     db.disconnect()
 
