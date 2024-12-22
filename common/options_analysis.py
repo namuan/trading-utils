@@ -88,6 +88,7 @@ class Trade:
     closed_trade_at: Optional[date] = None
     close_reason: Optional[str] = None
     legs: List[Leg] = field(default_factory=list)
+    id: Optional[str] = None
 
     def __str__(self):
         trade_str = (
