@@ -48,6 +48,7 @@ class TradeVisualizationData:
         Dict[str, float]
     ]  # Dict containing all Greeks and IV for long positions
     trade_date: date
+    trade_strike: float
     front_leg_expiry: date
     back_leg_expiry: date
 
@@ -62,6 +63,7 @@ class TradeVisualizationData:
             f"Short Greeks: {self.short_greeks}\n"
             f"Long Greeks: {self.long_greeks}\n"
             f"Trade Date: {self.trade_date}\n"
+            f"Trade Strike: {self.trade_strike}\n"
             f"Front Option Expiration: {self.front_leg_expiry}\n"
             f"Back Option Expiration: {self.back_leg_expiry}"
         )
@@ -196,6 +198,7 @@ class TradeDataProcessor:
             short_greeks=short_greeks,
             long_greeks=long_greeks,
             trade_date=trade.trade_date,
+            trade_strike=trade.legs[0].strike_price,
             front_leg_expiry=front_leg_expiry,
             back_leg_expiry=back_leg_expiry,
         )
@@ -358,6 +361,9 @@ class DashTradeVisualizer:
         trade = db.load_trade_with_multiple_legs(trade_id)
         data = TradeDataProcessor.process_trade_data(trade)
 
+        front_dte = self.calculate_days_between(data.front_leg_expiry, data.trade_date)
+        back_dte = self.calculate_days_between(data.back_leg_expiry, data.trade_date)
+
         # Create figure with subplot grid: 3 rows in first column, 5 rows in second column
         fig = make_subplots(
             rows=5,
@@ -462,7 +468,7 @@ class DashTradeVisualizer:
                     go.Scatter(
                         x=data.dates,
                         y=values,
-                        name=f"{position_type.capitalize()} {greek.upper()}",
+                        name=f"{position_type.capitalize()} Put",
                         line=dict(color=color, width=self.config.line_width),
                         mode="lines+markers",
                         marker=dict(size=self.config.marker_size),
@@ -482,12 +488,10 @@ class DashTradeVisualizer:
         )
 
         # Update layout
-        front_dte = self.calculate_days_between(data.front_leg_expiry, data.trade_date)
-        back_dte = self.calculate_days_between(data.back_leg_expiry, data.trade_date)
         fig.update_layout(
             height=self.config.figure_height,
             title=dict(
-                text=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b>Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
+                text=f"<b>Trade Date:</b> {data.trade_date} <b>Strike</b> {data.trade_strike} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b>Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
                 font=dict(family=self.FONT, size=16, color="#2C3E50"),
                 x=0.5,
             ),
