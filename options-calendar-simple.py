@@ -28,6 +28,7 @@ from common.options_analysis import (
     ContractType,
     Leg,
     LegType,
+    OptionsData,
     OptionsDatabase,
     PositionType,
     Trade,
@@ -68,15 +69,21 @@ def update_open_trades(db, quote_date):
             )
 
         for leg in existing_trade.legs:
-            underlying_price, call_price, put_price = db.get_current_prices(
+            od: OptionsData = db.get_current_options_data(
                 quote_date, leg.strike_price, leg.leg_expiry_date
             )
 
+            if not od:
+                logging.warning(
+                    f"⚠️ Unable to find options data for {quote_date=}, {leg.strike_price=}, {leg.leg_expiry_date=}"
+                )
+                continue
+
             if any(
-                price is None for price in (underlying_price, call_price, put_price)
+                price is None for price in (od.underlying_last, od.c_last, od.p_last)
             ):
                 logging.warning(
-                    f"⚠️ Bad data found on {quote_date}. One of {underlying_price=}, {call_price=}, {put_price=} is missing"
+                    f"⚠️ Bad data found on {quote_date}. One of {od.underlying_last=}, {od.c_last=}, {od.p_last=} is missing"
                 )
                 continue
 
@@ -88,9 +95,14 @@ def update_open_trades(db, quote_date):
                 strike_price=leg.strike_price,
                 underlying_price_open=leg.underlying_price_open,
                 premium_open=leg.premium_open,
-                underlying_price_current=underlying_price,
-                premium_current=put_price,
+                underlying_price_current=od.underlying_last,
+                premium_current=od.p_last,
                 leg_type=leg_type,
+                delta=od.p_delta,
+                gamma=od.p_gamma,
+                vega=od.p_vega,
+                theta=od.p_theta,
+                iv=od.p_iv,
             )
             updated_legs.append(updated_leg)
             db.update_trade_leg(existing_trade_id, updated_leg)
@@ -247,10 +259,24 @@ def main(args):
             front_call_price = front_call_df["CALL_C_LAST"].iloc[0]
             front_put_price = front_put_df["PUT_P_LAST"].iloc[0]
 
+            # Extract Put Option Greeks
+            front_put_delta = front_put_df["PUT_P_DELTA"].iloc[0]
+            front_put_gamma = front_put_df["PUT_P_GAMMA"].iloc[0]
+            front_put_vega = front_put_df["PUT_P_VEGA"].iloc[0]
+            front_put_theta = front_put_df["PUT_P_THETA"].iloc[0]
+            front_put_iv = front_put_df["PUT_P_IV"].iloc[0]
+
             back_underlying_price = back_call_df["UNDERLYING_LAST"].iloc[0]
             back_strike_price = back_call_df["CALL_STRIKE"].iloc[0]
             back_call_price = back_call_df["CALL_C_LAST"].iloc[0]
             back_put_price = back_put_df["PUT_P_LAST"].iloc[0]
+
+            # Extract Put Option Greeks
+            back_put_delta = back_put_df["PUT_P_DELTA"].iloc[0]
+            back_put_gamma = back_put_df["PUT_P_GAMMA"].iloc[0]
+            back_put_vega = back_put_df["PUT_P_VEGA"].iloc[0]
+            back_put_theta = back_put_df["PUT_P_THETA"].iloc[0]
+            back_put_iv = back_put_df["PUT_P_IV"].iloc[0]
 
             if (
                 front_call_price is None
@@ -259,7 +285,7 @@ def main(args):
                 or back_put_price is None
             ):
                 logging.warning(
-                    f"⚠️ One of {front_call_price}, {front_put_price}, {back_call_price}, {back_put_price} is not valid."
+                    f"⚠️ Bad data found on {quote_date}. One of {front_call_price}, {front_put_price}, {back_call_price}, {back_put_price} is not valid."
                 )
                 continue
 
@@ -282,6 +308,11 @@ def main(args):
                     underlying_price_open=front_underlying_price,
                     premium_open=front_put_price,
                     premium_current=0,
+                    delta=front_put_delta,
+                    gamma=front_put_gamma,
+                    vega=front_put_vega,
+                    theta=front_put_theta,
+                    iv=front_put_iv,
                 ),
                 Leg(
                     leg_quote_date=quote_date,
@@ -293,6 +324,11 @@ def main(args):
                     underlying_price_open=back_underlying_price,
                     premium_open=back_put_price,
                     premium_current=0,
+                    delta=back_put_delta,
+                    gamma=back_put_gamma,
+                    vega=back_put_vega,
+                    theta=back_put_theta,
+                    iv=back_put_iv,
                 ),
             ]
             premium_captured_calculated = sum(leg.premium_open for leg in trade_legs)

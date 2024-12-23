@@ -38,6 +38,11 @@ class Leg:
     premium_open: float = field(init=True)
     underlying_price_current: Optional[float] = None
     premium_current: Optional[float] = field(default=None)
+    delta: Optional[float] = None
+    gamma: Optional[float] = None
+    vega: Optional[float] = None
+    theta: Optional[float] = None
+    iv: Optional[float] = None
 
     def __post_init__(self):
         # Convert premiums after initialization
@@ -114,6 +119,43 @@ class Trade:
         return trade_str
 
 
+@dataclass
+class OptionsData:
+    quote_unixtime: int
+    quote_readtime: str
+    quote_date: str
+    quote_time_hours: str
+    underlying_last: float
+    expire_date: str
+    expire_unix: int
+    dte: float
+    c_delta: float
+    c_gamma: float
+    c_vega: float
+    c_theta: float
+    c_rho: float
+    c_iv: float
+    c_volume: float
+    c_last: float
+    c_size: str
+    c_bid: float
+    c_ask: float
+    strike: float
+    p_bid: float
+    p_ask: float
+    p_size: str
+    p_last: float
+    p_delta: float
+    p_gamma: float
+    p_vega: float
+    p_theta: float
+    p_rho: float
+    p_iv: float
+    p_volume: float
+    strike_distance: float
+    strike_distance_pct: float
+
+
 class OptionsDatabase:
     def __init__(self, db_path, table_tag):
         self.db_path = db_path
@@ -187,6 +229,11 @@ class OptionsDatabase:
             PremiumCurrent REAL,
             UnderlyingPriceOpen REAL,
             UnderlyingPriceCurrent REAL,
+            Delta REAL,
+            Gamma REAL,
+            Vega REAL,
+            Theta REAL,
+            Iv REAL,
             FOREIGN KEY(TradeId) REFERENCES {self.trades_table}(TradeId)
         )
         """
@@ -225,8 +272,9 @@ class OptionsDatabase:
         update_leg_sql = f"""
         INSERT INTO {self.trade_legs_table} (
             TradeId, Date, ExpiryDate, StrikePrice, ContractType, PositionType, LegType,
-            PremiumOpen, PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            PremiumOpen, PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent,
+            Delta, Gamma, Vega, Theta, Iv
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         params = (
@@ -241,6 +289,11 @@ class OptionsDatabase:
             updated_leg.premium_current,
             updated_leg.underlying_price_open,
             updated_leg.underlying_price_current,
+            updated_leg.delta,
+            updated_leg.gamma,
+            updated_leg.vega,
+            updated_leg.theta,
+            updated_leg.iv,
         )
 
         self.cursor.execute(update_leg_sql, params)
@@ -270,8 +323,9 @@ class OptionsDatabase:
         leg_sql = f"""
         INSERT INTO {self.trade_legs_table} (
             TradeId, Date, ExpiryDate, StrikePrice, ContractType, PositionType, LegType,
-            PremiumOpen, PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            PremiumOpen, PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent,
+            Delta, Gamma, Vega, Theta, Iv
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         for leg in trade.legs:
@@ -287,6 +341,11 @@ class OptionsDatabase:
                 leg.premium_current,
                 leg.underlying_price_open,
                 leg.underlying_price_current,
+                leg.delta,
+                leg.gamma,
+                leg.vega,
+                leg.theta,
+                leg.iv,
             )
             self.cursor.execute(leg_sql, leg_params)
 
@@ -313,14 +372,16 @@ class OptionsDatabase:
         if leg_type is None:
             legs_sql = f"""
             SELECT Date, ExpiryDate, StrikePrice, ContractType, PositionType, PremiumOpen,
-                   PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType
+                   PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType,
+                   Delta, Gamma, Vega, Theta, Iv
             FROM {self.trade_legs_table} WHERE TradeId = ?
             """
             params = (trade_id,)
         else:
             legs_sql = f"""
             SELECT Date, ExpiryDate, StrikePrice, ContractType, PositionType, PremiumOpen,
-                   PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType
+                   PremiumCurrent, UnderlyingPriceOpen, UnderlyingPriceCurrent, LegType,
+                   Delta, Gamma, Vega, Theta, Iv
             FROM {self.trade_legs_table} WHERE TradeId = ? AND LegType = ?
             """
             params = (trade_id, leg_type.value)
@@ -344,6 +405,11 @@ class OptionsDatabase:
                 premium_open=leg_row["PremiumOpen"],
                 underlying_price_current=leg_row["UnderlyingPriceCurrent"],
                 premium_current=leg_row["PremiumCurrent"],
+                delta=leg_row["Delta"],
+                gamma=leg_row["Gamma"],
+                vega=leg_row["Vega"],
+                theta=leg_row["Theta"],
+                iv=leg_row["Iv"],
             )
             trade_legs.append(leg)
 
@@ -520,6 +586,28 @@ class OptionsDatabase:
         """
         return pd.read_sql_query(query, self.conn)
 
+    def get_current_options_data(
+        self, quote_date: str, strike_price: float, expire_date: str
+    ) -> Optional[OptionsData]:
+        """Get current prices for a specific strike and expiration"""
+        query = """
+            SELECT *
+            FROM options_data
+            WHERE QUOTE_DATE = ?
+            AND STRIKE = ?
+            AND EXPIRE_DATE = ?
+            """
+        self.cursor.execute(query, (quote_date, strike_price, expire_date))
+        result = self.cursor.fetchone()
+        logging.debug(
+            f"get_current_prices query:\n{query} ({quote_date}, {strike_price}, {expire_date}) => {result}"
+        )
+
+        if result is None:
+            return None
+
+        return OptionsData(*result)
+
     def get_current_prices(self, quote_date, strike_price, expire_date):
         """Get current prices for a specific strike and expiration"""
         query = """
@@ -534,7 +622,7 @@ class OptionsDatabase:
         logging.debug(
             f"get_current_prices query:\n{query} ({quote_date}, {strike_price}, {expire_date}) => {result}"
         )
-        return result if result else (0, 0, 0)
+        return result
 
     def update_trade_status(
         self,
@@ -624,6 +712,7 @@ class OptionsDatabase:
         Get specific call and put options based on delta criteria:
         - Call option with C_DELTA > 0.5 (closest to 0.5)
         - Put option with P_DELTA > -0.5 (closest to -0.5)
+        Here we are selecting the first one closest to the current price
         Returns selected columns for both options
         """
         call_query = """
@@ -633,7 +722,12 @@ class OptionsDatabase:
             DTE,
             STRIKE,
             STRIKE_DISTANCE,
-            STRIKE_DISTANCE_PCT
+            STRIKE_DISTANCE_PCT,
+            C_DELTA,
+            C_GAMMA,
+            C_VEGA,
+            C_THETA,
+            C_IV
         FROM options_data
         WHERE QUOTE_DATE = ?
         AND EXPIRE_DATE = ?
@@ -648,7 +742,12 @@ class OptionsDatabase:
             DTE,
             STRIKE,
             STRIKE_DISTANCE,
-            STRIKE_DISTANCE_PCT
+            STRIKE_DISTANCE_PCT,
+            P_DELTA,
+            P_GAMMA,
+            P_VEGA,
+            P_THETA,
+            P_IV
         FROM options_data
         WHERE QUOTE_DATE = ?
         AND EXPIRE_DATE = ?
