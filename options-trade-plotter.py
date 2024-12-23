@@ -205,11 +205,15 @@ class PlotConfig:
     """Configuration for plot appearance"""
 
     def __init__(self):
-        self.figure_height = 800
-        self.underlying_color = "blue"
-        self.short_put_color = "red"
-        self.long_put_color = "green"
-        self.marker_size = 8
+        self.figure_height = 1000
+        # Base colors
+        self.underlying_color = "#2C3E50"  # Dark blue-grey
+        self.short_color = "#E74C3C"  # Coral red
+        self.long_color = "#2ECC71"  # Emerald green
+        self.total_color = "#9B59B6"  # Amethyst purple
+        self.grid_color = "#ECF0F1"  # Light grey
+        self.marker_size = 5
+        self.line_width = 1
         self.grid_style = "dot"
         self.currency_format = "${:,.2f}"
 
@@ -374,6 +378,7 @@ class DashTradeVisualizer:
                 [None, {"type": "scatter"}],
             ],
             column_widths=[0.5, 0.5],
+            row_heights=[0.01, 0.01, 0.01, 0.01, 0.01],
         )
 
         # Original price plot (row 1, col 1)
@@ -382,7 +387,9 @@ class DashTradeVisualizer:
                 x=data.dates,
                 y=data.underlying_prices,
                 name="Price",
-                line=dict(color=self.config.underlying_color),
+                line=dict(
+                    color=self.config.underlying_color, width=self.config.line_width
+                ),
                 mode="lines+markers",
                 marker=dict(size=self.config.marker_size),
                 showlegend=False,
@@ -398,7 +405,9 @@ class DashTradeVisualizer:
                     x=data.dates,
                     y=data.short_premiums,
                     name="Short Put",
-                    line=dict(color=self.config.short_put_color),
+                    line=dict(
+                        color=self.config.short_color, width=self.config.line_width
+                    ),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
                     showlegend=False,
@@ -413,7 +422,9 @@ class DashTradeVisualizer:
                     x=data.dates,
                     y=data.long_premiums,
                     name="Long Put",
-                    line=dict(color=self.config.long_put_color),
+                    line=dict(
+                        color=self.config.long_color, width=self.config.line_width
+                    ),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
                     showlegend=False,
@@ -428,7 +439,7 @@ class DashTradeVisualizer:
                 x=data.dates,
                 y=data.total_premium_differences,
                 name="Total",
-                line=dict(color="purple"),
+                line=dict(color=self.config.total_color, width=self.config.line_width),
                 mode="lines+markers",
                 marker=dict(size=self.config.marker_size),
                 showlegend=False,
@@ -438,10 +449,6 @@ class DashTradeVisualizer:
         )
 
         # Add Greek plots in second column
-        greek_colors = {
-            "short": self.config.short_put_color,
-            "long": self.config.long_put_color,
-        }
         greek_rows = {"delta": 1, "gamma": 2, "vega": 3, "theta": 4, "iv": 5}
 
         for position_type, greeks_data in [
@@ -450,12 +457,18 @@ class DashTradeVisualizer:
         ]:
             for greek in ["delta", "gamma", "vega", "theta", "iv"]:
                 values = [g[greek] if g else None for g in greeks_data]
+                color = (
+                    self.config.short_color
+                    if position_type == "short"
+                    else self.config.long_color
+                )
+
                 fig.add_trace(
                     go.Scatter(
                         x=data.dates,
                         y=values,
                         name=f"{position_type.capitalize()} {greek.upper()}",
-                        line=dict(color=greek_colors[position_type]),
+                        line=dict(color=color, width=self.config.line_width),
                         mode="lines+markers",
                         marker=dict(size=self.config.marker_size),
                         showlegend=False,
@@ -477,10 +490,12 @@ class DashTradeVisualizer:
         front_dte = self.calculate_days_between(data.front_leg_expiry, data.trade_date)
         back_dte = self.calculate_days_between(data.back_leg_expiry, data.trade_date)
         fig.update_layout(
-            height=1200,
+            height=self.config.figure_height,
             title=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b> Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
             showlegend=False,
             hovermode="x unified",
+            plot_bgcolor="white",
+            paper_bgcolor="white",
         )
 
         # Update y-axes labels for first column
@@ -499,15 +514,33 @@ class DashTradeVisualizer:
             5: "IV (%)",
         }
 
-        # Apply labels for first column
+        # Apply labels and grid styling for first column
         for row, label in col1_labels.items():
-            fig.update_yaxes(title_text=label, row=row, col=1)
+            fig.update_yaxes(
+                title_text=label,
+                row=row,
+                col=1,
+                showgrid=True,
+                gridwidth=1,
+                gridcolor=self.config.grid_color,
+                zeroline=True,
+                zerolinecolor=self.config.grid_color,
+            )
 
-        # Apply labels for second column
+        # Apply labels and grid styling for second column
         for row, label in col2_labels.items():
-            fig.update_yaxes(title_text=label, row=row, col=2)
+            fig.update_yaxes(
+                title_text=label,
+                row=row,
+                col=2,
+                showgrid=True,
+                gridwidth=1,
+                gridcolor=self.config.grid_color,
+                zeroline=True,
+                zerolinecolor=self.config.grid_color,
+            )
 
-        # Update x-axis labels
+        # Update x-axis labels and grid styling
         for col in [1, 2]:
             max_row = 3 if col == 1 else 5
             for row in range(1, max_row + 1):
@@ -517,13 +550,12 @@ class DashTradeVisualizer:
                     else "",
                     showgrid=True,
                     gridwidth=1,
-                    gridcolor="LightGrey",
+                    gridcolor=self.config.grid_color,
+                    zeroline=True,
+                    zerolinecolor=self.config.grid_color,
                     row=row,
                     col=col,
                 )
-
-        # Update grid style
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGrey")
 
         return fig
 
