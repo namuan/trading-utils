@@ -288,7 +288,7 @@ class DashTradeVisualizer:
                     ],
                     style={"width": "80%", "margin": "auto"},
                 ),
-                dcc.Graph(id="trade-plot", style={"height": "800px"}),
+                dcc.Graph(id="trade-plot", style={"height": "1600px"}),
             ],
             style={"padding": "20px"},
         )
@@ -348,20 +348,25 @@ class DashTradeVisualizer:
         trade = db.load_trade_with_multiple_legs(trade_id)
         data = TradeDataProcessor.process_trade_data(trade)
 
-        # Create figure with three subplots
+        # Create figure with eight subplots (original 3 + 5 for Greeks)
         fig = make_subplots(
-            rows=3,
+            rows=8,
             cols=1,
             subplot_titles=(
                 "Underlying Price Movement",
                 "Put Option Premiums (Long Puts +ve / Short Puts -ve)",
                 "Total Premium (Below Line -> Debit / Above Line -> Credit)",
+                "Delta",
+                "Gamma",
+                "Vega",
+                "Theta",
+                "Implied Volatility",
             ),
-            vertical_spacing=0.1,
-            specs=[[{"type": "scatter"}], [{"type": "scatter"}], [{"type": "scatter"}]],
+            vertical_spacing=0.03,
+            specs=[[{"type": "scatter"}]] * 8,
         )
 
-        # Add traces for underlying price
+        # Original price plot
         fig.add_trace(
             go.Scatter(
                 x=data.dates,
@@ -375,7 +380,7 @@ class DashTradeVisualizer:
             col=1,
         )
 
-        # Add traces for premiums with Greeks
+        # Original premium plots
         if data.short_premiums:
             fig.add_trace(
                 go.Scatter(
@@ -385,20 +390,6 @@ class DashTradeVisualizer:
                     line=dict(color=self.config.short_put_color),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
-                    hovertemplate=(
-                        "<b>Premium:</b> $%{y:.2f}<br>"
-                        "<b>Delta:</b> %{customdata[0]:.4f}<br>"
-                        "<b>Gamma:</b> %{customdata[1]:.4f}<br>"
-                        "<b>Theta:</b> %{customdata[2]:.4f}<br>"
-                        "<b>Vega:</b> %{customdata[3]:.4f}<br>"
-                        "<b>IV:</b> %{customdata[4]:.2f}%<extra></extra>"
-                    ),
-                    customdata=[
-                        [g["delta"], g["gamma"], g["theta"], g["vega"], g["iv"]]
-                        if g
-                        else [None] * 5
-                        for g in data.short_greeks
-                    ],
                 ),
                 row=2,
                 col=1,
@@ -413,26 +404,12 @@ class DashTradeVisualizer:
                     line=dict(color=self.config.long_put_color),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
-                    hovertemplate=(
-                        "<b>Premium:</b> $%{y:.2f}<br>"
-                        "<b>Delta:</b> %{customdata[0]:.4f}<br>"
-                        "<b>Gamma:</b> %{customdata[1]:.4f}<br>"
-                        "<b>Theta:</b> %{customdata[2]:.4f}<br>"
-                        "<b>Vega:</b> %{customdata[3]:.4f}<br>"
-                        "<b>IV:</b> %{customdata[4]:.2f}%<extra></extra>"
-                    ),
-                    customdata=[
-                        [g["delta"], g["gamma"], g["theta"], g["vega"], g["iv"]]
-                        if g
-                        else [None] * 5
-                        for g in data.long_greeks
-                    ],
                 ),
                 row=2,
                 col=1,
             )
 
-        # Add trace for total premium difference
+        # Total premium difference plot
         fig.add_trace(
             go.Scatter(
                 x=data.dates,
@@ -446,7 +423,33 @@ class DashTradeVisualizer:
             col=1,
         )
 
-        # Add a zero line for reference in the difference plot
+        # Add Greek plots
+        greek_colors = {
+            "short": self.config.short_put_color,
+            "long": self.config.long_put_color,
+        }
+        greek_rows = {"delta": 4, "gamma": 5, "vega": 6, "theta": 7, "iv": 8}
+
+        for position_type, greeks_data in [
+            ("short", data.short_greeks),
+            ("long", data.long_greeks),
+        ]:
+            for greek in ["delta", "gamma", "vega", "theta", "iv"]:
+                values = [g[greek] if g else None for g in greeks_data]
+                fig.add_trace(
+                    go.Scatter(
+                        x=data.dates,
+                        y=values,
+                        name=f"{position_type.capitalize()} {greek.upper()}",
+                        line=dict(color=greek_colors[position_type]),
+                        mode="lines+markers",
+                        marker=dict(size=self.config.marker_size),
+                    ),
+                    row=greek_rows[greek],
+                    col=1,
+                )
+
+        # Add zero line for premium difference
         fig.add_hline(
             y=0,
             line_dash="dash",
@@ -459,22 +462,39 @@ class DashTradeVisualizer:
         front_dte = self.calculate_days_between(data.front_leg_expiry, data.trade_date)
         back_dte = self.calculate_days_between(data.back_leg_expiry, data.trade_date)
         fig.update_layout(
+            height=1600,  # Moved height parameter here
             title=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b> Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
-            height=self.config.figure_height,
             showlegend=True,
             hovermode="x unified",
         )
 
         # Update y-axes labels
-        fig.update_yaxes(title_text="Price ($)", row=1, col=1)
-        fig.update_yaxes(title_text="Premium ($)", row=2, col=1)
-        fig.update_yaxes(title_text="Total Premium Difference ($)", row=3, col=1)
+        y_axis_labels = {
+            1: "Price ($)",
+            2: "Premium ($)",
+            3: "Total Premium Difference ($)",
+            4: "Delta",
+            5: "Gamma",
+            6: "Vega",
+            7: "Theta",
+            8: "IV (%)",
+        }
 
-        # Update x-axis labels
-        fig.update_xaxes(title_text="Date", row=3, col=1)
+        for row, label in y_axis_labels.items():
+            fig.update_yaxes(title_text=label, row=row, col=1)
+
+        # Update x-axis labels (only show on bottom plot)
+        for row in range(1, 9):
+            fig.update_xaxes(
+                title_text="Date" if row == 8 else "",
+                showgrid=True,
+                gridwidth=1,
+                gridcolor="LightGrey",
+                row=row,
+                col=1,
+            )
 
         # Update grid style
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="LightGrey")
         fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGrey")
 
         return fig
