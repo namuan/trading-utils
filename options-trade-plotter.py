@@ -292,7 +292,11 @@ class DashTradeVisualizer:
                     ],
                     style={"width": "80%", "margin": "auto"},
                 ),
-                dcc.Graph(id="trade-plot", style={"height": "1200px"}),
+                dcc.Graph(
+                    id="trade-plot",
+                    style={"height": "1200px"},
+                    config={"displayModeBar": False},
+                ),
             ],
             style={"padding": "20px"},
         )
@@ -480,7 +484,11 @@ class DashTradeVisualizer:
         back_dte = self.calculate_days_between(data.back_leg_expiry, data.trade_date)
         fig.update_layout(
             height=self.config.figure_height,
-            title=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b> Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
+            title=dict(
+                text=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b>Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
+                font=dict(family="Fantasque Sans Mono", size=16, color="#2C3E50"),
+                x=0.5,
+            ),
             showlegend=False,
             hovermode="x unified",
             plot_bgcolor="white",
@@ -491,7 +499,7 @@ class DashTradeVisualizer:
         col1_labels = {
             1: "Price ($)",
             2: "Premium ($)",
-            3: "Total Premium Difference ($)",
+            3: "Total Premium ($)",
         }
 
         # Update y-axes labels for second column
