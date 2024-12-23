@@ -288,7 +288,7 @@ class DashTradeVisualizer:
                     ],
                     style={"width": "80%", "margin": "auto"},
                 ),
-                dcc.Graph(id="trade-plot", style={"height": "1600px"}),
+                dcc.Graph(id="trade-plot", style={"height": "1200px"}),
             ],
             style={"padding": "20px"},
         )
@@ -348,25 +348,35 @@ class DashTradeVisualizer:
         trade = db.load_trade_with_multiple_legs(trade_id)
         data = TradeDataProcessor.process_trade_data(trade)
 
-        # Create figure with eight subplots (original 3 + 5 for Greeks)
+        # Create figure with subplot grid: 3 rows in first column, 5 rows in second column
         fig = make_subplots(
-            rows=8,
-            cols=1,
+            rows=5,
+            cols=2,
             subplot_titles=(
                 "Underlying Price Movement",
-                "Put Option Premiums (Long Puts +ve / Short Puts -ve)",
-                "Total Premium (Below Line -> Debit / Above Line -> Credit)",
                 "Delta",
+                "Put Option Premiums",
                 "Gamma",
+                "Total Premium",
                 "Vega",
+                "",
                 "Theta",
+                "",
                 "Implied Volatility",
             ),
-            vertical_spacing=0.03,
-            specs=[[{"type": "scatter"}]] * 8,
+            vertical_spacing=0.05,
+            horizontal_spacing=0.1,
+            specs=[
+                [{"type": "scatter"}, {"type": "scatter"}],
+                [{"type": "scatter"}, {"type": "scatter"}],
+                [{"type": "scatter"}, {"type": "scatter"}],
+                [None, {"type": "scatter"}],
+                [None, {"type": "scatter"}],
+            ],
+            column_widths=[0.5, 0.5],
         )
 
-        # Original price plot
+        # Original price plot (row 1, col 1)
         fig.add_trace(
             go.Scatter(
                 x=data.dates,
@@ -375,12 +385,13 @@ class DashTradeVisualizer:
                 line=dict(color=self.config.underlying_color),
                 mode="lines+markers",
                 marker=dict(size=self.config.marker_size),
+                showlegend=False,
             ),
             row=1,
             col=1,
         )
 
-        # Original premium plots
+        # Original premium plots (row 2, col 1)
         if data.short_premiums:
             fig.add_trace(
                 go.Scatter(
@@ -390,6 +401,7 @@ class DashTradeVisualizer:
                     line=dict(color=self.config.short_put_color),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
+                    showlegend=False,
                 ),
                 row=2,
                 col=1,
@@ -404,12 +416,13 @@ class DashTradeVisualizer:
                     line=dict(color=self.config.long_put_color),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
+                    showlegend=False,
                 ),
                 row=2,
                 col=1,
             )
 
-        # Total premium difference plot
+        # Total premium difference plot (row 3, col 1)
         fig.add_trace(
             go.Scatter(
                 x=data.dates,
@@ -418,17 +431,18 @@ class DashTradeVisualizer:
                 line=dict(color="purple"),
                 mode="lines+markers",
                 marker=dict(size=self.config.marker_size),
+                showlegend=False,
             ),
             row=3,
             col=1,
         )
 
-        # Add Greek plots
+        # Add Greek plots in second column
         greek_colors = {
             "short": self.config.short_put_color,
             "long": self.config.long_put_color,
         }
-        greek_rows = {"delta": 4, "gamma": 5, "vega": 6, "theta": 7, "iv": 8}
+        greek_rows = {"delta": 1, "gamma": 2, "vega": 3, "theta": 4, "iv": 5}
 
         for position_type, greeks_data in [
             ("short", data.short_greeks),
@@ -444,9 +458,10 @@ class DashTradeVisualizer:
                         line=dict(color=greek_colors[position_type]),
                         mode="lines+markers",
                         marker=dict(size=self.config.marker_size),
+                        showlegend=False,
                     ),
                     row=greek_rows[greek],
-                    col=1,
+                    col=2,
                 )
 
         # Add zero line for premium difference
@@ -462,37 +477,50 @@ class DashTradeVisualizer:
         front_dte = self.calculate_days_between(data.front_leg_expiry, data.trade_date)
         back_dte = self.calculate_days_between(data.back_leg_expiry, data.trade_date)
         fig.update_layout(
-            height=1600,  # Moved height parameter here
+            height=1200,
             title=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b> Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
-            showlegend=True,
+            showlegend=False,
             hovermode="x unified",
         )
 
-        # Update y-axes labels
-        y_axis_labels = {
+        # Update y-axes labels for first column
+        col1_labels = {
             1: "Price ($)",
             2: "Premium ($)",
             3: "Total Premium Difference ($)",
-            4: "Delta",
-            5: "Gamma",
-            6: "Vega",
-            7: "Theta",
-            8: "IV (%)",
         }
 
-        for row, label in y_axis_labels.items():
+        # Update y-axes labels for second column
+        col2_labels = {
+            1: "Delta",
+            2: "Gamma",
+            3: "Vega",
+            4: "Theta",
+            5: "IV (%)",
+        }
+
+        # Apply labels for first column
+        for row, label in col1_labels.items():
             fig.update_yaxes(title_text=label, row=row, col=1)
 
-        # Update x-axis labels (only show on bottom plot)
-        for row in range(1, 9):
-            fig.update_xaxes(
-                title_text="Date" if row == 8 else "",
-                showgrid=True,
-                gridwidth=1,
-                gridcolor="LightGrey",
-                row=row,
-                col=1,
-            )
+        # Apply labels for second column
+        for row, label in col2_labels.items():
+            fig.update_yaxes(title_text=label, row=row, col=2)
+
+        # Update x-axis labels
+        for col in [1, 2]:
+            max_row = 3 if col == 1 else 5
+            for row in range(1, max_row + 1):
+                fig.update_xaxes(
+                    title_text="Date"
+                    if (col == 1 and row == 3) or (col == 2 and row == 5)
+                    else "",
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor="LightGrey",
+                    row=row,
+                    col=col,
+                )
 
         # Update grid style
         fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGrey")
