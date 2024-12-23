@@ -356,18 +356,7 @@ class DashTradeVisualizer:
         fig = make_subplots(
             rows=5,
             cols=2,
-            subplot_titles=(
-                "Underlying Price Movement",
-                "Delta",
-                "Put Option Premiums",
-                "Gamma",
-                "Total Premium",
-                "Vega",
-                "",
-                "Theta",
-                "",
-                "Implied Volatility",
-            ),
+            subplot_titles=("", "", "", "", "", "", "", "", "", ""),
             vertical_spacing=0.05,
             horizontal_spacing=0.1,
             specs=[
@@ -520,11 +509,11 @@ class DashTradeVisualizer:
                 title_text=label,
                 row=row,
                 col=1,
-                showgrid=True,
-                gridwidth=1,
-                gridcolor=self.config.grid_color,
-                zeroline=True,
-                zerolinecolor=self.config.grid_color,
+                showgrid=False,
+                zeroline=False,
+                showline=True,
+                linewidth=1,
+                linecolor="lightgrey",
             )
 
         # Apply labels and grid styling for second column
@@ -533,11 +522,11 @@ class DashTradeVisualizer:
                 title_text=label,
                 row=row,
                 col=2,
-                showgrid=True,
-                gridwidth=1,
-                gridcolor=self.config.grid_color,
-                zeroline=True,
-                zerolinecolor=self.config.grid_color,
+                showgrid=False,
+                zeroline=False,
+                showline=True,
+                linewidth=1,
+                linecolor="lightgrey",
             )
 
         # Update x-axis labels and grid styling
@@ -548,11 +537,11 @@ class DashTradeVisualizer:
                     title_text="Date"
                     if (col == 1 and row == 3) or (col == 2 and row == 5)
                     else "",
-                    showgrid=True,
-                    gridwidth=1,
-                    gridcolor=self.config.grid_color,
-                    zeroline=True,
-                    zerolinecolor=self.config.grid_color,
+                    showgrid=False,
+                    zeroline=False,
+                    showline=True,
+                    linewidth=1,
+                    linecolor="lightgrey",
                     row=row,
                     col=col,
                 )
