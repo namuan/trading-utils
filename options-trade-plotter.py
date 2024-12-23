@@ -221,6 +221,8 @@ class PlotConfig:
 class DashTradeVisualizer:
     """Dash-based trade visualization"""
 
+    FONT = "Fantasque Sans Mono"
+
     def __init__(self, db_path: str, front_dte: int, back_dte: int):
         self.db_path = db_path
         self.table_tag = f"{front_dte}_{back_dte}"
@@ -486,13 +488,14 @@ class DashTradeVisualizer:
             height=self.config.figure_height,
             title=dict(
                 text=f"<b>Trade Date:</b> {data.trade_date} <b>Front Expiry:</b> {data.front_leg_expiry} ({front_dte}) <b>Back Expiry:</b> {data.back_leg_expiry} ({back_dte})",
-                font=dict(family="Fantasque Sans Mono", size=16, color="#2C3E50"),
+                font=dict(family=self.FONT, size=16, color="#2C3E50"),
                 x=0.5,
             ),
             showlegend=False,
             hovermode="x unified",
             plot_bgcolor="white",
             paper_bgcolor="white",
+            font=dict(family=self.FONT),
         )
 
         # Update y-axes labels for first column
