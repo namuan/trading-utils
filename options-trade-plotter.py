@@ -40,7 +40,9 @@ class TradeVisualizationData:
     underlying_prices: List[float]
     short_premiums: List[float]
     long_premiums: List[float]
-    total_premium_differences: List[float]  # Changed to store total differences
+    total_premium_differences: List[float]
+    short_deltas: List[float]
+    long_deltas: List[float]
     trade_date: date
     front_leg_expiry: date
     back_leg_expiry: date
@@ -53,6 +55,8 @@ class TradeVisualizationData:
             f"Short Premiums: {self.short_premiums}\n"
             f"Long Premiums: {self.long_premiums}\n"
             f"Total Premium Differences: {self.total_premium_differences}\n"
+            f"Short Deltas: {self.short_deltas}\n"
+            f"Long Deltas: {self.long_deltas}\n"
             f"Trade Date: {self.trade_date}\n"
             f"Front Option Expiration: {self.front_leg_expiry}\n"
             f"Back Option Expiration: {self.back_leg_expiry}"
@@ -70,6 +74,8 @@ class TradeDataProcessor:
         long_data = []
         short_diff_data = []
         long_diff_data = []
+        short_delta_data = []
+        long_delta_data = []
 
         front_leg_expiry = None
         back_leg_expiry = None
@@ -93,13 +99,16 @@ class TradeDataProcessor:
                 else leg.premium_open
             )
             premium_diff = leg.premium_current - leg.premium_open
+            current_delta = leg.delta
 
             if leg.position_type == PositionType.SHORT:
                 short_data.append((current_date, current_price, current_premium))
                 short_diff_data.append((current_date, premium_diff))
+                short_delta_data.append((current_date, current_delta))
             else:
                 long_data.append((current_date, current_price, current_premium))
                 long_diff_data.append((current_date, premium_diff))
+                long_delta_data.append((current_date, current_delta))
 
         # Get unique dates from both short and long positions
         all_dates = sorted({date for date, _, _ in short_data + long_data})
@@ -110,6 +119,8 @@ class TradeDataProcessor:
         short_premiums = []
         long_premiums = []
         total_premium_differences = []
+        short_deltas = []
+        long_deltas = []
 
         # For each date, find corresponding prices and premiums
         for current_date in all_dates:
@@ -120,6 +131,14 @@ class TradeDataProcessor:
             # Find matching long position
             long_match = next(
                 (data for data in long_data if data[0] == current_date), None
+            )
+
+            # Find matching delta data
+            short_delta_match = next(
+                (data for data in short_delta_data if data[0] == current_date), None
+            )
+            long_delta_match = next(
+                (data for data in long_delta_data if data[0] == current_date), None
             )
 
             # Find matching difference data
@@ -142,6 +161,10 @@ class TradeDataProcessor:
             short_premiums.append(short_match[2] if short_match else None)
             long_premiums.append(long_match[2] if long_match else None)
 
+            # Add deltas (None if no matching position)
+            short_deltas.append(short_delta_match[1] if short_delta_match else None)
+            long_deltas.append(long_delta_match[1] if long_delta_match else None)
+
             # Calculate total premium difference
             short_diff = short_diff_match[1] if short_diff_match else 0
             long_diff = long_diff_match[1] if long_diff_match else 0
@@ -158,6 +181,8 @@ class TradeDataProcessor:
             short_premiums=short_premiums,
             long_premiums=long_premiums,
             total_premium_differences=total_premium_differences,
+            short_deltas=short_deltas,
+            long_deltas=long_deltas,
             trade_date=trade.trade_date,
             front_leg_expiry=front_leg_expiry,
             back_leg_expiry=back_leg_expiry,
@@ -348,6 +373,12 @@ class DashTradeVisualizer:
                     line=dict(color=self.config.short_put_color),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
+                    hovertemplate=(
+                        "<b>Date:</b> %{x}<br>"
+                        "<b>Premium:</b> $%{y:.2f}<br>"
+                        "<b>Delta:</b> %{customdata:.4f}<extra></extra>"
+                    ),
+                    customdata=data.short_deltas,
                 ),
                 row=2,
                 col=1,
@@ -362,6 +393,12 @@ class DashTradeVisualizer:
                     line=dict(color=self.config.long_put_color),
                     mode="lines+markers",
                     marker=dict(size=self.config.marker_size),
+                    hovertemplate=(
+                        "<b>Date:</b> %{x}<br>"
+                        "<b>Premium:</b> $%{y:.2f}<br>"
+                        "<b>Delta:</b> %{customdata:.4f}<extra></extra>"
+                    ),
+                    customdata=data.long_deltas,
                 ),
                 row=2,
                 col=1,
