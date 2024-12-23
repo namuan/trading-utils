@@ -71,6 +71,15 @@ def update_open_trades(db, quote_date):
             underlying_price, call_price, put_price = db.get_current_prices(
                 quote_date, leg.strike_price, leg.leg_expiry_date
             )
+
+            if any(
+                price is None for price in (underlying_price, call_price, put_price)
+            ):
+                logging.warning(
+                    f"⚠️ Bad data found on {quote_date}. One of {underlying_price=}, {call_price=}, {put_price=} is missing"
+                )
+                continue
+
             updated_leg = Leg(
                 leg_quote_date=quote_date,
                 leg_expiry_date=leg.leg_expiry_date,
@@ -158,6 +167,18 @@ def parse_args():
         default=-1,
         help="Minimum number of days to wait between new trades",
     )
+    parser.add_argument(
+        "-sd",
+        "--start-date",
+        type=str,
+        help="Start date for backtesting",
+    )
+    parser.add_argument(
+        "-ed",
+        "--end-date",
+        type=str,
+        help="End date for backtesting",
+    )
     return parser.parse_args()
 
 
@@ -170,7 +191,7 @@ def main(args):
 
     try:
         db.setup_trades_table()
-        quote_dates = db.get_quote_dates()
+        quote_dates = db.get_quote_dates(args.start_date, args.end_date)
 
         for quote_date in quote_dates:
             logging.info(f"Processing {quote_date}")
@@ -230,6 +251,17 @@ def main(args):
             back_strike_price = back_call_df["CALL_STRIKE"].iloc[0]
             back_call_price = back_call_df["CALL_C_LAST"].iloc[0]
             back_put_price = back_put_df["PUT_P_LAST"].iloc[0]
+
+            if (
+                front_call_price is None
+                or front_put_price is None
+                or back_call_price is None
+                or back_put_price is None
+            ):
+                logging.warning(
+                    f"⚠️ One of {front_call_price}, {front_put_price}, {back_call_price}, {back_put_price} is not valid."
+                )
+                continue
 
             logging.info(
                 f"Front Contract (Expiry {expiry_front_dte}): Underlying Price={front_underlying_price:.2f}, Strike Price={front_strike_price:.2f}, Call Price={front_call_price:.2f}, Put Price={front_put_price:.2f}"

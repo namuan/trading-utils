@@ -580,9 +580,12 @@ class OptionsDatabase:
             logging.info("Closing database connection")
             self.conn.close()
 
-    def get_quote_dates(self):
+    def get_quote_dates(self, start_date=None, end_date=None):
         """Get all unique quote dates"""
-        query = "SELECT DISTINCT QUOTE_DATE FROM options_data ORDER BY QUOTE_DATE"
+        if start_date is None or end_date is None:
+            query = "SELECT DISTINCT QUOTE_DATE FROM options_data ORDER BY QUOTE_DATE"
+        else:
+            query = f"SELECT DISTINCT QUOTE_DATE FROM options_data WHERE QUOTE_DATE BETWEEN '{start_date}' AND '{end_date}' ORDER BY QUOTE_DATE"
         self.cursor.execute(query)
         dates = [row[0] for row in self.cursor.fetchall()]
         logging.debug(f"Found {len(dates)} unique quote dates")

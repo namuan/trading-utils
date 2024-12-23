@@ -372,7 +372,7 @@ class DashTradeVisualizer:
             go.Scatter(
                 x=data.dates,
                 y=data.total_premium_differences,
-                name="Total Premium Difference",
+                name="Total",
                 line=dict(color="purple"),
                 mode="lines+markers",
                 marker=dict(size=self.config.marker_size),
