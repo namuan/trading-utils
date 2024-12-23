@@ -77,6 +77,21 @@ class Leg:
         if self.premium_current is not None:
             leg_str.append(f"\n      Premium Current: ${self.premium_current:,.2f}")
 
+        if self.delta is not None:
+            leg_str.append(f"\n      Delta: {self.delta:.4f}")
+
+        if self.gamma is not None:
+            leg_str.append(f"\n      Gamma: {self.gamma:.4f}")
+
+        if self.vega is not None:
+            leg_str.append(f"\n      Vega: {self.vega:.4f}")
+
+        if self.theta is not None:
+            leg_str.append(f"\n      Theta: {self.theta:.4f}")
+
+        if self.iv is not None:
+            leg_str.append(f"\n      IV: {self.iv:.2%}")
+
         return "".join(leg_str)
 
 
