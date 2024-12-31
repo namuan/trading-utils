@@ -12,10 +12,7 @@ def output_dir():
 @PersistentCache()
 def download_ticker_data(ticker, start, end):
     try:
-        ticker_df = yf.download(ticker, start=start, end=end)
-        ticker_df.columns = ticker_df.columns.droplevel("Ticker")
-        ticker_df.to_csv(f"{output_dir()}/{ticker}.csv")
-        return ticker_df
+        return yf.download(ticker, start=start, end=end, multi_level_index=False)
     except:
         print(f"Unable to fetch data for ticker: {ticker}")
         return pd.DataFrame()

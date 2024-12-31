@@ -1,8 +1,10 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#     "pandas",
-#     "plotly",
+#   "pandas",
+#   "plotly",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 """
@@ -23,6 +25,8 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+from common.market_data import download_ticker_data
 
 
 def setup_logging(verbosity):
@@ -77,19 +81,38 @@ def run_query(query, db_path, params=None):
         return pd.read_sql_query(query, conn, params=params or ())
 
 
-def create_dashboard(df, summary_df, symbol):
-    # Create figure with three subplots
+def create_dashboard(df, summary_df, symbol, ticker_data):
+    # Create figure with four subplots
     fig = make_subplots(
-        rows=3,
+        rows=4,
         cols=1,
         subplot_titles=(
+            f"{symbol} Price Data",
             f"{symbol} Short Sale Volume Analysis",
             "Daily Buy/Sell Ratio",
             "Summary Statistics",
         ),
         vertical_spacing=0.1,
-        row_heights=[0.4, 0.3, 0.3],
-        specs=[[{"type": "bar"}], [{"type": "scatter"}], [{"type": "table"}]],
+        row_heights=[0.3, 0.3, 0.2, 0.2],
+        specs=[
+            [{"type": "scatter"}],
+            [{"type": "bar"}],
+            [{"type": "scatter"}],
+            [{"type": "table"}],
+        ],
+    )
+
+    # Add ticker data plot
+    fig.add_trace(
+        go.Scatter(
+            name="Price",
+            x=ticker_data.index,
+            y=ticker_data["Close"],
+            mode="lines",
+            line=dict(color="purple"),
+        ),
+        row=1,
+        col=1,
     )
 
     # Add volume bars
@@ -100,7 +123,7 @@ def create_dashboard(df, summary_df, symbol):
             y=df["bought"],
             marker_color="rgba(0, 128, 0, 0.6)",
         ),
-        row=1,
+        row=2,
         col=1,
     )
 
@@ -111,7 +134,7 @@ def create_dashboard(df, summary_df, symbol):
             y=df["sold"],
             marker_color="rgba(255, 0, 0, 0.6)",
         ),
-        row=1,
+        row=2,
         col=1,
     )
 
@@ -124,7 +147,7 @@ def create_dashboard(df, summary_df, symbol):
             mode="lines+markers",
             line=dict(color="blue"),
         ),
-        row=2,
+        row=3,
         col=1,
     )
 
@@ -149,22 +172,23 @@ def create_dashboard(df, summary_df, symbol):
                 font=dict(size=12),
             ),
         ),
-        row=3,
+        row=4,
         col=1,
     )
 
     # Update layout
     fig.update_layout(
         barmode="group",
-        height=1000,
+        height=1200,
         showlegend=True,
         title_text=f"Short Sale Volume Dashboard - {symbol}",
         title_x=0.5,
     )
 
     # Update y-axes labels
-    fig.update_yaxes(title_text="Volume", row=1, col=1)
-    fig.update_yaxes(title_text="Ratio", row=2, col=1)
+    fig.update_yaxes(title_text="Price", row=1, col=1)
+    fig.update_yaxes(title_text="Volume", row=2, col=1)
+    fig.update_yaxes(title_text="Ratio", row=3, col=1)
 
     fig.show()
 
@@ -181,6 +205,7 @@ def main(args):
     )
 
     logging.debug("Processing data")
+    df["date"] = pd.to_datetime(df["date"], format="%Y%m%d")
     df["bought"] = df["short_volume"]
     df["sold"] = df["total_volume"] - df["short_volume"]
     df["buy_ratio"] = (df["short_volume"] / df["sold"]).round(2)
@@ -206,7 +231,12 @@ def main(args):
         }
     )
 
-    create_dashboard(df, results_df, symbol)
+    # Download ticker data
+    start_date = df["date"].min()
+    end_date = df["date"].max()
+    ticker_data = download_ticker_data(symbol, start=start_date, end=end_date)
+
+    create_dashboard(df, results_df, symbol, ticker_data)
 
 
 if __name__ == "__main__":
