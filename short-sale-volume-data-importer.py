@@ -19,6 +19,7 @@ import logging
 import sqlite3
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
+from sqlite3 import IntegrityError
 
 import pandas as pd
 
@@ -58,7 +59,7 @@ def parse_args():
         "--input",
         type=Path,
         required=True,
-        help="Path to the input text file containing short sale volume data",
+        help="Path to the input directory containing short sale volume data files",
     )
     parser.add_argument(
         "-d",
@@ -120,9 +121,8 @@ def import_data(input_file, db_path):
             df.to_sql("short_sale_volume", conn, if_exists="append", index=False)
 
         logging.info(f"Successfully imported data from {input_file} to {db_path}")
-    except Exception as e:
+    except IntegrityError as e:
         logging.error(f"Error importing data: {str(e)}")
-        raise
 
 
 def main(args):
@@ -130,8 +130,9 @@ def main(args):
     args.database.parent.mkdir(parents=True, exist_ok=True)
     create_database_schema(args.database)
 
-    # Import the data
-    import_data(args.input, args.database)
+    # Process all files in the input directory
+    for input_file in args.input.glob("*.txt"):
+        import_data(input_file, args.database)
 
 
 if __name__ == "__main__":
