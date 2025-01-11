@@ -121,7 +121,7 @@ def filter_and_display_options(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
     df["ExpirationDate"] = pd.to_datetime(df["ExpirationDate"])
 
     today = datetime.now()
-    future_expiration_date = today + timedelta(days=60)
+    future_expiration_date = today + timedelta(days=30)
 
     df = df[
         (df["ExpirationDate"] >= today)
@@ -172,6 +172,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
         row = idx + 1
 
         if not put_df.empty:
+            # Plot put data
             fig.add_trace(
                 go.Scatter(
                     x=put_df["ExpirationDate"],
@@ -183,6 +184,21 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                         colorscale="Reds",
                         showscale=False,
                     ),
+                    name="Puts",
+                ),
+                row=row,
+                col=1,
+            )
+            # Find max StrikePrice for put data
+            max_strike_price = put_df["StrikePrice"].max()
+            # Add horizontal line at the max StrikePrice
+            fig.add_trace(
+                go.Scatter(
+                    x=[put_df["ExpirationDate"].min(), put_df["ExpirationDate"].max()],
+                    y=[max_strike_price, max_strike_price],
+                    mode="lines",
+                    line=dict(color="red", width=2, dash="dash"),
+                    name="Max Strike",
                 ),
                 row=row,
                 col=1,
@@ -200,6 +216,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                         colorscale="Blues",
                         showscale=False,
                     ),
+                    name="Calls",
                 ),
                 row=row,
                 col=1,
@@ -211,7 +228,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
         height=500 * min(num_plots, max_plots),
         width=1000,
         title_text="",
-        showlegend=False,  # Removed legends
+        showlegend=False,
         margin=dict(r=200, t=100, l=50, b=50),
     )
 
