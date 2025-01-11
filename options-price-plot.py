@@ -46,6 +46,12 @@ def parse_args():
         required=True,
         help="Path to SQLite database file",
     )
+    parser.add_argument(
+        "--symbol",
+        type=str,
+        required=True,
+        help="Symbol name for filtering tables",
+    )
     args = parser.parse_args()
 
     if not args.db_path.exists():
@@ -54,13 +60,13 @@ def parse_args():
     return args
 
 
-def load_database(db_path: Path, table_names: list[str]) -> dict[str, pd.DataFrame]:
+def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
     """
     Load data from multiple tables in SQLite database into pandas DataFrames.
 
     Args:
         db_path: Path to the SQLite database file
-        table_names: List of table names to query
+        symbol: Symbol name for filtering tables
 
     Returns:
         Dictionary mapping table names to their respective DataFrames
@@ -73,6 +79,13 @@ def load_database(db_path: Path, table_names: list[str]) -> dict[str, pd.DataFra
 
     try:
         with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE ?",
+                (f"{symbol}%",),
+            )
+            table_names = [table[0] for table in cursor.fetchall()]
+
             base_query = """
                 SELECT
                     ExpirationDate,
@@ -102,7 +115,7 @@ def load_database(db_path: Path, table_names: list[str]) -> dict[str, pd.DataFra
                 FROM {}
             """
 
-            for table_name in table_names:
+            for table_name in sorted(table_names):
                 query = base_query.format(table_name)
                 df = pd.read_sql_query(query, conn)
                 dataframes[table_name] = df
@@ -176,20 +189,23 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
         data_dict: Dictionary mapping table names to tuples of (put_df, call_df)
     """
     num_plots = len(data_dict)
-    specs = [[{"secondary_y": True}] for _ in range(num_plots)]
+    max_plots = 6
+    specs = [[{"secondary_y": True}] for _ in range(min(num_plots, max_plots))]
     fig = make_subplots(
-        rows=num_plots,
+        rows=min(num_plots, max_plots),
         cols=1,
         subplot_titles=[
-            f"Data for {table_name.split('_')[-1]}" for table_name in data_dict.keys()
+            f"On {table_name.split('_')[-1]}"
+            for table_name in list(data_dict.keys())[:max_plots]
         ],
         specs=specs,
-        vertical_spacing=0.25,  # Increased vertical spacing between plots
+        vertical_spacing=min(0.1, 1 / (min(num_plots, max_plots) - 1)),
     )
 
-    for idx, (table_name, (put_df, call_df)) in enumerate(data_dict.items()):
+    for idx, (table_name, (put_df, call_df)) in enumerate(
+        list(data_dict.items())[:max_plots]
+    ):
         row = idx + 1
-        date_suffix = table_name.split("_")[-1]
 
         if not put_df.empty:
             fig.add_trace(
@@ -197,23 +213,11 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                     x=put_df["ExpirationDate"],
                     y=put_df["StrikePrice"],
                     mode="markers",
-                    name=f"Puts",
-                    legendgroup=date_suffix,
-                    legendgrouptitle_text=date_suffix,
                     marker=dict(
                         size=8,
                         color=put_df["PutDelta"].abs(),
                         colorscale="Reds",
-                        showscale=True,
-                        colorbar=dict(
-                            title="Put Delta",
-                            x=1.02,
-                            y=1
-                            - (
-                                idx * 1 / (num_plots - 0.5)
-                            ),  # Adjusted colorbar positioning
-                            len=1 / num_plots - 0.15,  # Shortened colorbar length
-                        ),
+                        showscale=False,
                     ),
                 ),
                 row=row,
@@ -226,63 +230,33 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                     x=call_df["ExpirationDate"],
                     y=call_df["StrikePrice"],
                     mode="markers",
-                    name=f"Calls",
-                    legendgroup=date_suffix,
-                    legendgrouptitle_text=date_suffix,
                     marker=dict(
                         size=8,
                         color=call_df["CallDelta"],
                         colorscale="Blues",
-                        showscale=True,
-                        colorbar=dict(
-                            title="Call Delta",
-                            x=1.12,
-                            y=1
-                            - (
-                                idx * 1 / (num_plots - 0.5)
-                            ),  # Adjusted colorbar positioning
-                            len=1 / num_plots - 0.15,  # Shortened colorbar length
-                        ),
+                        showscale=False,
                     ),
                 ),
                 row=row,
                 col=1,
             )
 
-        # Update axes for each subplot
-        fig.update_xaxes(title_text="Expiration Date", row=row, col=1)
         fig.update_yaxes(title_text="Strike Price", row=row, col=1)
 
     fig.update_layout(
-        height=500 * num_plots,  # Increased height per plot
+        height=500 * min(num_plots, max_plots),
         width=1000,
-        title_text="Options Strike Prices vs Expiration Dates (Next 3 Months)",
-        showlegend=True,
-        legend=dict(
-            orientation="v",
-            yanchor="middle",
-            y=0.5,
-            xanchor="left",
-            x=1.25,
-            font=dict(size=10),
-            tracegroupgap=5,
-        ),
+        title_text="",
+        showlegend=False,  # Removed legends
         margin=dict(r=200, t=100, l=50, b=50),
     )
-
-    # Update legend groups positioning
-    for idx, group in enumerate(fig.data):
-        group.update(legendgroup=f"group{idx//2}")
-        if idx % 2 == 0:
-            group.update(legendgrouptitle_text=f"Data {group.legendgroup[-1]}")
 
     fig.show()
 
 
 def main(args):
     try:
-        table_names = ["spx_quotedata_20241230", "spx_quotedata_20241231"]
-        dataframes = load_database(args.db_path, table_names)
+        dataframes = load_database(args.db_path, args.symbol)
 
         processed_data = {}
         for table_name, df in dataframes.items():
