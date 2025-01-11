@@ -61,19 +61,6 @@ def parse_args():
 
 
 def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
-    """
-    Load data from multiple tables in SQLite database into pandas DataFrames.
-
-    Args:
-        db_path: Path to the SQLite database file
-        symbol: Symbol name for filtering tables
-
-    Returns:
-        Dictionary mapping table names to their respective DataFrames
-
-    Raises:
-        sqlite3.Error: If there's an error connecting to or querying the database
-    """
     logging.info(f"Loading data from database: {db_path}")
     dataframes = {}
 
@@ -128,45 +115,28 @@ def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
 
 
 def filter_and_display_options(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Filter options data by delta ranges and display key metrics grouped by expiration date.
-    Shows StrikePrice and absolute delta values for the next 3 months only.
-
-    Args:
-        df: DataFrame containing options data
-
-    Returns:
-        Tuple of (put_df, call_df) containing filtered options data for puts and calls
-    """
     put_results = []
     call_results = []
 
-    # Convert ExpirationDate to datetime
     df["ExpirationDate"] = pd.to_datetime(df["ExpirationDate"])
 
-    # Calculate date range
     today = datetime.now()
-    three_months_later = today + timedelta(days=90)
+    future_expiration_date = today + timedelta(days=60)
 
-    # Filter for next 3 months and remove weekends
     df = df[
         (df["ExpirationDate"] >= today)
-        & (df["ExpirationDate"] <= three_months_later)
+        & (df["ExpirationDate"] <= future_expiration_date)
         & (df["ExpirationDate"].dt.dayofweek < 5)  # 0-4 represents Monday-Friday
     ]
 
-    # Remove any dates with missing data
     df = df.dropna(subset=["StrikePrice", "PutDelta", "CallDelta"])
 
-    # Group by ExpirationDate
     grouped = df.groupby("ExpirationDate")
 
     for expiration_date, group in grouped:
-        # Filter rows based on delta conditions for puts
         put_mask = (group["PutDelta"] >= -0.50) & (group["PutDelta"] < -0.10)
         filtered_puts = group[put_mask]
 
-        # Filter rows based on delta conditions for calls
         call_mask = (group["CallDelta"] <= 0.50) & (group["CallDelta"] > 0.10)
         filtered_calls = group[call_mask]
 
@@ -182,12 +152,6 @@ def filter_and_display_options(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataF
 
 
 def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> None:
-    """
-    Create interactive plots of options data from multiple tables using Plotly.
-
-    Args:
-        data_dict: Dictionary mapping table names to tuples of (put_df, call_df)
-    """
     num_plots = len(data_dict)
     max_plots = 6
     specs = [[{"secondary_y": True}] for _ in range(min(num_plots, max_plots))]
