@@ -16,8 +16,10 @@ Usage:
 """
 
 import logging
+import sqlite3
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,6 +49,13 @@ def parse_args():
         "--file",
         required=True,
         help="Input CSV file name",
+    )
+    parser.add_argument(
+        "-d",
+        "--database",
+        required=True,
+        type=Path,
+        help="Database file path",
     )
     return parser.parse_args()
 
@@ -125,6 +134,8 @@ def load_and_process_data(file_path):
         "PutOpenInt",
     ]
 
+    df["SpotPrice"] = spot_price
+    df["TodayDate"] = today_date
     df["ExpirationDate"] = pd.to_datetime(df["ExpirationDate"], format="%a %b %d %Y")
     df["ExpirationDate"] = df["ExpirationDate"] + timedelta(hours=16)
     df["StrikePrice"] = df["StrikePrice"].astype(float)
@@ -357,6 +368,8 @@ def main(args):
     file_path = args.file
     df, spot_price, today_date = load_and_process_data(file_path)
 
+    save_to_database(args.database, file_path, df, today_date)
+
     from_strike = 0.8 * spot_price
     to_strike = 1.2 * spot_price
 
@@ -380,6 +393,20 @@ def main(args):
         total_gamma_ex_next,
         total_gamma_ex_fri,
     )
+
+
+def save_to_database(database_path, file_path, df, today_date):
+    # Connect to the database
+    conn = sqlite3.connect(database_path)
+    # Use Path to get file_name from file_path and use it in table_name
+    file_name = Path(file_path).stem
+    table_name = f"{file_name}_{today_date.strftime('%Y%m%d')}"
+    # Clear the table if it exists
+    conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+    # Save the DataFrame to the database
+    df.to_sql(table_name, conn, index=False)
+    # Close the connection
+    conn.close()
 
 
 if __name__ == "__main__":
