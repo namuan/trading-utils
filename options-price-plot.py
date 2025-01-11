@@ -187,7 +187,13 @@ def plot_options_data(put_df: pd.DataFrame, call_df: pd.DataFrame) -> None:
                     color=put_df["PutDelta"].abs(),
                     colorscale="Reds",
                     showscale=True,
-                    colorbar=dict(title="Put Delta", x=0.85, len=0.8),
+                    colorbar=dict(
+                        title="Put Delta",
+                        x=1.02,  # Moved slightly right
+                        len=0.8,
+                        yanchor="middle",
+                        y=0.5,
+                    ),
                 ),
             )
         )
@@ -205,7 +211,13 @@ def plot_options_data(put_df: pd.DataFrame, call_df: pd.DataFrame) -> None:
                     color=call_df["CallDelta"],
                     colorscale="Blues",
                     showscale=True,
-                    colorbar=dict(title="Call Delta", x=1.0, len=0.8),
+                    colorbar=dict(
+                        title="Call Delta",
+                        x=1.15,  # Moved further right
+                        len=0.8,
+                        yanchor="middle",
+                        y=0.5,
+                    ),
                 ),
             )
         )
@@ -215,10 +227,18 @@ def plot_options_data(put_df: pd.DataFrame, call_df: pd.DataFrame) -> None:
         xaxis_title="Expiration Date",
         yaxis_title="Strike Price",
         showlegend=True,
-        legend=dict(yanchor="top", y=1.1, xanchor="left", x=0.01),
-        margin=dict(r=100, t=100),
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=1.02,  # Moved outside to the right
+            orientation="v",
+        ),
+        margin=dict(
+            r=150, t=100, l=50, b=50
+        ),  # Increased right margin to accommodate legends
         height=600,
-        width=800,
+        width=1000,  # Increased width to accommodate legends
     )
 
     fig.show()
