@@ -18,7 +18,7 @@ Usage:
 import logging
 import sqlite3
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -96,23 +96,6 @@ def load_and_process_data(file_path):
     spot_price = float(spot_line.split("Last:")[1].split(",")[0])
     logging.debug(f"Spot price: {spot_price}")
 
-    date_line = options_file_data[2]
-    today_date = date_line.split("Date: ")[1].split(",")
-    month_day = today_date[0].split(" ")
-
-    if len(month_day) == 2:
-        year = int(today_date[1])
-        month = month_day[0]
-        day = int(month_day[1])
-    else:
-        year = int(month_day[2])
-        month = month_day[1]
-        day = int(month_day[0])
-
-    today_date = datetime.strptime(month, "%B")
-    today_date = today_date.replace(day=day, year=year)
-    logging.debug(f"Today's date: {today_date}")
-
     df = pd.read_csv(file_path, sep=",", header=None, skiprows=4)
     df.columns = [
         "ExpirationDate",
@@ -139,10 +122,10 @@ def load_and_process_data(file_path):
         "PutOpenInt",
     ]
 
-    df["SpotPrice"] = spot_price
-    df["TodayDate"] = today_date
     df["ExpirationDate"] = pd.to_datetime(df["ExpirationDate"], format="%a %b %d %Y")
     df["ExpirationDate"] = df["ExpirationDate"] + timedelta(hours=16)
+    today_date = df["ExpirationDate"].iloc[0]
+
     df["StrikePrice"] = df["StrikePrice"].astype(float)
     df["CallIV"] = df["CallIV"].astype(float)
     df["PutIV"] = df["PutIV"].astype(float)
@@ -150,6 +133,8 @@ def load_and_process_data(file_path):
     df["PutGamma"] = df["PutGamma"].astype(float)
     df["CallOpenInt"] = df["CallOpenInt"].astype(float)
     df["PutOpenInt"] = df["PutOpenInt"].astype(float)
+    df["SpotPrice"] = spot_price
+    df["QuoteDate"] = today_date
 
     return df, spot_price, today_date
 
