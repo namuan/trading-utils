@@ -52,6 +52,12 @@ def parse_args():
         required=True,
         help="Symbol name for filtering tables",
     )
+    parser.add_argument(
+        "--exclude-dates",
+        type=str,
+        nargs="+",
+        help="Dates to exclude in YYYY-MM-DD format",
+    )
     args = parser.parse_args()
 
     if not args.db_path.exists():
@@ -114,20 +120,28 @@ def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
         raise
 
 
-def filter_and_display_options(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def filter_and_display_options(
+    df: pd.DataFrame, exclude_dates: list[str] = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     put_results = []
     call_results = []
 
     df["ExpirationDate"] = pd.to_datetime(df["ExpirationDate"])
 
-    today = datetime.now()
-    future_expiration_date = today + timedelta(days=30)
+    if exclude_dates:
+        exclude_dates = pd.to_datetime(exclude_dates) + timedelta(hours=16)
 
-    df = df[
-        (df["ExpirationDate"] >= today)
-        & (df["ExpirationDate"] <= future_expiration_date)
-        & (df["ExpirationDate"].dt.dayofweek < 5)  # 0-4 represents Monday-Friday
-    ]
+    today = datetime.now()
+    future_expiration_date = today + timedelta(days=15)
+
+    date_filter = (df["ExpirationDate"] >= today) & (
+        df["ExpirationDate"] <= future_expiration_date
+    )
+
+    if exclude_dates is not None:
+        date_filter &= ~df["ExpirationDate"].isin(exclude_dates)
+
+    df = df[date_filter]
 
     df = df.dropna(subset=["StrikePrice", "PutDelta", "CallDelta"])
 
@@ -163,7 +177,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
             for table_name in list(data_dict.keys())[:max_plots]
         ],
         specs=specs,
-        vertical_spacing=min(0.1, 1 / (min(num_plots, max_plots) - 1)),
+        vertical_spacing=min(0.1, 1 / (min(num_plots, max_plots))),
     )
 
     for idx, (table_name, (put_df, call_df)) in enumerate(
@@ -265,7 +279,7 @@ def main(args):
 
         processed_data = {}
         for table_name, df in dataframes.items():
-            put_data, call_data = filter_and_display_options(df)
+            put_data, call_data = filter_and_display_options(df, args.exclude_dates)
             processed_data[table_name] = (put_data, call_data)
 
         plot_options_data(processed_data)
