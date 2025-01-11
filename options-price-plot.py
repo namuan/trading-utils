@@ -172,6 +172,18 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
         row = idx + 1
 
         if not put_df.empty:
+            # Calculate normalized size for puts
+            put_size = put_df["PutVol"] * put_df["PutOpenInt"]
+            # Normalize to range 8-30
+            put_size_normalized = (
+                8
+                + (put_size - put_size.min())
+                * (30 - 8)
+                / (put_size.max() - put_size.min())
+                if put_size.max() != put_size.min()
+                else 8
+            )
+
             # Plot put data
             fig.add_trace(
                 go.Scatter(
@@ -179,7 +191,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                     y=put_df["StrikePrice"],
                     mode="markers",
                     marker=dict(
-                        size=8,
+                        size=put_size_normalized,
                         color=put_df["PutDelta"].abs(),
                         colorscale="Reds",
                         showscale=False,
@@ -205,13 +217,25 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
             )
 
         if not call_df.empty:
+            # Calculate normalized size for calls
+            call_size = call_df["CallVol"] * call_df["CallOpenInt"]
+            # Normalize to range 8-30
+            call_size_normalized = (
+                8
+                + (call_size - call_size.min())
+                * (30 - 8)
+                / (call_size.max() - call_size.min())
+                if call_size.max() != call_size.min()
+                else 8
+            )
+
             fig.add_trace(
                 go.Scatter(
                     x=call_df["ExpirationDate"],
                     y=call_df["StrikePrice"],
                     mode="markers",
                     marker=dict(
-                        size=8,
+                        size=call_size_normalized,
                         color=call_df["CallDelta"],
                         colorscale="Blues",
                         showscale=False,
