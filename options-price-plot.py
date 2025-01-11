@@ -132,7 +132,7 @@ def filter_and_display_options(
         exclude_dates = pd.to_datetime(exclude_dates) + timedelta(hours=16)
 
     today = datetime.now()
-    future_expiration_date = today + timedelta(days=15)
+    future_expiration_date = today + timedelta(days=7)
 
     date_filter = (df["ExpirationDate"] >= today) & (
         df["ExpirationDate"] <= future_expiration_date
@@ -185,10 +185,12 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
     ):
         row = idx + 1
 
+        # Filter out weekends
         if not put_df.empty:
+            put_df = put_df[put_df["ExpirationDate"].dt.dayofweek < 5]
+
             # Calculate normalized size for puts
             put_size = put_df["PutVol"] * put_df["PutOpenInt"]
-            # Normalize to range 8-30
             put_size_normalized = (
                 8
                 + (put_size - put_size.min())
@@ -198,7 +200,6 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                 else 8
             )
 
-            # Plot put data
             fig.add_trace(
                 go.Scatter(
                     x=put_df["ExpirationDate"],
@@ -215,9 +216,8 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                 row=row,
                 col=1,
             )
-            # Find max StrikePrice for put data
+
             max_strike_price = put_df["StrikePrice"].max()
-            # Add horizontal line at the max StrikePrice
             fig.add_trace(
                 go.Scatter(
                     x=[put_df["ExpirationDate"].min(), put_df["ExpirationDate"].max()],
@@ -231,9 +231,9 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
             )
 
         if not call_df.empty:
-            # Calculate normalized size for calls
+            call_df = call_df[call_df["ExpirationDate"].dt.dayofweek < 5]
+
             call_size = call_df["CallVol"] * call_df["CallOpenInt"]
-            # Normalize to range 8-30
             call_size_normalized = (
                 8
                 + (call_size - call_size.min())
@@ -259,6 +259,16 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
                 row=row,
                 col=1,
             )
+
+        # Update x-axis settings to show only weekdays
+        fig.update_xaxes(
+            tickformat="%Y-%m-%d",
+            rangebreaks=[
+                dict(bounds=["sat", "mon"]),  # hide weekends
+            ],
+            row=row,
+            col=1,
+        )
 
         fig.update_yaxes(title_text="Strike Price", row=row, col=1)
 
