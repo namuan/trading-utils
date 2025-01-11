@@ -57,6 +57,11 @@ def parse_args():
         type=Path,
         help="Database file path",
     )
+    parser.add_argument(
+        "--show-plot",
+        action="store_true",
+        help="Flag to determine if the plot should be displayed",
+    )
     return parser.parse_args()
 
 
@@ -370,29 +375,30 @@ def main(args):
 
     save_to_database(args.database, file_path, df, today_date)
 
-    from_strike = 0.8 * spot_price
-    to_strike = 1.2 * spot_price
+    if args.show_plot:
+        from_strike = 0.8 * spot_price
+        to_strike = 1.2 * spot_price
 
-    df = calculate_gamma_exposure(df, spot_price)
+        df = calculate_gamma_exposure(df, spot_price)
 
-    (
-        levels,
-        total_gamma,
-        total_gamma_ex_next,
-        total_gamma_ex_fri,
-    ) = calculate_gamma_profile(df, spot_price, from_strike, to_strike, today_date)
+        (
+            levels,
+            total_gamma,
+            total_gamma_ex_next,
+            total_gamma_ex_fri,
+        ) = calculate_gamma_profile(df, spot_price, from_strike, to_strike, today_date)
 
-    plot_combined_gamma(
-        df,
-        spot_price,
-        from_strike,
-        to_strike,
-        today_date,
-        levels,
-        total_gamma,
-        total_gamma_ex_next,
-        total_gamma_ex_fri,
-    )
+        plot_combined_gamma(
+            df,
+            spot_price,
+            from_strike,
+            to_strike,
+            today_date,
+            levels,
+            total_gamma,
+            total_gamma_ex_next,
+            total_gamma_ex_fri,
+        )
 
 
 def save_to_database(database_path, file_path, df, today_date):
