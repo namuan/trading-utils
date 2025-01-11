@@ -177,7 +177,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
             for table_name in list(data_dict.keys())[:max_plots]
         ],
         specs=specs,
-        vertical_spacing=min(0.1, 1 / (min(num_plots, max_plots))),
+        vertical_spacing=0.02,
     )
 
     for idx, (table_name, (put_df, call_df)) in enumerate(
@@ -263,8 +263,8 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
         fig.update_yaxes(title_text="Strike Price", row=row, col=1)
 
     fig.update_layout(
-        height=500 * min(num_plots, max_plots),
-        width=1000,
+        height=800 * min(num_plots, max_plots),
+        width=1500,
         title_text="",
         showlegend=False,
         margin=dict(r=200, t=100, l=50, b=50),
