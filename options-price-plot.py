@@ -432,7 +432,7 @@ def plot_oi_mirror(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> N
     fig.update_layout(
         height=300 * num_tables,
         width=300 * max_dates,
-        showlegend=True,
+        showlegend=False,
         margin=dict(r=50, t=100, l=50, b=50),
         barmode="overlay",
         bargap=0,
@@ -465,25 +465,33 @@ def plot_iv_term_structure(
         row = idx + 1
 
         if not put_df.empty and not call_df.empty:
-            # Find nearest 0.5 delta options
-            put_df["PutDeltaDiff"] = abs(put_df["PutDelta"] + 0.5)
-            call_df["CallDeltaDiff"] = abs(call_df["CallDelta"] - 0.5)
+            # Find nearest 0.5 and 0.25 delta options
+            put_df["PutDelta50Diff"] = abs(put_df["PutDelta"] + 0.5)
+            put_df["PutDelta25Diff"] = abs(put_df["PutDelta"] + 0.25)
+            call_df["CallDelta50Diff"] = abs(call_df["CallDelta"] - 0.5)
+            call_df["CallDelta25Diff"] = abs(call_df["CallDelta"] - 0.25)
 
-            # Group by expiration date and get the nearest 0.5 delta for each date
-            nearest_puts = put_df.loc[
-                put_df.groupby("ExpirationDate")["PutDeltaDiff"].idxmin()
+            # Group by expiration date and get the nearest deltas for each date
+            nearest_puts_50 = put_df.loc[
+                put_df.groupby("ExpirationDate")["PutDelta50Diff"].idxmin()
             ]
-            nearest_calls = call_df.loc[
-                call_df.groupby("ExpirationDate")["CallDeltaDiff"].idxmin()
+            nearest_puts_25 = put_df.loc[
+                put_df.groupby("ExpirationDate")["PutDelta25Diff"].idxmin()
+            ]
+            nearest_calls_50 = call_df.loc[
+                call_df.groupby("ExpirationDate")["CallDelta50Diff"].idxmin()
+            ]
+            nearest_calls_25 = call_df.loc[
+                call_df.groupby("ExpirationDate")["CallDelta25Diff"].idxmin()
             ]
 
-            # Plot put IV
+            # Plot 0.5 delta put IV
             fig.add_trace(
                 go.Scatter(
-                    x=nearest_puts["ExpirationDate"],
-                    y=nearest_puts["PutIV"],
+                    x=nearest_puts_50["ExpirationDate"],
+                    y=nearest_puts_50["PutIV"],
                     mode="lines+markers",
-                    name="Put IV",
+                    name="50Δ Put IV",
                     line=dict(color="red", width=2),
                     marker=dict(size=8, symbol="circle"),
                 ),
@@ -491,15 +499,43 @@ def plot_iv_term_structure(
                 col=1,
             )
 
-            # Plot call IV
+            # Plot 0.25 delta put IV
             fig.add_trace(
                 go.Scatter(
-                    x=nearest_calls["ExpirationDate"],
-                    y=nearest_calls["CallIV"],
+                    x=nearest_puts_25["ExpirationDate"],
+                    y=nearest_puts_25["PutIV"],
                     mode="lines+markers",
-                    name="Call IV",
+                    name="25Δ Put IV",
+                    line=dict(color="pink", width=2),
+                    marker=dict(size=8, symbol="diamond"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Plot 0.5 delta call IV
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_calls_50["ExpirationDate"],
+                    y=nearest_calls_50["CallIV"],
+                    mode="lines+markers",
+                    name="50Δ Call IV",
                     line=dict(color="blue", width=2),
                     marker=dict(size=8, symbol="square"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Plot 0.25 delta call IV
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_calls_25["ExpirationDate"],
+                    y=nearest_calls_25["CallIV"],
+                    mode="lines+markers",
+                    name="25Δ Call IV",
+                    line=dict(color="lightblue", width=2),
+                    marker=dict(size=8, symbol="cross"),
                 ),
                 row=row,
                 col=1,
@@ -524,12 +560,19 @@ def plot_iv_term_structure(
     fig.update_layout(
         height=300 * min(num_plots, max_plots),
         width=1200,
-        title_text="IV Term Structure for ATM Options",
+        title_text="IV Term Structure for 25Δ and 50Δ Options",
         showlegend=False,
-        margin=dict(r=100, t=100, l=50, b=50),
+        margin=dict(r=200, t=100, l=50, b=50),
     )
 
     fig.show()
+
+
+def plot_premium_structure(processed_data):
+    # TODO: Similar to plot_iv_term_structure, here I want to display the Call and Put Premium prices
+    # Use these columns to calculate the mid price - CallBid, CallAsk, PutBid, PutAsk
+    # I want to display the prices for 0.50 Delta, 0.25 Delta for both Calls and Puts across expirations
+    ...
 
 
 def main(args):
@@ -546,6 +589,7 @@ def main(args):
         plot_options_data(processed_data)
         plot_oi_mirror(processed_data)
         plot_iv_term_structure(processed_data)
+        plot_premium_structure(processed_data)
         logging.info("Data loaded and displayed successfully")
     except Exception as e:
         logging.error(f"Error in main: {e}")
