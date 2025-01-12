@@ -58,6 +58,12 @@ def parse_args():
         nargs="+",
         help="Dates to exclude in YYYY-MM-DD format",
     )
+    parser.add_argument(
+        "--expiration-window",
+        type=int,
+        default=7,
+        help="Number of days to look ahead for expiration dates (default: 7)",
+    )
     args = parser.parse_args()
 
     if not args.db_path.exists():
@@ -121,7 +127,7 @@ def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
 
 
 def filter_and_display_options(
-    df: pd.DataFrame, exclude_dates: list[str] = None
+    df: pd.DataFrame, expiration_window: int, exclude_dates: list[str] = None
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     put_results = []
     call_results = []
@@ -132,7 +138,7 @@ def filter_and_display_options(
         exclude_dates = pd.to_datetime(exclude_dates) + timedelta(hours=16)
 
     today = datetime.now()
-    future_expiration_date = today + timedelta(days=7)
+    future_expiration_date = today + timedelta(days=expiration_window)
 
     date_filter = (df["ExpirationDate"] >= today) & (
         df["ExpirationDate"] <= future_expiration_date
@@ -440,7 +446,9 @@ def main(args):
 
         processed_data = {}
         for table_name, df in dataframes.items():
-            put_data, call_data = filter_and_display_options(df, args.exclude_dates)
+            put_data, call_data = filter_and_display_options(
+                df, args.expiration_window, args.exclude_dates
+            )
             processed_data[table_name] = (put_data, call_data)
 
         plot_options_data(processed_data)
