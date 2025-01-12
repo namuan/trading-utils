@@ -568,11 +568,134 @@ def plot_iv_term_structure(
     fig.show()
 
 
-def plot_premium_structure(processed_data):
-    # TODO: Similar to plot_iv_term_structure, here I want to display the Call and Put Premium prices
-    # Use these columns to calculate the mid price - CallBid, CallAsk, PutBid, PutAsk
-    # I want to display the prices for 0.50 Delta, 0.25 Delta for both Calls and Puts across expirations
-    ...
+def plot_premium_structure(
+    data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]],
+) -> None:
+    num_plots = len(data_dict)
+    max_plots = 6
+    specs = [[{"secondary_y": True}] for _ in range(min(num_plots, max_plots))]
+    fig = make_subplots(
+        rows=min(num_plots, max_plots),
+        cols=1,
+        subplot_titles=[
+            f"On {table_name.split('_')[-1]}"
+            for table_name in list(data_dict.keys())[:max_plots]
+        ],
+        specs=specs,
+        vertical_spacing=0.05,
+    )
+
+    for idx, (table_name, (put_df, call_df)) in enumerate(
+        list(data_dict.items())[:max_plots]
+    ):
+        row = idx + 1
+
+        if not put_df.empty and not call_df.empty:
+            # Calculate mid prices
+            put_df["PutMidPrice"] = (put_df["PutBid"] + put_df["PutAsk"]) / 2
+            call_df["CallMidPrice"] = (call_df["CallBid"] + call_df["CallAsk"]) / 2
+
+            # Find nearest 0.5 and 0.25 delta options
+            put_df["PutDelta50Diff"] = abs(put_df["PutDelta"] + 0.5)
+            put_df["PutDelta25Diff"] = abs(put_df["PutDelta"] + 0.25)
+            call_df["CallDelta50Diff"] = abs(call_df["CallDelta"] - 0.5)
+            call_df["CallDelta25Diff"] = abs(call_df["CallDelta"] - 0.25)
+
+            # Group by expiration date and get the nearest deltas for each date
+            nearest_puts_50 = put_df.loc[
+                put_df.groupby("ExpirationDate")["PutDelta50Diff"].idxmin()
+            ]
+            nearest_puts_25 = put_df.loc[
+                put_df.groupby("ExpirationDate")["PutDelta25Diff"].idxmin()
+            ]
+            nearest_calls_50 = call_df.loc[
+                call_df.groupby("ExpirationDate")["CallDelta50Diff"].idxmin()
+            ]
+            nearest_calls_25 = call_df.loc[
+                call_df.groupby("ExpirationDate")["CallDelta25Diff"].idxmin()
+            ]
+
+            # Plot 0.5 delta put premium
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_puts_50["ExpirationDate"],
+                    y=nearest_puts_50["PutMidPrice"],
+                    mode="lines+markers",
+                    name="50Δ Put Premium",
+                    line=dict(color="red", width=2),
+                    marker=dict(size=8, symbol="circle"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Plot 0.25 delta put premium
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_puts_25["ExpirationDate"],
+                    y=nearest_puts_25["PutMidPrice"],
+                    mode="lines+markers",
+                    name="25Δ Put Premium",
+                    line=dict(color="pink", width=2),
+                    marker=dict(size=8, symbol="diamond"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Plot 0.5 delta call premium
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_calls_50["ExpirationDate"],
+                    y=nearest_calls_50["CallMidPrice"],
+                    mode="lines+markers",
+                    name="50Δ Call Premium",
+                    line=dict(color="blue", width=2),
+                    marker=dict(size=8, symbol="square"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Plot 0.25 delta call premium
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_calls_25["ExpirationDate"],
+                    y=nearest_calls_25["CallMidPrice"],
+                    mode="lines+markers",
+                    name="25Δ Call Premium",
+                    line=dict(color="lightblue", width=2),
+                    marker=dict(size=8, symbol="cross"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Update x-axis settings
+            fig.update_xaxes(
+                tickformat="%Y-%m-%d",
+                rangebreaks=[dict(bounds=["sat", "mon"])],
+                title_text="",
+                row=row,
+                col=1,
+            )
+
+            fig.update_yaxes(
+                title_text="Option Premium ($)",
+                tickprefix="$",
+                row=row,
+                col=1,
+            )
+
+    fig.update_layout(
+        height=300 * min(num_plots, max_plots),
+        width=1200,
+        title_text="Premium Structure for 25Δ and 50Δ Options",
+        showlegend=False,
+        margin=dict(r=200, t=100, l=50, b=50),
+    )
+
+    fig.show()
 
 
 def main(args):
