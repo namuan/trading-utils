@@ -148,10 +148,10 @@ def filter_and_display_options(
     grouped = df.groupby("ExpirationDate")
 
     for expiration_date, group in grouped:
-        put_mask = (group["PutDelta"] >= -0.50) & (group["PutDelta"] < -0.10)
+        put_mask = (group["PutDelta"] >= -0.90) & (group["PutDelta"] < -0.10)
         filtered_puts = group[put_mask]
 
-        call_mask = (group["CallDelta"] <= 0.50) & (group["CallDelta"] > 0.10)
+        call_mask = (group["CallDelta"] <= 0.90) & (group["CallDelta"] > 0.10)
         filtered_calls = group[call_mask]
 
         if not filtered_puts.empty:
@@ -188,6 +188,9 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
         # Filter out weekends
         if not put_df.empty:
             put_df = put_df[put_df["ExpirationDate"].dt.dayofweek < 5]
+            put_df = put_df[
+                (put_df["PutDelta"] >= -0.50) & (put_df["PutDelta"] < -0.10)
+            ]
 
             # Calculate normalized size for puts
             put_size = put_df["PutVol"] * put_df["PutOpenInt"]
@@ -232,6 +235,9 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
 
         if not call_df.empty:
             call_df = call_df[call_df["ExpirationDate"].dt.dayofweek < 5]
+            call_df = call_df[
+                (call_df["CallDelta"] <= 0.50) & (call_df["CallDelta"] > 0.10)
+            ]
 
             call_size = call_df["CallVol"] * call_df["CallOpenInt"]
             call_size_normalized = (
@@ -283,6 +289,134 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
     fig.show()
 
 
+def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> None:
+    # Process only valid tables that have data
+    valid_tables = {
+        name: data
+        for name, data in data_dict.items()
+        if not (data[0].empty and data[1].empty)
+    }
+
+    if not valid_tables:
+        return
+
+    num_tables = len(valid_tables)
+
+    # Create subplot grid for all tables and their expiration dates
+    table_plots = []
+    max_dates = 0
+
+    # First pass to determine layout
+    for table_name, (put_df, call_df) in valid_tables.items():
+        expiration_dates = pd.concat(
+            [
+                put_df["ExpirationDate"] if not put_df.empty else pd.Series(),
+                call_df["ExpirationDate"] if not call_df.empty else pd.Series(),
+            ]
+        ).unique()
+        expiration_dates = sorted(expiration_dates)
+        expiration_dates = [
+            d for d in expiration_dates if pd.to_datetime(d).dayofweek < 5
+        ]
+        max_dates = max(max_dates, len(expiration_dates))
+        table_plots.append((table_name, expiration_dates))
+
+    # Create subplot grid
+    specs = [
+        [{"secondary_y": True} for _ in range(max_dates)] for _ in range(num_tables)
+    ]
+    fig = make_subplots(
+        rows=num_tables,
+        cols=max_dates,
+        subplot_titles=[
+            f"{name.split('_')[-1]} - {date.strftime('%Y-%m-%d')}"
+            for name, dates in table_plots
+            for date in dates
+        ],
+        specs=specs,
+        vertical_spacing=0.08,  # Increased spacing to prevent title overlap
+        horizontal_spacing=0.02,
+    )
+
+    # Plot data
+    for row_idx, (table_name, expiration_dates) in enumerate(table_plots, 1):
+        put_df, call_df = valid_tables[table_name]
+
+        for col_idx, exp_date in enumerate(expiration_dates, 1):
+            current_puts = (
+                put_df[put_df["ExpirationDate"] == exp_date]
+                if not put_df.empty
+                else pd.DataFrame()
+            )
+            current_calls = (
+                call_df[call_df["ExpirationDate"] == exp_date]
+                if not call_df.empty
+                else pd.DataFrame()
+            )
+
+            if not current_puts.empty:
+                put_size = current_puts["PutVol"] * current_puts["PutOpenInt"]
+                fig.add_trace(
+                    go.Bar(
+                        x=-put_size,
+                        y=current_puts["StrikePrice"],
+                        orientation="h",
+                        name="Puts",
+                        marker_color="red",
+                        marker_line_color="black",
+                        marker_line_width=1,
+                        showlegend=False,
+                    ),
+                    row=row_idx,
+                    col=col_idx,
+                )
+
+            if not current_calls.empty:
+                call_size = current_calls["CallVol"] * current_calls["CallOpenInt"]
+                fig.add_trace(
+                    go.Bar(
+                        x=call_size,
+                        y=current_calls["StrikePrice"],
+                        orientation="h",
+                        name="Calls",
+                        marker_color="green",
+                        marker_line_color="black",
+                        marker_line_width=1,
+                        showlegend=False,
+                    ),
+                    row=row_idx,
+                    col=col_idx,
+                )
+
+            # Update axes
+            fig.update_xaxes(
+                zeroline=True,
+                zerolinewidth=1,
+                zerolinecolor="black",
+                row=row_idx,
+                col=col_idx,
+            )
+
+            fig.update_yaxes(
+                title_text="Strike Price" if col_idx == 1 else "",
+                row=row_idx,
+                col=col_idx,
+            )
+
+    # Update layout
+    fig.update_layout(
+        height=300 * num_tables,  # Reduced height per plot
+        width=300 * max_dates,
+        showlegend=True,
+        margin=dict(r=50, t=100, l=50, b=50),
+        barmode="overlay",
+        bargap=0,
+        bargroupgap=0,
+    )
+
+    fig.show()
+
+
 def main(args):
     try:
         dataframes = load_database(args.db_path, args.symbol)
@@ -293,6 +427,7 @@ def main(args):
             processed_data[table_name] = (put_data, call_data)
 
         plot_options_data(processed_data)
+        plot_options_oi(processed_data)
         logging.info("Data loaded and displayed successfully")
     except Exception as e:
         logging.error(f"Error in main: {e}")
