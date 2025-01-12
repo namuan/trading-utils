@@ -18,8 +18,10 @@ Usage:
 import logging
 import sqlite3
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import List
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -70,6 +72,26 @@ def parse_args():
         parser.error(f"Database file not found: {args.db_path}")
 
     return args
+
+
+@dataclass
+class DeltaLevel:
+    value: float
+    name: str
+    color: str
+    marker_symbol: str
+    is_call: bool = True
+
+
+def get_delta_levels() -> List[DeltaLevel]:
+    return [
+        DeltaLevel(-0.50, "50Δ Put", "red", "circle", False),
+        DeltaLevel(0.50, "50Δ Call", "blue", "square"),
+        DeltaLevel(-0.25, "25Δ Put", "pink", "diamond", False),
+        DeltaLevel(0.25, "25Δ Call", "lightblue", "cross"),
+        DeltaLevel(-0.15, "15Δ Put", "darkred", "star-triangle-down", False),
+        DeltaLevel(0.15, "15Δ Call", "darkblue", "star-triangle-up"),
+    ]
 
 
 def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
@@ -154,10 +176,10 @@ def filter_and_display_options(
     grouped = df.groupby("ExpirationDate")
 
     for expiration_date, group in grouped:
-        put_mask = (group["PutDelta"] >= -0.90) & (group["PutDelta"] < -0.10)
+        put_mask = (group["PutDelta"] >= -0.95) & (group["PutDelta"] < -0.05)
         filtered_puts = group[put_mask]
 
-        call_mask = (group["CallDelta"] <= 0.90) & (group["CallDelta"] > 0.10)
+        call_mask = (group["CallDelta"] <= 0.95) & (group["CallDelta"] > 0.05)
         filtered_calls = group[call_mask]
 
         if not filtered_puts.empty:
@@ -459,89 +481,37 @@ def plot_iv_term_structure(
         vertical_spacing=0.05,
     )
 
+    delta_levels = get_delta_levels()
+
     for idx, (table_name, (put_df, call_df)) in enumerate(
         list(data_dict.items())[:max_plots]
     ):
         row = idx + 1
 
         if not put_df.empty and not call_df.empty:
-            # Find nearest 0.5 and 0.25 delta options
-            put_df["PutDelta50Diff"] = abs(put_df["PutDelta"] + 0.5)
-            put_df["PutDelta25Diff"] = abs(put_df["PutDelta"] + 0.25)
-            call_df["CallDelta50Diff"] = abs(call_df["CallDelta"] - 0.5)
-            call_df["CallDelta25Diff"] = abs(call_df["CallDelta"] - 0.25)
+            for delta_level in delta_levels:
+                df = put_df if not delta_level.is_call else call_df
+                delta_col = "PutDelta" if not delta_level.is_call else "CallDelta"
+                iv_col = "PutIV" if not delta_level.is_call else "CallIV"
 
-            # Group by expiration date and get the nearest deltas for each date
-            nearest_puts_50 = put_df.loc[
-                put_df.groupby("ExpirationDate")["PutDelta50Diff"].idxmin()
-            ]
-            nearest_puts_25 = put_df.loc[
-                put_df.groupby("ExpirationDate")["PutDelta25Diff"].idxmin()
-            ]
-            nearest_calls_50 = call_df.loc[
-                call_df.groupby("ExpirationDate")["CallDelta50Diff"].idxmin()
-            ]
-            nearest_calls_25 = call_df.loc[
-                call_df.groupby("ExpirationDate")["CallDelta25Diff"].idxmin()
-            ]
+                df[f"{delta_col}Diff"] = abs(df[delta_col] - delta_level.value)
+                nearest_options = df.loc[
+                    df.groupby("ExpirationDate")[f"{delta_col}Diff"].idxmin()
+                ]
 
-            # Plot 0.5 delta put IV
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_puts_50["ExpirationDate"],
-                    y=nearest_puts_50["PutIV"],
-                    mode="lines+markers",
-                    name="50Δ Put IV",
-                    line=dict(color="red", width=2),
-                    marker=dict(size=8, symbol="circle"),
-                ),
-                row=row,
-                col=1,
-            )
+                fig.add_trace(
+                    go.Scatter(
+                        x=nearest_options["ExpirationDate"],
+                        y=nearest_options[iv_col],
+                        mode="lines+markers",
+                        name=f"{delta_level.name} IV",
+                        line=dict(color=delta_level.color, width=2),
+                        marker=dict(size=8, symbol=delta_level.marker_symbol),
+                    ),
+                    row=row,
+                    col=1,
+                )
 
-            # Plot 0.25 delta put IV
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_puts_25["ExpirationDate"],
-                    y=nearest_puts_25["PutIV"],
-                    mode="lines+markers",
-                    name="25Δ Put IV",
-                    line=dict(color="pink", width=2),
-                    marker=dict(size=8, symbol="diamond"),
-                ),
-                row=row,
-                col=1,
-            )
-
-            # Plot 0.5 delta call IV
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_calls_50["ExpirationDate"],
-                    y=nearest_calls_50["CallIV"],
-                    mode="lines+markers",
-                    name="50Δ Call IV",
-                    line=dict(color="blue", width=2),
-                    marker=dict(size=8, symbol="square"),
-                ),
-                row=row,
-                col=1,
-            )
-
-            # Plot 0.25 delta call IV
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_calls_25["ExpirationDate"],
-                    y=nearest_calls_25["CallIV"],
-                    mode="lines+markers",
-                    name="25Δ Call IV",
-                    line=dict(color="lightblue", width=2),
-                    marker=dict(size=8, symbol="cross"),
-                ),
-                row=row,
-                col=1,
-            )
-
-            # Update x-axis settings
             fig.update_xaxes(
                 tickformat="%Y-%m-%d",
                 rangebreaks=[dict(bounds=["sat", "mon"])],
@@ -585,93 +555,40 @@ def plot_premium_structure(
         vertical_spacing=0.05,
     )
 
+    delta_levels = get_delta_levels()
+
     for idx, (table_name, (put_df, call_df)) in enumerate(
         list(data_dict.items())[:max_plots]
     ):
         row = idx + 1
 
         if not put_df.empty and not call_df.empty:
-            # Calculate mid prices
             put_df["PutMidPrice"] = (put_df["PutBid"] + put_df["PutAsk"]) / 2
             call_df["CallMidPrice"] = (call_df["CallBid"] + call_df["CallAsk"]) / 2
 
-            # Find nearest 0.5 and 0.25 delta options
-            put_df["PutDelta50Diff"] = abs(put_df["PutDelta"] + 0.5)
-            put_df["PutDelta25Diff"] = abs(put_df["PutDelta"] + 0.25)
-            call_df["CallDelta50Diff"] = abs(call_df["CallDelta"] - 0.5)
-            call_df["CallDelta25Diff"] = abs(call_df["CallDelta"] - 0.25)
+            for delta_level in delta_levels:
+                df = put_df if not delta_level.is_call else call_df
+                delta_col = "PutDelta" if not delta_level.is_call else "CallDelta"
+                price_col = "PutMidPrice" if not delta_level.is_call else "CallMidPrice"
 
-            # Group by expiration date and get the nearest deltas for each date
-            nearest_puts_50 = put_df.loc[
-                put_df.groupby("ExpirationDate")["PutDelta50Diff"].idxmin()
-            ]
-            nearest_puts_25 = put_df.loc[
-                put_df.groupby("ExpirationDate")["PutDelta25Diff"].idxmin()
-            ]
-            nearest_calls_50 = call_df.loc[
-                call_df.groupby("ExpirationDate")["CallDelta50Diff"].idxmin()
-            ]
-            nearest_calls_25 = call_df.loc[
-                call_df.groupby("ExpirationDate")["CallDelta25Diff"].idxmin()
-            ]
+                df[f"{delta_col}Diff"] = abs(df[delta_col] - delta_level.value)
+                nearest_options = df.loc[
+                    df.groupby("ExpirationDate")[f"{delta_col}Diff"].idxmin()
+                ]
 
-            # Plot 0.5 delta put premium
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_puts_50["ExpirationDate"],
-                    y=nearest_puts_50["PutMidPrice"],
-                    mode="lines+markers",
-                    name="50Δ Put Premium",
-                    line=dict(color="red", width=2),
-                    marker=dict(size=8, symbol="circle"),
-                ),
-                row=row,
-                col=1,
-            )
+                fig.add_trace(
+                    go.Scatter(
+                        x=nearest_options["ExpirationDate"],
+                        y=nearest_options[price_col],
+                        mode="lines+markers",
+                        name=f"{delta_level.name} Premium",
+                        line=dict(color=delta_level.color, width=2),
+                        marker=dict(size=8, symbol=delta_level.marker_symbol),
+                    ),
+                    row=row,
+                    col=1,
+                )
 
-            # Plot 0.25 delta put premium
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_puts_25["ExpirationDate"],
-                    y=nearest_puts_25["PutMidPrice"],
-                    mode="lines+markers",
-                    name="25Δ Put Premium",
-                    line=dict(color="pink", width=2),
-                    marker=dict(size=8, symbol="diamond"),
-                ),
-                row=row,
-                col=1,
-            )
-
-            # Plot 0.5 delta call premium
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_calls_50["ExpirationDate"],
-                    y=nearest_calls_50["CallMidPrice"],
-                    mode="lines+markers",
-                    name="50Δ Call Premium",
-                    line=dict(color="blue", width=2),
-                    marker=dict(size=8, symbol="square"),
-                ),
-                row=row,
-                col=1,
-            )
-
-            # Plot 0.25 delta call premium
-            fig.add_trace(
-                go.Scatter(
-                    x=nearest_calls_25["ExpirationDate"],
-                    y=nearest_calls_25["CallMidPrice"],
-                    mode="lines+markers",
-                    name="25Δ Call Premium",
-                    line=dict(color="lightblue", width=2),
-                    marker=dict(size=8, symbol="cross"),
-                ),
-                row=row,
-                col=1,
-            )
-
-            # Update x-axis settings
             fig.update_xaxes(
                 tickformat="%Y-%m-%d",
                 rangebreaks=[dict(bounds=["sat", "mon"])],
