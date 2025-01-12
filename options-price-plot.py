@@ -295,7 +295,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
     fig.show()
 
 
-def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> None:
+def plot_oi_mirror(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> None:
     # Process only valid tables that have data
     valid_tables = {
         name: data
@@ -335,9 +335,11 @@ def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> 
         rows=num_tables,
         cols=max_dates,
         subplot_titles=[
-            f"{name.split('_')[-1]} - {date.strftime('%Y-%m-%d')}"
+            f"<b>On {name.split('_')[-1]}</b>::{date.strftime('%Y-%m-%d')}"
+            if i == 0
+            else date.strftime("%Y-%m-%d")
             for name, dates in table_plots
-            for date in dates
+            for i, date in enumerate(dates)
         ],
         specs=specs,
         vertical_spacing=0.08,
@@ -440,6 +442,96 @@ def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> 
     fig.show()
 
 
+def plot_iv_term_structure(
+    data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]],
+) -> None:
+    num_plots = len(data_dict)
+    max_plots = 6
+    specs = [[{"secondary_y": True}] for _ in range(min(num_plots, max_plots))]
+    fig = make_subplots(
+        rows=min(num_plots, max_plots),
+        cols=1,
+        subplot_titles=[
+            f"On {table_name.split('_')[-1]}"
+            for table_name in list(data_dict.keys())[:max_plots]
+        ],
+        specs=specs,
+        vertical_spacing=0.05,
+    )
+
+    for idx, (table_name, (put_df, call_df)) in enumerate(
+        list(data_dict.items())[:max_plots]
+    ):
+        row = idx + 1
+
+        if not put_df.empty and not call_df.empty:
+            # Find nearest 0.5 delta options
+            put_df["PutDeltaDiff"] = abs(put_df["PutDelta"] + 0.5)
+            call_df["CallDeltaDiff"] = abs(call_df["CallDelta"] - 0.5)
+
+            # Group by expiration date and get the nearest 0.5 delta for each date
+            nearest_puts = put_df.loc[
+                put_df.groupby("ExpirationDate")["PutDeltaDiff"].idxmin()
+            ]
+            nearest_calls = call_df.loc[
+                call_df.groupby("ExpirationDate")["CallDeltaDiff"].idxmin()
+            ]
+
+            # Plot put IV
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_puts["ExpirationDate"],
+                    y=nearest_puts["PutIV"],
+                    mode="lines+markers",
+                    name="Put IV",
+                    line=dict(color="red", width=2),
+                    marker=dict(size=8, symbol="circle"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Plot call IV
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_calls["ExpirationDate"],
+                    y=nearest_calls["CallIV"],
+                    mode="lines+markers",
+                    name="Call IV",
+                    line=dict(color="blue", width=2),
+                    marker=dict(size=8, symbol="square"),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Update x-axis settings
+            fig.update_xaxes(
+                tickformat="%Y-%m-%d",
+                rangebreaks=[dict(bounds=["sat", "mon"])],
+                title_text="",
+                row=row,
+                col=1,
+            )
+
+            fig.update_yaxes(
+                title_text="Implied Volatility",
+                tickformat=".1%",
+                row=row,
+                col=1,
+            )
+
+    fig.update_layout(
+        height=300 * min(num_plots, max_plots),
+        width=1200,
+        title_text="IV Term Structure for ATM Options",
+        showlegend=False,
+        margin=dict(r=100, t=100, l=50, b=50),
+    )
+
+    fig.show()
+
+
 def main(args):
     try:
         dataframes = load_database(args.db_path, args.symbol)
@@ -452,7 +544,8 @@ def main(args):
             processed_data[table_name] = (put_data, call_data)
 
         plot_options_data(processed_data)
-        plot_options_oi(processed_data)
+        plot_oi_mirror(processed_data)
+        plot_iv_term_structure(processed_data)
         logging.info("Data loaded and displayed successfully")
     except Exception as e:
         logging.error(f"Error in main: {e}")
