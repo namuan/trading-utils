@@ -334,7 +334,7 @@ def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> 
             for date in dates
         ],
         specs=specs,
-        vertical_spacing=0.08,  # Increased spacing to prevent title overlap
+        vertical_spacing=0.08,
         horizontal_spacing=0.02,
     )
 
@@ -353,6 +353,19 @@ def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> 
                 if not call_df.empty
                 else pd.DataFrame()
             )
+
+            # Calculate max value for x-axis scaling
+            max_put_size = (
+                0
+                if current_puts.empty
+                else (current_puts["PutVol"] * current_puts["PutOpenInt"]).max()
+            )
+            max_call_size = (
+                0
+                if current_calls.empty
+                else (current_calls["CallVol"] * current_calls["CallOpenInt"]).max()
+            )
+            max_size = max(max_put_size, max_call_size)
 
             if not current_puts.empty:
                 put_size = current_puts["PutVol"] * current_puts["PutOpenInt"]
@@ -388,11 +401,15 @@ def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> 
                     col=col_idx,
                 )
 
-            # Update axes
+            # Update axes with symmetric range around zero
             fig.update_xaxes(
                 zeroline=True,
-                zerolinewidth=1,
+                zerolinewidth=2,
                 zerolinecolor="black",
+                range=[
+                    -max_size * 1.1,
+                    max_size * 1.1,
+                ],  # Make range symmetric around 0
                 row=row_idx,
                 col=col_idx,
             )
@@ -405,7 +422,7 @@ def plot_options_oi(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> 
 
     # Update layout
     fig.update_layout(
-        height=300 * num_tables,  # Reduced height per plot
+        height=300 * num_tables,
         width=300 * max_dates,
         showlegend=True,
         margin=dict(r=50, t=100, l=50, b=50),
