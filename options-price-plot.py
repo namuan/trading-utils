@@ -195,22 +195,18 @@ def filter_and_display_options(
 
 def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> None:
     num_plots = len(data_dict)
-    max_plots = 6
-    specs = [[{"secondary_y": True}] for _ in range(min(num_plots, max_plots))]
+    specs = [[{"secondary_y": True}] for _ in range(num_plots)]
     fig = make_subplots(
-        rows=min(num_plots, max_plots),
+        rows=num_plots,
         cols=1,
         subplot_titles=[
-            f"On {table_name.split('_')[-1]}"
-            for table_name in list(data_dict.keys())[:max_plots]
+            f"On {table_name.split('_')[-1]}" for table_name in list(data_dict.keys())
         ],
         specs=specs,
         vertical_spacing=0.02,
     )
 
-    for idx, (table_name, (put_df, call_df)) in enumerate(
-        list(data_dict.items())[:max_plots]
-    ):
+    for idx, (table_name, (put_df, call_df)) in enumerate(list(data_dict.items())):
         row = idx + 1
 
         # Filter out weekends
@@ -307,7 +303,7 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
         fig.update_yaxes(title_text="Strike Price", row=row, col=1)
 
     fig.update_layout(
-        height=800 * min(num_plots, max_plots),
+        height=800 * num_plots,
         width=1500,
         title_text="",
         showlegend=False,
@@ -468,14 +464,12 @@ def plot_iv_term_structure(
     data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]],
 ) -> None:
     num_plots = len(data_dict)
-    max_plots = 6
-    specs = [[{"secondary_y": True}] for _ in range(min(num_plots, max_plots))]
+    specs = [[{"secondary_y": True}] for _ in range(num_plots)]
     fig = make_subplots(
-        rows=min(num_plots, max_plots),
+        rows=num_plots,
         cols=1,
         subplot_titles=[
-            f"On {table_name.split('_')[-1]}"
-            for table_name in list(data_dict.keys())[:max_plots]
+            f"On {table_name.split('_')[-1]}" for table_name in list(data_dict.keys())
         ],
         specs=specs,
         vertical_spacing=0.05,
@@ -483,9 +477,7 @@ def plot_iv_term_structure(
 
     delta_levels = get_delta_levels()
 
-    for idx, (table_name, (put_df, call_df)) in enumerate(
-        list(data_dict.items())[:max_plots]
-    ):
+    for idx, (table_name, (put_df, call_df)) in enumerate(list(data_dict.items())):
         row = idx + 1
 
         if not put_df.empty and not call_df.empty:
@@ -528,7 +520,7 @@ def plot_iv_term_structure(
             )
 
     fig.update_layout(
-        height=300 * min(num_plots, max_plots),
+        height=300 * num_plots,
         width=1200,
         title_text="IV Term Structure for 25Δ and 50Δ Options",
         showlegend=False,
@@ -542,14 +534,12 @@ def plot_premium_structure(
     data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]],
 ) -> None:
     num_plots = len(data_dict)
-    max_plots = 6
-    specs = [[{"secondary_y": True}] for _ in range(min(num_plots, max_plots))]
+    specs = [[{"secondary_y": True}] for _ in range(num_plots)]
     fig = make_subplots(
-        rows=min(num_plots, max_plots),
+        rows=num_plots,
         cols=1,
         subplot_titles=[
-            f"On {table_name.split('_')[-1]}"
-            for table_name in list(data_dict.keys())[:max_plots]
+            f"On {table_name.split('_')[-1]}" for table_name in list(data_dict.keys())
         ],
         specs=specs,
         vertical_spacing=0.05,
@@ -557,9 +547,7 @@ def plot_premium_structure(
 
     delta_levels = get_delta_levels()
 
-    for idx, (table_name, (put_df, call_df)) in enumerate(
-        list(data_dict.items())[:max_plots]
-    ):
+    for idx, (table_name, (put_df, call_df)) in enumerate(list(data_dict.items())):
         row = idx + 1
 
         if not put_df.empty and not call_df.empty:
@@ -605,7 +593,7 @@ def plot_premium_structure(
             )
 
     fig.update_layout(
-        height=300 * min(num_plots, max_plots),
+        height=300 * num_plots,
         width=1200,
         title_text="Premium Structure for 25Δ and 50Δ Options",
         showlegend=False,
