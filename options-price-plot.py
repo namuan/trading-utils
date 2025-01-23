@@ -313,6 +313,125 @@ def plot_options_data(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -
     fig.show()
 
 
+def plot_implied_move(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> None:
+    num_plots = len(data_dict)
+    specs = [[{"secondary_y": True}] for _ in range(num_plots)]
+    fig = make_subplots(
+        rows=num_plots,
+        cols=1,
+        subplot_titles=[
+            f"On {table_name.split('_')[-1]}" for table_name in list(data_dict.keys())
+        ],
+        specs=specs,
+        vertical_spacing=0.05,
+    )
+
+    for idx, (table_name, (put_df, call_df)) in enumerate(list(data_dict.items())):
+        row = idx + 1
+
+        if not put_df.empty and not call_df.empty:
+            # Find options closest to 50 delta
+            put_df["PutDeltaDiff"] = abs(put_df["PutDelta"] - (-0.50))
+            call_df["CallDeltaDiff"] = abs(call_df["CallDelta"] - 0.50)
+
+            # Get the nearest 50 delta options for each expiration
+            nearest_puts = put_df.loc[
+                put_df.groupby("ExpirationDate")["PutDeltaDiff"].idxmin()
+            ]
+            nearest_calls = call_df.loc[
+                call_df.groupby("ExpirationDate")["CallDeltaDiff"].idxmin()
+            ]
+
+            # Calculate mid prices for options
+            nearest_puts["PutMidPrice"] = (
+                nearest_puts["PutBid"] + nearest_puts["PutAsk"]
+            ) / 2
+            nearest_calls["CallMidPrice"] = (
+                nearest_calls["CallBid"] + nearest_calls["CallAsk"]
+            ) / 2
+
+            # Calculate implied move based on premium
+            spot_price = nearest_puts["SpotPrice"].iloc[0]
+            implied_move_up = spot_price + nearest_calls["CallMidPrice"]
+            implied_move_down = spot_price - nearest_puts["PutMidPrice"]
+
+            # Calculate implied move percentage
+            implied_move_up_pct = (implied_move_up - spot_price) / spot_price * 100
+            implied_move_down_pct = (spot_price - implied_move_down) / spot_price * 100
+
+            # Plot implied moves with hover information
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_calls["ExpirationDate"],
+                    y=implied_move_up_pct,
+                    mode="lines+markers",
+                    name="Upside Move",
+                    line=dict(color="green", width=2),
+                    marker=dict(size=8, symbol="triangle-up"),
+                    hovertemplate="<b>Date</b>: %{x|%Y-%m-%d}<br>"
+                    + "<b>Move %</b>: %{y:.1f}%<br>"
+                    + "<b>Price</b>: $%{customdata[0]:.2f}<br>"
+                    + "<b>Spot</b>: $%{customdata[1]:.2f}<extra></extra>",
+                    customdata=list(zip(implied_move_up, nearest_calls["SpotPrice"])),
+                ),
+                row=row,
+                col=1,
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=nearest_puts["ExpirationDate"],
+                    y=-implied_move_down_pct,  # Negative to show downside
+                    mode="lines+markers",
+                    name="Downside Move",
+                    line=dict(color="red", width=2),
+                    marker=dict(size=8, symbol="triangle-down"),
+                    hovertemplate="<b>Date</b>: %{x|%Y-%m-%d}<br>"
+                    + "<b>Move %</b>: %{y:.1f}%<br>"
+                    + "<b>Price</b>: $%{customdata[0]:.2f}<br>"
+                    + "<b>Spot</b>: $%{customdata[1]:.2f}<extra></extra>",
+                    customdata=list(zip(implied_move_down, nearest_puts["SpotPrice"])),
+                ),
+                row=row,
+                col=1,
+            )
+
+            # Add reference line at zero
+            fig.add_hline(
+                y=0,
+                line_dash="dash",
+                line_color="gray",
+                row=row,
+                col=1,
+            )
+
+            fig.update_xaxes(
+                tickformat="%Y-%m-%d",
+                rangebreaks=[dict(bounds=["sat", "mon"])],
+                title_text="Expiration Date",
+                row=row,
+                col=1,
+            )
+
+            fig.update_yaxes(
+                title_text="Implied Move (%)",
+                tickformat=".1f",
+                ticksuffix="%",
+                row=row,
+                col=1,
+            )
+
+    fig.update_layout(
+        height=300 * num_plots,
+        width=1200,
+        title_text="Implied Move from 50Δ Options",
+        showlegend=False,
+        margin=dict(r=200, t=100, l=50, b=50),
+    )
+
+    fig.show()
+
+
 def plot_oi_mirror(data_dict: dict[str, tuple[pd.DataFrame, pd.DataFrame]]) -> None:
     # Process only valid tables that have data
     valid_tables = {
@@ -615,6 +734,7 @@ def main(args):
             processed_data[table_name] = (put_data, call_data)
 
         plot_options_data(processed_data)
+        plot_implied_move(processed_data)
         plot_oi_mirror(processed_data)
         plot_iv_term_structure(processed_data)
         plot_premium_structure(processed_data)
