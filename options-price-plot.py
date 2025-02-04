@@ -102,8 +102,21 @@ def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE ?",
-                (f"{symbol}%",),
+                """
+                SELECT name
+                FROM sqlite_master
+                WHERE type='table'
+                AND name LIKE ?
+                AND name IN (
+                    SELECT name
+                    FROM sqlite_master
+                    WHERE type='table'
+                    AND name LIKE ?
+                    ORDER BY name DESC
+                    LIMIT 7
+                )
+            """,
+                (f"{symbol}%", f"{symbol}%"),
             )
             table_names = [table[0] for table in cursor.fetchall()]
 
@@ -140,7 +153,7 @@ def load_database(db_path: Path, symbol: str) -> dict[str, pd.DataFrame]:
                 query = base_query.format(table_name)
                 df = pd.read_sql_query(query, conn)
                 dataframes[table_name] = df
-                logging.debug(f"Loaded {len(df)} rows from table {table_name}")
+                logging.info(f"Loaded {len(df)} rows from table {table_name}")
 
             return dataframes
     except sqlite3.Error as e:
