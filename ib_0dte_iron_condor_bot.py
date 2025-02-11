@@ -67,14 +67,14 @@ min_strike_price = market_price - strike_price_range
 max_strike_price = market_price + strike_price_range
 
 
-put_strikes = [s for s in range(market_price, min_strike_price, 5)]
-
-# Build Call Contracts
-call_strikes = [s for s in range(market_price, max_strike_price, 5)]
-
 today = date.today()
 date_today = today.strftime("%Y%m%d")
 
+ib.reqMarketDataType(2)
+
+# Select Call
+call_strikes = [s for s in range(market_price, max_strike_price, 5)]
+print(f"Selecting contracts for call strikes {call_strikes}")
 call_contracts = [
     Option(
         "SPX",
@@ -89,9 +89,29 @@ call_contracts = [
     for strike in call_strikes
 ]
 qualified_call_contracts = ib.qualifyContracts(*call_contracts)
-ib.reqMarketDataType(2)
+# ib.reqMarketDataType(2)
 call_contract_tickers = [ib.ticker(c) for c in qualified_call_contracts]
-
 print(call_contract_tickers)
+
+# Select Put
+put_strikes = [s for s in range(min_strike_price, market_price, 5)]
+print(f"Selecting contracts for put strikes {put_strikes}")
+put_contracts = [
+    Option(
+        "SPX",
+        date_today,
+        strike,
+        "P",
+        "SMART",
+        "100",
+        "USD",
+        tradingClass="SPXW",
+    )
+    for strike in call_strikes
+]
+qualified_put_contracts = ib.qualifyContracts(*put_contracts)
+
+put_contract_tickers = [ib.ticker(c) for c in qualified_put_contracts]
+print(put_contract_tickers)
 
 ib.disconnect()
