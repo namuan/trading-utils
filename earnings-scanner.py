@@ -28,6 +28,84 @@ import yfinance as yf
 from dotenv import load_dotenv
 from scipy.interpolate import interp1d
 
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earnings Calendar</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 2rem;
+            color: #333;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            overflow-x: auto;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: white;
+        }}
+        th, td {{
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        th {{
+            background-color: #f8fafc;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }}
+        tr:hover {{
+            background-color: #f8fafc;
+        }}
+        .check-pass {{
+            color: #059669;
+        }}
+        .check-fail {{
+            color: #dc2626;
+        }}
+        .metrics {{
+            font-size: 0.875rem;
+            color: #666;
+        }}
+        .expected-move {{
+            font-weight: 600;
+            color: #2563eb;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Earnings Calendar and Analysis</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Symbol</th>
+                    <th>Report Time</th>
+                    <th>Estimates</th>
+                    <th>Criteria Met</th>
+                    <th>Expected Move</th>
+                    <th>Detailed Metrics</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+"""
 
 def setup_logging(verbosity):
     logging_level = logging.WARNING
@@ -69,6 +147,13 @@ def parse_args():
         type=str,
         default="",
         help="Specific stock symbol to look up (default: all symbols)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default="earnings_report.html",
+        help="Output HTML file name (default: earnings_report.html)",
     )
     return parser.parse_args()
 
@@ -233,11 +318,12 @@ def compute_recommendation(ticker):
             ivs.append(iv)
 
         term_spline = build_term_structure(dtes, ivs)
-
         ts_slope_0_45 = (term_spline(45) - term_spline(dtes[0])) / (45 - dtes[0])
 
         price_history = stock.history(period="3mo")
-        iv30_rv30 = term_spline(30) / yang_zhang(price_history)
+        rv30 = yang_zhang(price_history)
+        iv30 = term_spline(30)
+        iv30_rv30 = iv30 / rv30
 
         avg_volume = price_history["Volume"].rolling(30).mean().dropna().iloc[-1]
 
@@ -250,9 +336,14 @@ def compute_recommendation(ticker):
             "iv30_rv30": iv30_rv30 >= 1.25,
             "ts_slope_0_45": ts_slope_0_45 <= -0.00406,
             "expected_move": expected_move,
+            "detailed_metrics": {
+                "30-day Avg Volume": format_number(avg_volume),
+                "IV30/RV30 Ratio": f"{iv30_rv30:.2f}",
+                "Term Structure Slope": f"{ts_slope_0_45:.6f}"
+            }
         }
-    except Exception:
-        raise Exception(f"Error occurred processing")
+    except Exception as e:
+        raise Exception(f"Error occurred processing: {str(e)}")
 
 def get_earnings_calendar(days_ahead, symbol=""):
     load_dotenv()
@@ -288,47 +379,65 @@ def format_number(number):
         return f"${number/1e6:.2f}M"
     return f"${number:,.2f}"
 
-def format_earnings_data(earnings):
-    if not earnings or not isinstance(earnings, dict) or 'earningsCalendar' not in earnings:
-        return "No earnings data found"
+def generate_html_row(entry, recommendation):
+    report_time = entry.get('hour', '').upper()
+    if report_time == 'BMO':
+        report_time = 'Before Market Open'
+    elif report_time == 'AMC':
+        report_time = 'After Market Close'
+    elif not report_time:
+        report_time = 'Time Not Specified'
 
-    result = []
-    for entry in earnings['earningsCalendar']:
-        report_time = entry.get('hour', '').upper()
-        if report_time == 'BMO':
-            report_time = 'Before Market Open'
-        elif report_time == 'AMC':
-            report_time = 'After Market Close'
-        elif not report_time:
-            report_time = 'Time Not Specified'
+    estimates = []
+    if entry.get('epsEstimate') is not None:
+        estimates.append(f"EPS est: ${entry['epsEstimate']:.2f}")
+    if entry.get('epsActual') is not None:
+        estimates.append(f"EPS act: ${entry['epsActual']:.2f}")
+    if entry.get('revenueEstimate') is not None:
+        estimates.append(f"Rev est: {format_number(entry['revenueEstimate'])}")
+    if entry.get('revenueActual') is not None:
+        estimates.append(f"Rev act: {format_number(entry['revenueActual'])}")
 
-        line = (
-            f"{entry['date']} - {entry['symbol']:<6} "
-            f"Q{entry['quarter']} {entry['year']} "
-            f"({report_time})"
+    criteria_html = "Error computing recommendation"
+    expected_move = "N/A"
+    metrics_html = ""
+
+    if isinstance(recommendation, dict):
+        criteria_met = sum([
+            recommendation['avg_volume'],
+            recommendation['iv30_rv30'],
+            recommendation['ts_slope_0_45']
+        ])
+
+        checks = [
+            ('High Volume', recommendation['avg_volume']),
+            ('IV/RV Ratio', recommendation['iv30_rv30']),
+            ('Term Structure', recommendation['ts_slope_0_45'])
+        ]
+
+        criteria_html = f"{criteria_met}/3<br>" + "<br>".join(
+            f"<span class='{'check-pass' if passed else 'check-fail'}'>"
+            f"{'✓' if passed else '✗'} {name}</span>"
+            for name, passed in checks
         )
 
-        eps_est = entry.get('epsEstimate')
-        eps_act = entry.get('epsActual')
-        rev_est = entry.get('revenueEstimate')
-        rev_act = entry.get('revenueActual')
+        expected_move = recommendation['expected_move'] or "N/A"
 
-        details = []
-        if eps_est is not None:
-            details.append(f"EPS est: ${eps_est:.2f}")
-        if eps_act is not None:
-            details.append(f"EPS act: ${eps_act:.2f}")
-        if rev_est is not None:
-            details.append(f"Rev est: {format_number(rev_est)}")
-        if rev_act is not None:
-            details.append(f"Rev act: {format_number(rev_act)}")
+        if 'detailed_metrics' in recommendation:
+            metrics = recommendation['detailed_metrics']
+            metrics_html = "<br>".join(f"{k}: {v}" for k, v in metrics.items())
 
-        if details:
-            line += " | " + " | ".join(details)
-
-        result.append(line)
-
-    return "\n".join(sorted(result))
+    return f"""
+        <tr>
+            <td>{entry['date']}</td>
+            <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol={entry['symbol']}">{entry['symbol']}</a></td>
+            <td>{report_time}</td>
+            <td>{' | '.join(estimates)}</td>
+            <td>{criteria_html}</td>
+            <td class="expected-move">{expected_move}</td>
+            <td class="metrics">{metrics_html}</td>
+        </tr>
+    """
 
 def main(args):
     logging.debug(f"Looking up earnings for the next {args.days} days")
@@ -338,122 +447,21 @@ def main(args):
         print("Failed to retrieve earnings data")
         return
 
-    print("\nUpcoming Earnings and Recommendations:")
-    print("====================================")
-
+    table_rows = []
     for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
-        report_time = entry.get('hour', '').upper()
-        if report_time == 'BMO':
-            report_time = 'Before Market Open'
-        elif report_time == 'AMC':
-            report_time = 'After Market Close'
-        elif not report_time:
-            report_time = 'Time Not Specified'
-
-        symbol = entry['symbol']
-        line = (
-            f"{entry['date']} - {symbol:<6} "
-            f"Q{entry['quarter']} {entry['year']} "
-            f"({report_time})"
-        )
-
-        eps_est = entry.get('epsEstimate')
-        eps_act = entry.get('epsActual')
-        rev_est = entry.get('revenueEstimate')
-        rev_act = entry.get('revenueActual')
-
-        details = []
-        if eps_est is not None:
-            details.append(f"EPS est: ${eps_est:.2f}")
-        if eps_act is not None:
-            details.append(f"EPS act: ${eps_act:.2f}")
-        if rev_est is not None:
-            details.append(f"Rev est: {format_number(rev_est)}")
-        if rev_act is not None:
-            details.append(f"Rev act: {format_number(rev_act)}")
-
-        if details:
-            line += " | " + " | ".join(details)
-
-        print(line)
-
         try:
-            recommendation = compute_recommendation(symbol)
-            if isinstance(recommendation, dict):
-                # Get specific values
-                volume_check = recommendation['avg_volume']
-                iv_rv_check = recommendation['iv30_rv30']
-                slope_check = recommendation['ts_slope_0_45']
-
-                # Count criteria met
-                criteria_met = sum([volume_check, iv_rv_check, slope_check])
-
-                print(f"    Recommendation Criteria Met: {criteria_met}/3")
-                print(f"    - High Volume: {'✓' if volume_check else '✗'} (threshold: >1.5M)")
-                print(f"    - IV/RV Ratio: {'✓' if iv_rv_check else '✗'} (threshold: >1.25)")
-                print(f"    - Term Structure Slope: {'✓' if slope_check else '✗'} (threshold: <-0.00406)")
-
-                if recommendation['expected_move']:
-                    print(f"    - Expected Move: {recommendation['expected_move']}")
-
-                print("\n    Detailed Values:")
-                try:
-                    stock = yf.Ticker(symbol)
-                    price_history = stock.history(period="3mo")
-                    avg_volume = price_history["Volume"].rolling(30).mean().dropna().iloc[-1]
-                    print(f"    • 30-day Avg Volume: {format_number(avg_volume)}")
-
-                    # Calculate IV30/RV30
-                    price_data = stock.history(period="3mo")
-                    rv30 = yang_zhang(price_data)
-
-                    # Get IV30 from the term structure
-                    today = datetime.today().date()
-                    exp_dates = list(stock.options)
-                    options_chains = {date: stock.option_chain(date) for date in exp_dates}
-
-                    underlying_price = get_current_price(stock)
-                    atm_iv = {}
-
-                    for exp_date, chain in options_chains.items():
-                        calls = chain.calls
-                        puts = chain.puts
-
-                        if calls.empty or puts.empty:
-                            continue
-
-                        call_diffs = (calls["strike"] - underlying_price).abs()
-                        put_diffs = (puts["strike"] - underlying_price).abs()
-
-                        call_idx = call_diffs.idxmin()
-                        put_idx = put_diffs.idxmin()
-
-                        call_iv = calls.loc[call_idx, "impliedVolatility"]
-                        put_iv = puts.loc[put_idx, "impliedVolatility"]
-
-                        atm_iv[exp_date] = (call_iv + put_iv) / 2.0
-
-                    dtes = []
-                    ivs = []
-                    for exp_date, iv in atm_iv.items():
-                        exp_date_obj = datetime.strptime(exp_date, "%Y-%m-%d").date()
-                        days_to_expiry = (exp_date_obj - today).days
-                        dtes.append(days_to_expiry)
-                        ivs.append(iv)
-
-                    term_spline = build_term_structure(dtes, ivs)
-                    iv30 = term_spline(30)
-
-                    print(f"    • IV30/RV30 Ratio: {iv30/rv30:.2f}")
-                    print(f"    • Term Structure Slope: {(term_spline(45) - term_spline(dtes[0])) / (45 - dtes[0]):.6f}")
-
-                except Exception as e:
-                    print(f"    Error calculating detailed values: {str(e)}")
-            else:
-                print(f"    {recommendation}")
+            recommendation = compute_recommendation(entry['symbol'])
+            table_rows.append(generate_html_row(entry, recommendation))
         except Exception as e:
-            print(f"    Error computing recommendation: {str(e)}")
-        print()
+            logging.error(f"Error processing {entry['symbol']}: {str(e)}")
+            table_rows.append(generate_html_row(entry, str(e)))
+
+    html_content = HTML_TEMPLATE.format(table_rows="\n".join(table_rows))
+
+    with open(args.output, 'w') as f:
+        f.write(html_content)
+
+    print(f"\nReport generated successfully: {args.output}")
 
 if __name__ == "__main__":
     args = parse_args()
