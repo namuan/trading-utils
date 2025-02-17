@@ -431,6 +431,9 @@ def generate_html_row(entry, recommendation):
             recommendation['ts_slope_0_45']
         ])
 
+        if criteria_met < 3:  # Return None if not all criteria are met
+            return None
+
         checks = [
             ('High Volume', recommendation['avg_volume']),
             ('IV/RV Ratio', recommendation['iv30_rv30']),
@@ -449,17 +452,18 @@ def generate_html_row(entry, recommendation):
             metrics = recommendation['detailed_metrics']
             metrics_html = "<br>".join(f"{k}: {v}" for k, v in metrics.items())
 
-    return f"""
-        <tr>
-            <td>{entry['date']}</td>
-            <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol={entry['symbol']}">{entry['symbol']}</a></td>
-            <td>{report_time}</td>
-            <td>{' | '.join(estimates)}</td>
-            <td>{criteria_html}</td>
-            <td class="expected-move">{expected_move}</td>
-            <td class="metrics">{metrics_html}</td>
-        </tr>
-    """
+        return f"""
+            <tr>
+                <td>{entry['date']}</td>
+                <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol={entry['symbol']}">{entry['symbol']}</a></td>
+                <td>{report_time}</td>
+                <td>{' | '.join(estimates)}</td>
+                <td>{criteria_html}</td>
+                <td class="expected-move">{expected_move}</td>
+                <td class="metrics">{metrics_html}</td>
+            </tr>
+        """
+    return None
 
 def main(args):
     logging.info(f"Looking up earnings for the next {args.days} days")
@@ -476,11 +480,12 @@ def main(args):
     for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
         try:
             recommendation = compute_recommendation(entry['symbol'])
-            table_rows.append(generate_html_row(entry, recommendation))
+            row = generate_html_row(entry, recommendation)
+            if row:  # Only append if all criteria are met
+                table_rows.append(row)
             time.sleep(0.3)
         except Exception as e:
             logging.error(f"Error processing {entry['symbol']}: {str(e)}")
-            table_rows.append(generate_html_row(entry, str(e)))
 
     html_content = HTML_TEMPLATE.format(table_rows="\n".join(table_rows))
 
