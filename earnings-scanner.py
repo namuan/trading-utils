@@ -20,6 +20,7 @@ Usage:
 import logging
 import os
 import time
+import webbrowser  # Newly added module to open the HTML report
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 
@@ -157,6 +158,12 @@ def parse_args():
         type=str,
         default="earnings_report.html",
         help="Output HTML file name (default: earnings_report.html)",
+    )
+    # New flag to open the output report automatically
+    parser.add_argument(
+        "--open-report",
+        action="store_true",
+        help="Open the generated HTML report in the default web browser"
     )
     return parser.parse_args()
 
@@ -460,7 +467,7 @@ def generate_html_row(entry, recommendation):
         return f"""
             <tr>
                 <td>{entry['date']}</td>
-                <td><a target="_blank" href="https://www.tradingview.com/chart/?symbol={entry['symbol']}">{entry['symbol']}</a></td>
+                <td><a target="_blank" href="https://namuan.github.io/lazy-trader/?symbol={entry['symbol']}">{entry['symbol']}</a></td>
                 <td>{report_time}</td>
                 <td>{' | '.join(estimates)}</td>
                 <td>{criteria_html}</td>
@@ -490,7 +497,7 @@ def main(args):
             # We only process recommendations that return a dict with raw_metrics.
             if isinstance(recommendation, dict) and "raw_metrics" in recommendation:
                 results.append((entry, recommendation))
-            time.sleep(0.3)
+            time.sleep(1)
         except Exception as e:
             logging.error(f"Error processing {entry['symbol']}: {str(e)}")
 
@@ -554,6 +561,10 @@ def main(args):
         f.write(html_content)
 
     print(f"\nReport generated successfully: {args.output}")
+
+    # Open the report in the default web browser if the flag is set.
+    if args.open_report:
+        webbrowser.open('file://' + os.path.abspath(args.output))
 
 if __name__ == "__main__":
     args = parse_args()
