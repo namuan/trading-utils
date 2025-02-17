@@ -418,9 +418,9 @@ def format_number(number):
 def generate_html_row(entry, recommendation):
     report_time = entry.get('hour', '').upper()
     if report_time == 'BMO':
-        report_time = 'Before Market Open'
+        report_time = '☀️'  # Sun emoji for Before Market Open
     elif report_time == 'AMC':
-        report_time = 'After Market Close'
+        report_time = '🌙'  # Moon emoji for After Market Close
     elif not report_time:
         report_time = 'Time Not Specified'
 
