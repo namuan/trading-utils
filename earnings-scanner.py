@@ -523,8 +523,8 @@ def main(args):
     weight_ts_slope = 1
     total_weight = weight_avg_volume + weight_iv30_rv30 + weight_ts_slope
 
-    # Compute normalized score for each entry.
-    table_rows = []
+    # Compute normalized score for each entry and collect them with their HTML row.
+    scored_rows = []
     for (entry, rec) in results:
         raw_av = rec["raw_metrics"]["avg_volume"]
         raw_iv30_rv30 = rec["raw_metrics"]["iv30_rv30"]
@@ -553,7 +553,11 @@ def main(args):
 
         row = generate_html_row(entry, rec)
         if row:  # Only append if all criteria are met
-            table_rows.append(row)
+            scored_rows.append((score, row))
+
+    # Sort rows descending by score (higher scores first)
+    scored_rows.sort(key=lambda x: x[0], reverse=True)
+    table_rows = [row for (_, row) in scored_rows]
 
     html_content = HTML_TEMPLATE.format(table_rows="\n".join(table_rows))
 
