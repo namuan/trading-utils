@@ -9,7 +9,7 @@
 # ]
 # ///
 """
-A script to fetch upcoming earnings from Finnhub API
+A script to fetch upcoming earnings from Finnhub API and score each entry based on normalized metrics.
 
 Usage:
 ./earnings-scanner.py -h
@@ -97,6 +97,7 @@ HTML_TEMPLATE = """
                     <th>Criteria Met</th>
                     <th>Expected Move</th>
                     <th>Detailed Metrics</th>
+                    <th>Score</th>
                 </tr>
             </thead>
             <tbody>
@@ -339,6 +340,12 @@ def compute_recommendation(ticker):
             "iv30_rv30": iv30_rv30 >= 1.25,
             "ts_slope_0_45": ts_slope_0_45 <= -0.00406,
             "expected_move": expected_move,
+            # Save raw numeric values for scoring later
+            "raw_metrics": {
+                "avg_volume": avg_volume,
+                "iv30_rv30": iv30_rv30,
+                "ts_slope_0_45": ts_slope_0_45
+            },
             "detailed_metrics": {
                 "30-day Avg Volume": format_number(avg_volume),
                 "IV30/RV30 Ratio": f"{iv30_rv30:.2f}",
@@ -420,10 +427,6 @@ def generate_html_row(entry, recommendation):
     if entry.get('revenueActual') is not None:
         estimates.append(f"Rev act: {format_number(entry['revenueActual'])}")
 
-    criteria_html = "Error computing recommendation"
-    expected_move = "N/A"
-    metrics_html = ""
-
     if isinstance(recommendation, dict):
         criteria_met = sum([
             recommendation['avg_volume'],
@@ -431,7 +434,8 @@ def generate_html_row(entry, recommendation):
             recommendation['ts_slope_0_45']
         ])
 
-        if criteria_met < 3:  # Return None if not all criteria are met
+        # Only include entries that meet all criteria
+        if criteria_met < 3:
             return None
 
         checks = [
@@ -448,6 +452,7 @@ def generate_html_row(entry, recommendation):
 
         expected_move = recommendation['expected_move'] or "N/A"
 
+        metrics_html = ""
         if 'detailed_metrics' in recommendation:
             metrics = recommendation['detailed_metrics']
             metrics_html = "<br>".join(f"{k}: {v}" for k, v in metrics.items())
@@ -461,6 +466,7 @@ def generate_html_row(entry, recommendation):
                 <td>{criteria_html}</td>
                 <td class="expected-move">{expected_move}</td>
                 <td class="metrics">{metrics_html}</td>
+                <td>{recommendation['score']:.2f}</td>
             </tr>
         """
     return None
@@ -476,16 +482,71 @@ def main(args):
         logging.error("Failed to retrieve earnings data")
         return
 
-    table_rows = []
+    # First, collect all valid results along with their raw metrics.
+    results = []
     for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
         try:
             recommendation = compute_recommendation(entry['symbol'])
-            row = generate_html_row(entry, recommendation)
-            if row:  # Only append if all criteria are met
-                table_rows.append(row)
+            # We only process recommendations that return a dict with raw_metrics.
+            if isinstance(recommendation, dict) and "raw_metrics" in recommendation:
+                results.append((entry, recommendation))
             time.sleep(0.3)
         except Exception as e:
             logging.error(f"Error processing {entry['symbol']}: {str(e)}")
+
+    if not results:
+        logging.warning("No earnings meeting criteria found.")
+        return
+
+    # Gather raw values for normalization.
+    avg_volume_values = [rec["raw_metrics"]["avg_volume"] for (_, rec) in results]
+    iv30_rv30_values = [rec["raw_metrics"]["iv30_rv30"] for (_, rec) in results]
+    ts_slope_values = [rec["raw_metrics"]["ts_slope_0_45"] for (_, rec) in results]
+
+    min_avg_volume = min(avg_volume_values)
+    max_avg_volume = max(avg_volume_values)
+    min_iv30_rv30 = min(iv30_rv30_values)
+    max_iv30_rv30 = max(iv30_rv30_values)
+    min_ts_slope = min(ts_slope_values)
+    max_ts_slope = max(ts_slope_values)
+
+    # Weights for the metrics (giving high weight to IV30/RV30 Ratio)
+    weight_avg_volume = 1
+    weight_iv30_rv30 = 2
+    weight_ts_slope = 1
+    total_weight = weight_avg_volume + weight_iv30_rv30 + weight_ts_slope
+
+    # Compute normalized score for each entry.
+    table_rows = []
+    for (entry, rec) in results:
+        raw_av = rec["raw_metrics"]["avg_volume"]
+        raw_iv30_rv30 = rec["raw_metrics"]["iv30_rv30"]
+        raw_ts_slope = rec["raw_metrics"]["ts_slope_0_45"]
+
+        # Normalize avg_volume (higher is better)
+        if max_avg_volume > min_avg_volume:
+            norm_av = (raw_av - min_avg_volume) / (max_avg_volume - min_avg_volume)
+        else:
+            norm_av = 1.0
+
+        # Normalize iv30_rv30 (higher is better)
+        if max_iv30_rv30 > min_iv30_rv30:
+            norm_iv = (raw_iv30_rv30 - min_iv30_rv30) / (max_iv30_rv30 - min_iv30_rv30)
+        else:
+            norm_iv = 1.0
+
+        # Normalize term structure slope (lower is better, so invert the normalization)
+        if max_ts_slope > min_ts_slope:
+            norm_ts = (max_ts_slope - raw_ts_slope) / (max_ts_slope - min_ts_slope)
+        else:
+            norm_ts = 1.0
+
+        score = (norm_av * weight_avg_volume + norm_iv * weight_iv30_rv30 + norm_ts * weight_ts_slope) / total_weight
+        rec["score"] = score
+
+        row = generate_html_row(entry, rec)
+        if row:  # Only append if all criteria are met
+            table_rows.append(row)
 
     html_content = HTML_TEMPLATE.format(table_rows="\n".join(table_rows))
 
