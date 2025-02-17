@@ -19,6 +19,7 @@ Usage:
 """
 import logging
 import os
+import time
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 
@@ -138,15 +139,16 @@ def parse_args():
         "-d",
         "--days",
         type=int,
-        default=30,
-        help="Number of days to look ahead for earnings (default: 30)",
+        default=7,
+        help="Number of days to look ahead for earnings",
     )
     parser.add_argument(
         "-s",
-        "--symbol",
+        "--symbols",
         type=str,
-        default="",
-        help="Specific stock symbol to look up (default: all symbols)",
+        nargs="+",
+        default=[],
+        help="Specific stock symbols to look up (space-separated, default: all symbols)",
     )
     parser.add_argument(
         "-o",
@@ -246,6 +248,7 @@ def compute_recommendation(ticker):
         except KeyError:
             return f"Error: No options found for stock symbol '{ticker}'."
 
+        logging.info(f"Looking up options for stock symbol {ticker}")
         exp_dates = list(stock.options)
         try:
             exp_dates = filter_dates(exp_dates)
@@ -345,7 +348,9 @@ def compute_recommendation(ticker):
     except Exception as e:
         raise Exception(f"Error occurred processing: {str(e)}")
 
-def get_earnings_calendar(days_ahead, symbol=""):
+def get_earnings_calendar(days_ahead, symbols=None):
+    if symbols is None:
+        symbols = []
     load_dotenv()
     api_key = os.getenv("FINNHUB_API_KEY")
     if not api_key:
@@ -358,14 +363,31 @@ def get_earnings_calendar(days_ahead, symbol=""):
 
     logging.info(f"Fetching earnings from {start_date} to {end_date}")
 
+    all_earnings = []
     try:
-        earnings = finnhub_client.earnings_calendar(
-            _from=start_date,
-            to=end_date,
-            symbol=symbol,
-            international=False
-        )
-        return earnings
+        if not symbols:
+            earnings = finnhub_client.earnings_calendar(
+                _from=start_date,
+                to=end_date,
+                symbol="",
+                international=False
+            )
+            return earnings
+        else:
+            for symbol in symbols:
+                try:
+                    earnings = finnhub_client.earnings_calendar(
+                        _from=start_date,
+                        to=end_date,
+                        symbol=symbol.strip().upper(),
+                        international=False
+                    )
+                    if earnings and 'earningsCalendar' in earnings:
+                        all_earnings.extend(earnings['earningsCalendar'])
+                except Exception as e:
+                    logging.error(f"Error fetching data for {symbol}: {str(e)}")
+
+            return {'earningsCalendar': all_earnings} if all_earnings else None
     except Exception as e:
         logging.error(f"Error fetching earnings data: {str(e)}")
         return None
@@ -440,11 +462,14 @@ def generate_html_row(entry, recommendation):
     """
 
 def main(args):
-    logging.debug(f"Looking up earnings for the next {args.days} days")
+    logging.info(f"Looking up earnings for the next {args.days} days")
 
-    earnings = get_earnings_calendar(args.days, args.symbol)
+    if args.symbols:
+        logging.info(f"Fetching data for symbols: {', '.join(args.symbols)}")
+
+    earnings = get_earnings_calendar(args.days, args.symbols)
     if not earnings:
-        print("Failed to retrieve earnings data")
+        logging.error("Failed to retrieve earnings data")
         return
 
     table_rows = []
@@ -452,6 +477,7 @@ def main(args):
         try:
             recommendation = compute_recommendation(entry['symbol'])
             table_rows.append(generate_html_row(entry, recommendation))
+            time.sleep(0.3)
         except Exception as e:
             logging.error(f"Error processing {entry['symbol']}: {str(e)}")
             table_rows.append(generate_html_row(entry, str(e)))
