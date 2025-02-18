@@ -558,73 +558,79 @@ def main(args):
     # Initialize SQLite database connection
     db_conn = init_db()
 
-    # First, collect all valid results along with their raw metrics.
-    results = []
+    # Process new earnings entries and store them if not already in the database
     for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
+        # Check if the entry has already been processed by looking for matching symbol and date
+        cur = db_conn.cursor()
+        cur.execute("SELECT 1 FROM earnings WHERE symbol=? AND date=?", (entry.get("symbol"), entry.get("date")))
+        if cur.fetchone() is not None:
+            logging.info(f"Skipping existing record for {entry.get('symbol')} on {entry.get('date')}")
+            continue
+
         try:
             recommendation = compute_recommendation(entry['symbol'])
-            # We only process recommendations that return a dict with raw_metrics.
+            # Only process recommendations that return a dict with raw_metrics.
             if isinstance(recommendation, dict) and "raw_metrics" in recommendation:
-                results.append((entry, recommendation))
-                # Store each entry in the SQLite DB:
+                # Store each new entry in the SQLite DB:
                 store_entry(db_conn, entry, recommendation)
             time.sleep(1)
         except Exception as e:
             logging.error(f"Error processing {entry['symbol']}: {str(e)}")
 
-    if not results:
-        logging.warning("No earnings meeting criteria found.")
+    # Generate the report using data from the database
+    cur = db_conn.cursor()
+    cur.execute("""
+        SELECT date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, 
+               criteria_met, expected_move, detailed_metrics, score 
+        FROM earnings
+    """)
+    db_rows = cur.fetchall()
+
+    if not db_rows:
+        logging.warning("No earnings data found in the database.")
         return
 
-    # Gather raw values for normalization.
-    avg_volume_values = [rec["raw_metrics"]["avg_volume"] for (_, rec) in results]
-    iv30_rv30_values = [rec["raw_metrics"]["iv30_rv30"] for (_, rec) in results]
-    ts_slope_values = [rec["raw_metrics"]["ts_slope_0_45"] for (_, rec) in results]
-
-    min_avg_volume = min(avg_volume_values)
-    max_avg_volume = max(avg_volume_values)
-    min_iv30_rv30 = min(iv30_rv30_values)
-    max_iv30_rv30 = max(iv30_rv30_values)
-    min_ts_slope = min(ts_slope_values)
-    max_ts_slope = max(ts_slope_values)
-
-    # Weights for the metrics (giving high weight to IV30/RV30 Ratio)
-    weight_avg_volume = 1
-    weight_iv30_rv30 = 2
-    weight_ts_slope = 1
-    total_weight = weight_avg_volume + weight_iv30_rv30 + weight_ts_slope
-
-    # Compute normalized score for each entry and collect them with their HTML row.
     scored_rows = []
-    for (entry, rec) in results:
-        raw_av = rec["raw_metrics"]["avg_volume"]
-        raw_iv30_rv30 = rec["raw_metrics"]["iv30_rv30"]
-        raw_ts_slope = rec["raw_metrics"]["ts_slope_0_45"]
+    for row in db_rows:
+        # row indices:
+        # 0: date, 1: symbol, 2: report_time, 3: eps_estimate, 4: eps_actual,
+        # 5: revenue_estimate, 6: revenue_actual, 7: criteria_met, 8: expected_move,
+        # 9: detailed_metrics, 10: score
 
-        # Normalize avg_volume (higher is better)
-        if max_avg_volume > min_avg_volume:
-            norm_av = (raw_av - min_avg_volume) / (max_avg_volume - min_avg_volume)
-        else:
-            norm_av = 1.0
+        estimates = []
+        if row[3] is not None:
+            estimates.append(f"EPS est: ${row[3]:.2f}")
+        if row[4] is not None:
+            estimates.append(f"EPS act: ${row[4]:.2f}")
+        if row[5] is not None:
+            estimates.append(f"Rev est: {row[5]}")
+        if row[6] is not None:
+            estimates.append(f"Rev act: {row[6]}")
 
-        # Normalize iv30_rv30 (higher is better)
-        if max_iv30_rv30 > min_iv30_rv30:
-            norm_iv = (raw_iv30_rv30 - min_iv30_rv30) / (max_iv30_rv30 - min_iv30_rv30)
-        else:
-            norm_iv = 1.0
+        criteria_met = json.loads(row[7])
+        criteria_count = sum(bool(val) for val in criteria_met.values())
+        criteria_html = f"{criteria_count}/3<br>" + "<br>".join(
+            f"<span class='{'check-pass' if bool(val) else 'check-fail'}'>{'✓' if bool(val) else '✗'} {key}</span>"
+            for key, val in criteria_met.items()
+        )
+        detailed_metrics = json.loads(row[9])
+        metrics_html = "<br>".join(f"{k}: {v}" for k, v in detailed_metrics.items())
+        expected_move = row[8] if row[8] is not None else "N/A"
+        score_str = f"{row[10]:.2f}" if row[10] is not None else "N/A"
 
-        # Normalize term structure slope (lower is better, so invert the normalization)
-        if max_ts_slope > min_ts_slope:
-            norm_ts = (max_ts_slope - raw_ts_slope) / (max_ts_slope - min_ts_slope)
-        else:
-            norm_ts = 1.0
-
-        score = (norm_av * weight_avg_volume + norm_iv * weight_iv30_rv30 + norm_ts * weight_ts_slope) / total_weight
-        rec["score"] = score
-
-        row = generate_html_row(entry, rec)
-        if row:  # Only append if all criteria are met
-            scored_rows.append((score, row))
+        html_row = f"""
+            <tr>
+                <td>{row[0]}</td>
+                <td><a target="_blank" href="https://namuan.github.io/lazy-trader/?symbol={row[1]}">{row[1]}</a></td>
+                <td>{row[2]}</td>
+                <td>{' | '.join(estimates)}</td>
+                <td>{criteria_html}</td>
+                <td class="expected-move">{expected_move}</td>
+                <td class="metrics">{metrics_html}</td>
+                <td>{score_str}</td>
+            </tr>
+        """
+        scored_rows.append((row[10] if row[10] is not None else 0, html_row))
 
     # Sort rows descending by score (higher scores first)
     scored_rows.sort(key=lambda x: x[0], reverse=True)
@@ -637,7 +643,6 @@ def main(args):
 
     print(f"\nReport generated successfully: {args.output}")
 
-    # Open the report in the default web browser if the flag is set.
     if args.open_report:
         webbrowser.open('file://' + os.path.abspath(args.output))
 
