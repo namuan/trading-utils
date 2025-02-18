@@ -26,6 +26,7 @@ import time
 import webbrowser  # Newly added module to open the HTML report
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import finnhub
 import numpy as np
@@ -556,7 +557,8 @@ def main(args):
         return
 
     # Initialize SQLite database connection
-    db_conn = init_db()
+    db_file = Path.cwd() / "data" / "earnings_data.db"
+    db_conn = init_db(db_file=db_file.as_posix())
 
     # Process new earnings entries and store them if not already in the database
     for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
