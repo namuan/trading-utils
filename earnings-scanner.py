@@ -441,10 +441,6 @@ def generate_html_row(entry, recommendation):
             recommendation['ts_slope_0_45']
         ])
 
-        # Only include entries that meet all criteria
-        if criteria_met < 3:
-            return None
-
         checks = [
             ('High Volume', recommendation['avg_volume']),
             ('IV/RV Ratio', recommendation['iv30_rv30']),
