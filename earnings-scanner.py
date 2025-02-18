@@ -133,7 +133,7 @@ def parse_args():
         "-v",
         "--verbose",
         action="count",
-        default=0,
+        default=1,
         dest="verbose",
         help="Increase verbosity of logging output",
     )
