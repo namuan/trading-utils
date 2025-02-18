@@ -9,7 +9,8 @@
 # ]
 # ///
 """
-A script to fetch upcoming earnings from Finnhub API and score each entry based on normalized metrics.
+A script to fetch upcoming earnings from Finnhub API, score each entry based on normalized metrics,
+and store company earnings data in a SQLite database.
 
 Usage:
 ./earnings-scanner.py -h
@@ -19,6 +20,8 @@ Usage:
 """
 import logging
 import os
+import sqlite3
+import json
 import time
 import webbrowser  # Newly added module to open the HTML report
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
@@ -474,6 +477,73 @@ def generate_html_row(entry, recommendation):
         """
     return None
 
+# --- Database functions ---
+def init_db(db_file="earnings_data.db"):
+    conn = sqlite3.connect(db_file)
+    cur = conn.cursor()
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS earnings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            symbol TEXT,
+            report_time TEXT,
+            eps_estimate REAL,
+            eps_actual REAL,
+            revenue_estimate TEXT,
+            revenue_actual TEXT,
+            criteria_met TEXT,
+            expected_move TEXT,
+            detailed_metrics TEXT,
+            score REAL,
+            raw_metrics TEXT
+        )
+    ''')
+    conn.commit()
+    return conn
+
+def store_entry(conn, entry, recommendation):
+    cur = conn.cursor()
+    date = entry.get("date")
+    symbol = entry.get("symbol")
+    report_time = entry.get("hour", "").upper()
+    if report_time == "BMO":
+        report_time = "Before Market Open"
+    elif report_time == "AMC":
+        report_time = "After Market Close"
+    else:
+        report_time = "Time Not Specified"
+
+    eps_estimate = entry.get("epsEstimate")
+    eps_actual = entry.get("epsActual")
+    revenue_estimate = entry.get("revenueEstimate")
+    revenue_actual = entry.get("revenueActual")
+
+    # Convert NumPy booleans to native bool for JSON serialization
+    criteria_met = json.dumps({
+        "High Volume": bool(recommendation.get("avg_volume")),
+        "IV/RV Ratio": bool(recommendation.get("iv30_rv30")),
+        "Term Structure": bool(recommendation.get("ts_slope_0_45"))
+    })
+    expected_move = recommendation.get("expected_move")
+    detailed_metrics = json.dumps(recommendation.get("detailed_metrics", {}))
+    score = recommendation.get("score")
+
+    # Convert raw_metrics booleans to native bool if necessary
+    raw_metrics_dict = recommendation.get("raw_metrics", {})
+    raw_metrics = json.dumps({k: (bool(v) if isinstance(v, (np.bool_, bool)) else v) for k, v in raw_metrics_dict.items()})
+
+    cur.execute('''
+        INSERT INTO earnings 
+        (date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, criteria_met, expected_move, detailed_metrics, score, raw_metrics)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        date, symbol, report_time, eps_estimate, eps_actual,
+        revenue_estimate, revenue_actual, criteria_met, expected_move,
+        detailed_metrics, score, raw_metrics
+    ))
+    conn.commit()
+# --- End Database functions ---
+
 def main(args):
     logging.info(f"Looking up earnings for the next {args.days} days")
 
@@ -485,6 +555,9 @@ def main(args):
         logging.error("Failed to retrieve earnings data")
         return
 
+    # Initialize SQLite database connection
+    db_conn = init_db()
+
     # First, collect all valid results along with their raw metrics.
     results = []
     for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
@@ -493,6 +566,8 @@ def main(args):
             # We only process recommendations that return a dict with raw_metrics.
             if isinstance(recommendation, dict) and "raw_metrics" in recommendation:
                 results.append((entry, recommendation))
+                # Store each entry in the SQLite DB:
+                store_entry(db_conn, entry, recommendation)
             time.sleep(1)
         except Exception as e:
             logging.error(f"Error processing {entry['symbol']}: {str(e)}")
