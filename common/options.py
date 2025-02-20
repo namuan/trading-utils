@@ -27,6 +27,12 @@ def stock_quote(symbols):
     return get_data(path, params)
 
 
+def stock_historical(symbol, start, end, interval="daily"):
+    path = "markets/history"
+    params = {"symbol": symbol, "interval": interval, "start": start, "end": end}
+    return get_data(path, params)
+
+
 def option_chain(symbol, expiration):
     path = "/markets/options/chains"
     params = {"symbol": symbol, "expiration": expiration, "greeks": "true"}
