@@ -38,86 +38,6 @@ from dotenv import load_dotenv
 
 from earnings_vol_algo import compute_recommendation, format_number
 
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Earnings Calendar</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            margin: 2rem;
-            color: #333;
-        }}
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            overflow-x: auto;
-        }}
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
-            background: white;
-        }}
-        th, td {{
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid #e2e8f0;
-        }}
-        th {{
-            background-color: #f8fafc;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-        }}
-        tr:hover {{
-            background-color: #f8fafc;
-        }}
-        .check-pass {{
-            color: #059669;
-        }}
-        .check-fail {{
-            color: #dc2626;
-        }}
-        .metrics {{
-            font-size: 0.875rem;
-            color: #666;
-        }}
-        .expected-move {{
-            font-weight: 600;
-            color: #2563eb;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Earnings Calendar and Analysis</h1>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Symbol</th>
-                    <th>Report Time</th>
-                    <th>Underlying Price</th>
-                    <th>Estimates</th>
-                    <th>Criteria Met</th>
-                    <th>Expected Move</th>
-                    <th>Detailed Metrics</th>
-                    <th>Score</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows}
-            </tbody>
-        </table>
-    </div>
-</body>
-</html>
-"""
 
 def setup_logging(verbosity):
     logging_level = logging.WARNING
@@ -455,15 +375,99 @@ def main(args):
     scored_rows.sort(key=lambda x: x[0], reverse=True)
     table_rows = [html for score, html in scored_rows]
 
-    html_content = HTML_TEMPLATE.format(table_rows="\n".join(table_rows))
-
-    with open(args.output, 'w') as f:
-        f.write(html_content)
-
-    print(f"\nReport generated successfully: {args.output}")
+    generate_report(args.output, table_rows)
 
     if args.open_report:
         webbrowser.open('file://' + os.path.abspath(args.output))
+
+
+def generate_report(output_file, table_rows):
+    html_template = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earnings Calendar</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 2rem;
+            color: #333;
+        }}
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            overflow-x: auto;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: white;
+        }}
+        th, td {{
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        th {{
+            background-color: #f8fafc;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }}
+        tr:hover {{
+            background-color: #f8fafc;
+        }}
+        .check-pass {{
+            color: #059669;
+        }}
+        .check-fail {{
+            color: #dc2626;
+        }}
+        .metrics {{
+            font-size: 0.875rem;
+            color: #666;
+        }}
+        .expected-move {{
+            font-weight: 600;
+            color: #2563eb;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Earnings Calendar and Analysis</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Symbol</th>
+                    <th>Report Time</th>
+                    <th>Underlying Price</th>
+                    <th>Estimates</th>
+                    <th>Criteria Met</th>
+                    <th>Expected Move</th>
+                    <th>Detailed Metrics</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {table_rows}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+"""
+    html_content = html_template.format(table_rows="\n".join(table_rows))
+    with open(output_file, 'w') as f:
+        f.write(html_content)
+    logging.info(f"\nReport generated successfully: {output_file}")
+
+
 
 if __name__ == "__main__":
     args = parse_args()
