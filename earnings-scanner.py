@@ -370,7 +370,9 @@ def main(args):
     if args.refresh_data:
         refresh_db(db_conn)
 
-    for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
+    companies_with_earnings = earnings['earningsCalendar']
+    logging.info(f"Found {len(companies_with_earnings)} companies with earnings")
+    for entry in sorted(companies_with_earnings, key=lambda x: x['date']):
         cur = db_conn.cursor()
         cur.execute("SELECT 1 FROM earnings WHERE symbol=? AND date=?", (entry.get("symbol"), entry.get("date")))
         if cur.fetchone() is not None:
@@ -384,7 +386,7 @@ def main(args):
             if isinstance(recommendation, dict) and "raw_metrics" in recommendation:
                 # Store each new entry in the SQLite DB:
                 store_entry(db_conn, entry, recommendation)
-            time.sleep(1)
+            time.sleep(2)
         except Exception as e:
             logging.error(f"Error processing {entry['symbol']}: {str(e)}")
 
