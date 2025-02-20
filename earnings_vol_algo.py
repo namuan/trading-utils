@@ -78,6 +78,15 @@ def build_term_structure(days, ivs):
 
     return term_spline
 
+def compute_score(avg_volume, iv30_rv30, ts_slope):
+    # Normalize avg_volume between 0 and 3000000
+    normalized_avg_volume = min(max(avg_volume / 3000000, 0), 1)
+    # Normalize iv30_rv30 between 0.5 and 2.0
+    normalized_iv = min(max((iv30_rv30 - 0.5) / (2.0 - 0.5), 0), 1)
+    # Normalize ts_slope between -0.01 and 0.0 (lower is better)
+    normalized_ts = min(max((0.0 - ts_slope) / (0.0 - (-0.01)), 0), 1)
+    # Weighted average: 50% weight to iv30_rv30, 25% each for avg_volume and ts_slope
+    return normalized_iv * 0.5 + normalized_avg_volume * 0.25 + normalized_ts * 0.25
 
 def get_current_price(ticker):
     spot_price_data = stock_quote(ticker)
@@ -89,6 +98,14 @@ def get_current_price(ticker):
     )
     return None
 
+def format_number(number):
+    if number is None:
+        return 'N/A'
+    if abs(number) >= 1e9:
+        return f"${number/1e9:.2f}B"
+    if abs(number) >= 1e6:
+        return f"${number/1e6:.2f}M"
+    return f"${number:,.2f}"
 
 def compute_recommendation(ticker):
     try:
@@ -199,21 +216,26 @@ def compute_recommendation(ticker):
             avg_volume_threshold, iv30_rv30_threshold, ts_slope_0_45_threshold
         )
 
-        score = ...
+        score = compute_score(avg_volume, iv30_rv30, ts_slope_0_45)
 
         return {
+            "underlying_price": underlying_price,
             "avg_volume": avg_volume_threshold,
             "iv30_rv30": iv30_rv30_threshold,
             "ts_slope_0_45": ts_slope_0_45_threshold,
             "expected_move": expected_move,
             "recommendation": recommendation,
             "score": score,
-            "details": {
-                "iv30_rv30": iv30_rv30,
-                "ts_slope_0_45": ts_slope_0_45,
-                "term_spline": term_spline,
+            "raw_metrics": {
                 "avg_volume": avg_volume,
+                "iv30_rv30": iv30_rv30,
+                "ts_slope_0_45": ts_slope_0_45
             },
+            "detailed_metrics": {
+                "30-day Avg Volume": format_number(avg_volume),
+                "IV30/RV30 Ratio": f"{iv30_rv30:.2f}",
+                "Term Structure Slope": f"{ts_slope_0_45:.6f}"
+            }
         }
     except Exception as e:
         logging.exception(e)
@@ -223,14 +245,12 @@ def compute_recommendation(ticker):
 def calculate_recommendation(
     avg_volume_threshold, iv30_rv30_threshold, ts_slope_0_45_threshold
 ):
-    title = ""
     if avg_volume_threshold and iv30_rv30_threshold and ts_slope_0_45_threshold:
-        title = "Recommended"
+        return "Recommended"
     elif ts_slope_0_45_threshold and (
         (avg_volume_threshold and not iv30_rv30_threshold)
         or (iv30_rv30_threshold and not avg_volume_threshold)
     ):
-        title = "Consider"
+        return "Consider"
     else:
-        title = "Avoid"
-    return title
+        return "Avoid"
