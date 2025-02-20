@@ -166,6 +166,11 @@ def parse_args():
         default="earnings_report.html",
         help="Output HTML file name (default: earnings_report.html)",
     )
+    parser.add_argument(
+        "--refresh-data",
+        action="store_true",
+        help="Refresh the database with the latest data by clearing existing records"
+    )
     # New flag to open the output report automatically
     parser.add_argument(
         "--open-report",
@@ -300,6 +305,12 @@ def init_db(db_file="earnings_data.db"):
     conn.commit()
     return conn
 
+def refresh_db(conn):
+    cur = conn.cursor()
+    cur.execute("DELETE FROM earnings")
+    conn.commit()
+    logging.info("Database refreshed: old records have been deleted.")
+
 def store_entry(conn, entry, recommendation):
     cur = conn.cursor()
     date = entry.get("date")
@@ -353,13 +364,13 @@ def main(args):
         logging.error("Failed to retrieve earnings data")
         return
 
-    # Initialize SQLite database connection
     db_file = Path.cwd() / "data" / "earnings_data.db"
     db_conn = init_db(db_file=db_file.as_posix())
 
-    # Process new earnings entries and store them if not already in the database
+    if args.refresh_data:
+        refresh_db(db_conn)
+
     for entry in sorted(earnings['earningsCalendar'], key=lambda x: x['date']):
-        # Check if the entry has already been processed by looking for matching symbol and date
         cur = db_conn.cursor()
         cur.execute("SELECT 1 FROM earnings WHERE symbol=? AND date=?", (entry.get("symbol"), entry.get("date")))
         if cur.fetchone() is not None:
@@ -392,7 +403,7 @@ def main(args):
 
     scored_rows = []
     for row in db_rows:
-        # row indices:
+        # Indices:
         # 0: date, 1: symbol, 2: report_time, 3: eps_estimate, 4: eps_actual,
         # 5: revenue_estimate, 6: revenue_actual, 7: criteria_met, 8: expected_move,
         # 9: detailed_metrics, 10: score
