@@ -371,7 +371,7 @@ def main(args):
         refresh_db(db_conn)
 
     companies_with_earnings = earnings['earningsCalendar']
-    logging.info(f"Found {len(companies_with_earnings)} companies with earnings")
+    logging.info(f"Found {len(companies_with_earnings)} companies with earnings in the next {args.days} days")
     for entry in sorted(companies_with_earnings, key=lambda x: x['date']):
         cur = db_conn.cursor()
         cur.execute("SELECT 1 FROM earnings WHERE symbol=? AND date=?", (entry.get("symbol"), entry.get("date")))
@@ -379,16 +379,15 @@ def main(args):
             logging.info(f"Skipping existing record for {entry.get('symbol')} on {entry.get('date')}")
             continue
 
+        symbol = entry['symbol']
+        logging.info(f"Processing {symbol} ...")
         try:
-            recommendation = compute_recommendation(entry['symbol'])
-
-            # Only process recommendations that return a dict with raw_metrics.
+            recommendation = compute_recommendation(symbol)
             if isinstance(recommendation, dict) and "raw_metrics" in recommendation:
-                # Store each new entry in the SQLite DB:
                 store_entry(db_conn, entry, recommendation)
             time.sleep(2)
         except Exception as e:
-            logging.error(f"Error processing {entry['symbol']}: {str(e)}")
+            logging.error(f"Error processing {symbol}: {str(e)}")
 
     # Generate the report using data from the database
     cur = db_conn.cursor()
