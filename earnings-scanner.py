@@ -13,8 +13,8 @@
 # ///
 """
 A script to fetch upcoming earnings from Finnhub API, score each entry based on normalized metrics,
-store company earnings data (including underlying price) in a SQLite database,
-and generate an HTML report.
+store company earnings data (including underlying price and recommendation category) in a SQLite database,
+and generate an HTML report with symbols grouped by recommendation.
 
 Usage:
 ./earnings-scanner.py -h
@@ -145,6 +145,7 @@ def get_earnings_calendar(days_ahead, symbols=None):
         logging.error(f"Error fetching earnings data: {str(e)}")
         return None
 
+
 def generate_html_row(entry, recommendation):
     report_time = entry.get('hour', '').upper()
     if report_time == 'BMO':
@@ -205,6 +206,7 @@ def generate_html_row(entry, recommendation):
         """
     return None
 
+
 def init_db(db_file="earnings_data.db"):
     conn = sqlite3.connect(db_file)
     # Use Row factory to access columns by name
@@ -225,17 +227,20 @@ def init_db(db_file="earnings_data.db"):
             detailed_metrics TEXT,
             score REAL,
             underlying_price REAL,
-            raw_metrics TEXT
+            raw_metrics TEXT,
+            recommendation_category TEXT
         )
     ''')
     conn.commit()
     return conn
+
 
 def refresh_db(conn):
     cur = conn.cursor()
     cur.execute("DELETE FROM earnings")
     conn.commit()
     logging.info("Database refreshed: old records have been deleted.")
+
 
 def store_entry(conn, entry, recommendation):
     cur = conn.cursor()
@@ -267,20 +272,24 @@ def store_entry(conn, entry, recommendation):
     # Underlying price from the recommendation
     underlying_price = recommendation.get("underlying_price")
 
+    recommendation_category = recommendation["recommendation"]
+
     # Convert raw_metrics booleans to native bool if necessary
     raw_metrics_dict = recommendation.get("raw_metrics", {})
     raw_metrics = json.dumps({k: (bool(v) if isinstance(v, (np.bool_, bool)) else v) for k, v in raw_metrics_dict.items()})
 
     cur.execute('''
         INSERT INTO earnings 
-        (date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, criteria_met, expected_move, detailed_metrics, score, underlying_price, raw_metrics)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, 
+         criteria_met, expected_move, detailed_metrics, score, underlying_price, raw_metrics, recommendation_category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         date, symbol, report_time, eps_estimate, eps_actual,
         revenue_estimate, revenue_actual, criteria_met, expected_move,
-        detailed_metrics, score, underlying_price, raw_metrics
+        detailed_metrics, score, underlying_price, raw_metrics, recommendation_category
     ))
     conn.commit()
+
 
 def main(args):
     logging.info(f"Looking up earnings for the next {args.days} day(s)")
@@ -318,11 +327,11 @@ def main(args):
         except Exception as e:
             logging.error(f"Error processing {symbol}: {str(e)}")
 
-    # Generate the report using data from the database with named columns
+    # Generate the report using data from the database with named columns, including recommendation_category
     cur = db_conn.cursor()
     cur.execute("""
         SELECT date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, 
-               criteria_met, expected_move, detailed_metrics, score, underlying_price
+               criteria_met, expected_move, detailed_metrics, score, underlying_price, recommendation_category
         FROM earnings
     """)
     db_rows = cur.fetchall()
@@ -331,58 +340,104 @@ def main(args):
         logging.warning("No earnings data found in the database.")
         return
 
-    scored_rows = []
+    # Group rows by recommendation_category
+    grouped_rows = {
+        "Recommended": [],
+        "Consider": [],
+        "Avoid": []
+    }
+
     for row in db_rows:
-        # Access each column by name since we're using sqlite3.Row
-        estimates = []
-        if row["eps_estimate"] is not None:
-            estimates.append(f"EPS est: ${row['eps_estimate']:.2f}")
-        if row["eps_actual"] is not None:
-            estimates.append(f"EPS act: ${row['eps_actual']:.2f}")
-        if row["revenue_estimate"] is not None:
-            estimates.append(f"Rev est: {row['revenue_estimate']}")
-        if row["revenue_actual"] is not None:
-            estimates.append(f"Rev act: {row['revenue_actual']}")
+        category = row["recommendation_category"]
+        grouped_rows[category].append(row)
 
-        criteria_met = json.loads(row["criteria_met"])
-        criteria_count = sum(bool(val) for val in criteria_met.values())
-        criteria_html = f"{criteria_count}/3<br>" + "<br>".join(
-            f"<span class='{'check-pass' if bool(val) else 'check-fail'}'>{'✓' if bool(val) else '✗'} {key}</span>"
-            for key, val in criteria_met.items()
-        )
-        detailed_metrics = json.loads(row["detailed_metrics"])
-        metrics_html = "<br>".join(f"{k}: {v}" for k, v in detailed_metrics.items())
-        expected_move = row["expected_move"] if row["expected_move"] is not None else "N/A"
-        score_str = f"{row['score']:.2f}" if row["score"] is not None else "N/A"
-        underlying_price = row["underlying_price"] if row["underlying_price"] is not None else "N/A"
+    # For each group, sort the rows descending by score (higher scores first) and generate HTML rows.
+    grouped_html = {}
+    for category, rows in grouped_rows.items():
+        html_rows = []
+        for row in rows:
+            estimates = []
+            if row["eps_estimate"] is not None:
+                estimates.append(f"EPS est: ${row['eps_estimate']:.2f}")
+            if row["eps_actual"] is not None:
+                estimates.append(f"EPS act: ${row['eps_actual']:.2f}")
+            if row["revenue_estimate"] is not None:
+                estimates.append(f"Rev est: {row['revenue_estimate']}")
+            if row["revenue_actual"] is not None:
+                estimates.append(f"Rev act: {row['revenue_actual']}")
 
-        html_row = f"""
-            <tr>
-                <td>{row['date']}</td>
-                <td><a target="_blank" href="https://namuan.github.io/lazy-trader/?symbol={row['symbol']}">{row['symbol']}</a></td>
-                <td>{row['report_time']}</td>
-                <td>{underlying_price}</td>
-                <td>{' | '.join(estimates)}</td>
-                <td>{criteria_html}</td>
-                <td class="expected-move">{expected_move}</td>
-                <td class="metrics">{metrics_html}</td>
-                <td>{score_str}</td>
-            </tr>
-        """
-        scored_rows.append((row["score"] if row["score"] is not None else 0, html_row))
+            criteria_met = json.loads(row["criteria_met"])
+            criteria_count = sum(bool(val) for val in criteria_met.values())
+            criteria_html = f"{criteria_count}/3<br>" + "<br>".join(
+                f"<span class='{'check-pass' if bool(val) else 'check-fail'}'>{'✓' if bool(val) else '✗'} {key}</span>"
+                for key, val in criteria_met.items()
+            )
+            detailed_metrics = json.loads(row["detailed_metrics"])
+            metrics_html = "<br>".join(f"{k}: {v}" for k, v in detailed_metrics.items())
+            expected_move = row["expected_move"] if row["expected_move"] is not None else "N/A"
+            score_str = f"{row['score']:.2f}" if row["score"] is not None else "N/A"
+            underlying_price = row["underlying_price"] if row["underlying_price"] is not None else "N/A"
 
-    # Sort rows descending by score (higher scores first)
-    scored_rows.sort(key=lambda x: x[0], reverse=True)
-    table_rows = [html for score, html in scored_rows]
+            html_row = f"""
+                <tr>
+                    <td>{row['date']}</td>
+                    <td><a target="_blank" href="https://namuan.github.io/lazy-trader/?symbol={row['symbol']}">{row['symbol']}</a></td>
+                    <td>{row['report_time']}</td>
+                    <td>{underlying_price}</td>
+                    <td>{' | '.join(estimates)}</td>
+                    <td>{criteria_html}</td>
+                    <td class="expected-move">{expected_move}</td>
+                    <td class="metrics">{metrics_html}</td>
+                    <td>{score_str}</td>
+                </tr>
+            """
+            html_rows.append((row["score"] if row["score"] is not None else 0, html_row))
+        # Sort each group descending by score
+        html_rows.sort(key=lambda x: x[0], reverse=True)
+        # Only keep the HTML portion of the rows
+        grouped_html[category] = [html for score, html in html_rows]
 
-    generate_report(args.output, table_rows)
+    generate_report(args.output, grouped_html)
 
     if args.open_report:
         webbrowser.open('file://' + os.path.abspath(args.output))
 
 
-def generate_report(output_file, table_rows):
-    html_template = """
+def generate_report(output_file, grouped_html):
+    """
+    grouped_html is a dictionary where each key is a recommendation category (e.g. "Recommended", "Consider", "Avoid")
+    and the value is the list of HTML rows in that category.
+    """
+    # Build sections for each group - in the desired order.
+    sections_order = ["Recommended", "Consider", "Avoid"]
+    sections_html = ""
+    for group in sections_order:
+        rows = grouped_html.get(group, [])
+        if rows:
+            section = f"""
+            <h2>{group}</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Symbol</th>
+                        <th>Report Time</th>
+                        <th>Underlying Price</th>
+                        <th>Estimates</th>
+                        <th>Criteria Met</th>
+                        <th>Expected Move</th>
+                        <th>Detailed Metrics</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(rows)}
+                </tbody>
+            </table>
+            """
+            sections_html += section
+
+    html_template = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -435,38 +490,23 @@ def generate_report(output_file, table_rows):
             font-weight: 600;
             color: #2563eb;
         }}
+        h2 {{
+            margin-top: 2rem;
+            color: #333;
+        }}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Earnings Calendar and Analysis</h1>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Symbol</th>
-                    <th>Report Time</th>
-                    <th>Underlying Price</th>
-                    <th>Estimates</th>
-                    <th>Criteria Met</th>
-                    <th>Expected Move</th>
-                    <th>Detailed Metrics</th>
-                    <th>Score</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows}
-            </tbody>
-        </table>
+        {sections_html}
     </div>
 </body>
 </html>
 """
-    html_content = html_template.format(table_rows="\n".join(table_rows))
     with open(output_file, 'w') as f:
-        f.write(html_content)
+        f.write(html_template)
     logging.info(f"\nReport generated successfully: {output_file}")
-
 
 
 if __name__ == "__main__":
