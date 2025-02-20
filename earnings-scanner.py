@@ -13,7 +13,8 @@
 # ///
 """
 A script to fetch upcoming earnings from Finnhub API, score each entry based on normalized metrics,
-and store company earnings data in a SQLite database.
+store company earnings data (including underlying price) in a SQLite database,
+and generate an HTML report.
 
 Usage:
 ./earnings-scanner.py -h
@@ -101,6 +102,7 @@ HTML_TEMPLATE = """
                     <th>Date</th>
                     <th>Symbol</th>
                     <th>Report Time</th>
+                    <th>Underlying Price</th>
                     <th>Estimates</th>
                     <th>Criteria Met</th>
                     <th>Expected Move</th>
@@ -273,6 +275,7 @@ def generate_html_row(entry, recommendation):
                 <td>{entry['date']}</td>
                 <td><a target="_blank" href="https://namuan.github.io/lazy-trader/?symbol={entry['symbol']}">{entry['symbol']}</a></td>
                 <td>{report_time}</td>
+                <td>{recommendation.get("underlying_price", "N/A")}</td>
                 <td>{' | '.join(estimates)}</td>
                 <td>{criteria_html}</td>
                 <td class="expected-move">{expected_move}</td>
@@ -284,6 +287,8 @@ def generate_html_row(entry, recommendation):
 
 def init_db(db_file="earnings_data.db"):
     conn = sqlite3.connect(db_file)
+    # Use Row factory to access columns by name
+    conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute('''
         CREATE TABLE IF NOT EXISTS earnings (
@@ -299,6 +304,7 @@ def init_db(db_file="earnings_data.db"):
             expected_move TEXT,
             detailed_metrics TEXT,
             score REAL,
+            underlying_price REAL,
             raw_metrics TEXT
         )
     ''')
@@ -338,23 +344,26 @@ def store_entry(conn, entry, recommendation):
     detailed_metrics = json.dumps(recommendation.get("detailed_metrics", {}))
     score = recommendation.get("score")
 
+    # Underlying price from the recommendation
+    underlying_price = recommendation.get("underlying_price")
+
     # Convert raw_metrics booleans to native bool if necessary
     raw_metrics_dict = recommendation.get("raw_metrics", {})
     raw_metrics = json.dumps({k: (bool(v) if isinstance(v, (np.bool_, bool)) else v) for k, v in raw_metrics_dict.items()})
 
     cur.execute('''
         INSERT INTO earnings 
-        (date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, criteria_met, expected_move, detailed_metrics, score, raw_metrics)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, criteria_met, expected_move, detailed_metrics, score, underlying_price, raw_metrics)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         date, symbol, report_time, eps_estimate, eps_actual,
         revenue_estimate, revenue_actual, criteria_met, expected_move,
-        detailed_metrics, score, raw_metrics
+        detailed_metrics, score, underlying_price, raw_metrics
     ))
     conn.commit()
 
 def main(args):
-    logging.info(f"Looking up earnings for the next {args.days} days")
+    logging.info(f"Looking up earnings for the next {args.days} day(s)")
 
     if args.symbols:
         logging.info(f"Fetching data for symbols: {', '.join(args.symbols)}")
@@ -371,7 +380,7 @@ def main(args):
         refresh_db(db_conn)
 
     companies_with_earnings = earnings['earningsCalendar']
-    logging.info(f"Found {len(companies_with_earnings)} companies with earnings in the next {args.days} days")
+    logging.info(f"Found {len(companies_with_earnings)} companies with earnings in the next {args.days} day(s)")
     for entry in sorted(companies_with_earnings, key=lambda x: x['date']):
         cur = db_conn.cursor()
         cur.execute("SELECT 1 FROM earnings WHERE symbol=? AND date=?", (entry.get("symbol"), entry.get("date")))
@@ -389,11 +398,11 @@ def main(args):
         except Exception as e:
             logging.error(f"Error processing {symbol}: {str(e)}")
 
-    # Generate the report using data from the database
+    # Generate the report using data from the database with named columns
     cur = db_conn.cursor()
     cur.execute("""
         SELECT date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, 
-               criteria_met, expected_move, detailed_metrics, score 
+               criteria_met, expected_move, detailed_metrics, score, underlying_price
         FROM earnings
     """)
     db_rows = cur.fetchall()
@@ -404,37 +413,35 @@ def main(args):
 
     scored_rows = []
     for row in db_rows:
-        # Indices:
-        # 0: date, 1: symbol, 2: report_time, 3: eps_estimate, 4: eps_actual,
-        # 5: revenue_estimate, 6: revenue_actual, 7: criteria_met, 8: expected_move,
-        # 9: detailed_metrics, 10: score
-
+        # Access each column by name since we're using sqlite3.Row
         estimates = []
-        if row[3] is not None:
-            estimates.append(f"EPS est: ${row[3]:.2f}")
-        if row[4] is not None:
-            estimates.append(f"EPS act: ${row[4]:.2f}")
-        if row[5] is not None:
-            estimates.append(f"Rev est: {row[5]}")
-        if row[6] is not None:
-            estimates.append(f"Rev act: {row[6]}")
+        if row["eps_estimate"] is not None:
+            estimates.append(f"EPS est: ${row['eps_estimate']:.2f}")
+        if row["eps_actual"] is not None:
+            estimates.append(f"EPS act: ${row['eps_actual']:.2f}")
+        if row["revenue_estimate"] is not None:
+            estimates.append(f"Rev est: {row['revenue_estimate']}")
+        if row["revenue_actual"] is not None:
+            estimates.append(f"Rev act: {row['revenue_actual']}")
 
-        criteria_met = json.loads(row[7])
+        criteria_met = json.loads(row["criteria_met"])
         criteria_count = sum(bool(val) for val in criteria_met.values())
         criteria_html = f"{criteria_count}/3<br>" + "<br>".join(
             f"<span class='{'check-pass' if bool(val) else 'check-fail'}'>{'✓' if bool(val) else '✗'} {key}</span>"
             for key, val in criteria_met.items()
         )
-        detailed_metrics = json.loads(row[9])
+        detailed_metrics = json.loads(row["detailed_metrics"])
         metrics_html = "<br>".join(f"{k}: {v}" for k, v in detailed_metrics.items())
-        expected_move = row[8] if row[8] is not None else "N/A"
-        score_str = f"{row[10]:.2f}" if row[10] is not None else "N/A"
+        expected_move = row["expected_move"] if row["expected_move"] is not None else "N/A"
+        score_str = f"{row['score']:.2f}" if row["score"] is not None else "N/A"
+        underlying_price = row["underlying_price"] if row["underlying_price"] is not None else "N/A"
 
         html_row = f"""
             <tr>
-                <td>{row[0]}</td>
-                <td><a target="_blank" href="https://namuan.github.io/lazy-trader/?symbol={row[1]}">{row[1]}</a></td>
-                <td>{row[2]}</td>
+                <td>{row['date']}</td>
+                <td><a target="_blank" href="https://namuan.github.io/lazy-trader/?symbol={row['symbol']}">{row['symbol']}</a></td>
+                <td>{row['report_time']}</td>
+                <td>{underlying_price}</td>
                 <td>{' | '.join(estimates)}</td>
                 <td>{criteria_html}</td>
                 <td class="expected-move">{expected_move}</td>
@@ -442,11 +449,11 @@ def main(args):
                 <td>{score_str}</td>
             </tr>
         """
-        scored_rows.append((row[10] if row[10] is not None else 0, html_row))
+        scored_rows.append((row["score"] if row["score"] is not None else 0, html_row))
 
     # Sort rows descending by score (higher scores first)
     scored_rows.sort(key=lambda x: x[0], reverse=True)
-    table_rows = [row for (_, row) in scored_rows]
+    table_rows = [html for score, html in scored_rows]
 
     html_content = HTML_TEMPLATE.format(table_rows="\n".join(table_rows))
 
