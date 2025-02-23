@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -13,85 +14,196 @@ from common.options import (
 )
 
 
-def filter_dates(expiries):
+def filter_dates(expiries: Any) -> List[str]:
+    """
+    Filter expiration dates to only include dates occurring within the next 45 days.
+
+    Args:
+        expiries: An object with an `expirations.date` attribute: a list of date strings ("%Y-%m-%d").
+
+    Returns:
+        List of expiration date strings before the 45-day cutoff.
+    """
     today = datetime.today().date()
     cutoff_date = today + timedelta(days=45)
     expiry_dates = expiries.expirations.date
     return [
-        date
-        for date in expiry_dates
-        if datetime.strptime(date, "%Y-%m-%d").date() < cutoff_date
+        date_str
+        for date_str in expiry_dates
+        if datetime.strptime(date_str, "%Y-%m-%d").date() < cutoff_date
     ]
 
 
-def yang_zhang(price_data, window=30, trading_periods=252, return_last_only=True):
-    log_ho = (price_data["high"] / price_data["open"]).apply(np.log)
-    log_lo = (price_data["low"] / price_data["open"]).apply(np.log)
-    log_co = (price_data["close"] / price_data["open"]).apply(np.log)
+def has_weekly_expiries_in_dates(dates: List[str]) -> bool:
+    """
+    Check if the provided list of expiration dates contains any consecutive weekly expiries.
 
-    log_oc = (price_data["open"] / price_data["close"].shift(1)).apply(np.log)
-    log_oc_sq = log_oc**2
+    Args:
+        dates: List of expiration date strings in '%Y-%m-%d' format.
 
-    log_cc = (price_data["close"] / price_data["close"].shift(1)).apply(np.log)
-    log_cc_sq = log_cc**2
-
-    rs = log_ho * (log_ho - log_co) + log_lo * (log_lo - log_co)
-
-    close_vol = log_cc_sq.rolling(window=window, center=False).sum() * (
-        1.0 / (window - 1.0)
+    Returns:
+        True if any pair of consecutive dates are 7 days apart.
+    """
+    return any(
+        (
+                datetime.strptime(dates[i], "%Y-%m-%d").date() -
+                datetime.strptime(dates[i - 1], "%Y-%m-%d").date()
+        ).days == 7
+        for i in range(1, len(dates))
     )
 
-    open_vol = log_oc_sq.rolling(window=window, center=False).sum() * (
-        1.0 / (window - 1.0)
-    )
 
-    window_rs = rs.rolling(window=window, center=False).sum() * (1.0 / (window - 1.0))
+def process_option_chain(chain: Any, underlying_price: float, compute_details: bool = False) -> Optional[Dict[str, Optional[float]]]:
+    """
+    Process an option chain to compute the at-the-money (ATM) implied volatility.
+    Optionally compute additional metrics like straddle price and bid/ask spread score.
+
+    Args:
+        chain: Option chain data object with accessible options.
+        underlying_price: The current price of the underlying asset.
+        compute_details: If True, compute additional metrics (straddle and spread_score).
+
+    Returns:
+        A dictionary with at least the key 'atm_iv'. If compute_details is True,
+        also returns 'straddle' and 'spread_score'. Returns None if chain is invalid.
+    """
+    options = chain.options.option
+    calls = [opt for opt in options if opt.option_type == "call"]
+    puts = [opt for opt in options if opt.option_type == "put"]
+    if not calls or not puts:
+        return None
+
+    # Determine ATM options by selecting strikes closest to underlying price
+    call_option = min(calls, key=lambda opt: abs(opt.strike - underlying_price))
+    put_option = min(puts, key=lambda opt: abs(opt.strike - underlying_price))
+    call_iv = call_option.greeks.mid_iv
+    put_iv = put_option.greeks.mid_iv
+    atm_iv_value = (call_iv + put_iv) / 2.0
+
+    result = {"atm_iv": atm_iv_value}
+
+    if compute_details:
+        call_bid = call_option.bid
+        call_ask = call_option.ask
+        put_bid = put_option.bid
+        put_ask = put_option.ask
+
+        if call_bid is not None and call_ask is not None and put_bid is not None and put_ask is not None:
+            call_mid = (call_bid + call_ask) / 2.0
+            put_mid = (put_bid + put_ask) / 2.0
+            straddle = call_mid + put_mid
+
+            call_spread = (call_ask - call_bid) / ((call_ask + call_bid) / 2)
+            put_spread = (put_ask - put_bid) / ((put_ask + put_bid) / 2)
+            avg_spread = (call_spread + put_spread) / 2
+            spread_score = max(0, min(1, 1 - (avg_spread / 0.1)))
+            result.update({"straddle": straddle, "spread_score": spread_score})
+        else:
+            result.update({"straddle": None, "spread_score": 0})
+    return result
+
+
+def yang_zhang(
+        price_data: pd.DataFrame,
+        window: int = 30,
+        trading_periods: int = 252,
+        return_last_only: bool = True,
+) -> Union[float, pd.Series]:
+    """
+    Calculate the Yang-Zhang volatility estimator.
+
+    Args:
+        price_data: DataFrame containing columns 'open', 'high', 'low', and 'close'.
+        window: Rolling window period for volatility calculation.
+        trading_periods: Annualizing factor (typically 252 trading days).
+        return_last_only: If True, returns only the last computed volatility; otherwise, returns a series.
+
+    Returns:
+        The computed volatility as a float (or series if return_last_only is False).
+    """
+    log_open_high = (price_data["high"] / price_data["open"]).apply(np.log)
+    log_open_low = (price_data["low"] / price_data["open"]).apply(np.log)
+    log_open_close = (price_data["close"] / price_data["open"]).apply(np.log)
+
+    log_prev_close_to_open = (price_data["open"] / price_data["close"].shift(1)).apply(np.log)
+    log_prev_close_to_open_sq = log_prev_close_to_open ** 2
+
+    log_close_to_close = (price_data["close"] / price_data["close"].shift(1)).apply(np.log)
+    log_close_to_close_sq = log_close_to_close ** 2
+
+    # Rogers-Satchell volatility component
+    rs = log_open_high * (log_open_high - log_open_close) + log_open_low * (log_open_low - log_open_close)
+    close_vol = log_close_to_close_sq.rolling(window=window).sum() / (window - 1)
+    open_vol = log_prev_close_to_open_sq.rolling(window=window).sum() / (window - 1)
+    window_rs = rs.rolling(window=window).sum() / (window - 1)
 
     k = 0.34 / (1.34 + ((window + 1) / (window - 1)))
-    result = (open_vol + k * close_vol + (1 - k) * window_rs).apply(np.sqrt) * np.sqrt(
-        trading_periods
-    )
+    result = (open_vol + k * close_vol + (1 - k) * window_rs).apply(np.sqrt) * np.sqrt(trading_periods)
 
     if return_last_only:
         return result.iloc[-1]
-    else:
-        return result.dropna()
+    return result.dropna()
 
 
-def build_term_structure(days, ivs):
-    days = np.array(days)
-    ivs = np.array(ivs)
+def build_term_structure(days: List[Union[int, float]], ivs: List[Union[int, float]]) -> Callable[[float], float]:
+    """
+    Build a linear term structure for implied volatilities over expiration days.
 
-    # Remove any duplicates
-    unique_indices = np.unique(days, return_index=True)[1]
-    days = days[unique_indices]
-    ivs = ivs[unique_indices]
+    Args:
+        days: List of days to expiration.
+        ivs: List of implied volatilities corresponding to the expiration days.
 
-    # Sort the arrays
-    sort_idx = days.argsort()
-    days = days[sort_idx]
-    ivs = ivs[sort_idx]
+    Returns:
+        A callable interpolation function that returns IV given a day-to-expiry.
+    """
+    days_arr = np.array(days)
+    ivs_arr = np.array(ivs)
 
-    # Ensure we have at least 2 points for interpolation
-    if len(days) < 2:
-        return lambda x: ivs[0] if ivs.size > 0 else 0
+    # Remove duplicate days
+    _, unique_indices = np.unique(days_arr, return_index=True)
+    days_arr = days_arr[unique_indices]
+    ivs_arr = ivs_arr[unique_indices]
 
-    # Handle potential division by zero in interpolation
-    with np.errstate(divide='ignore', invalid='ignore'):
-        spline = interp1d(days, ivs, kind='linear', fill_value='extrapolate')
+    sort_idx = days_arr.argsort()
+    days_arr = days_arr[sort_idx]
+    ivs_arr = ivs_arr[sort_idx]
 
-    def term_spline(dte):
-        if dte < days[0]:
-            return ivs[0]
-        elif dte > days[-1]:
-            return ivs[-1]
-        else:
-            return float(spline(dte))
+    if len(days_arr) < 2:
+        return lambda x: float(ivs_arr[0]) if ivs_arr.size > 0 else 0
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        spline = interp1d(days_arr, ivs_arr, kind="linear", fill_value="extrapolate")
+
+    def term_spline(dte: float) -> float:
+        if dte < days_arr[0]:
+            return float(ivs_arr[0])
+        elif dte > days_arr[-1]:
+            return float(ivs_arr[-1])
+        return float(spline(dte))
 
     return term_spline
 
 
-def compute_score(avg_volume, iv30_rv30, ts_slope, has_weekly_expiries, spread_score):
+def compute_score(
+        avg_volume: float,
+        iv30_rv30: float,
+        ts_slope: float,
+        has_weekly_expiries: bool,
+        spread_score: float,
+) -> float:
+    """
+    Compute a composite score using normalized metrics.
+
+    Args:
+        avg_volume: Average trading volume.
+        iv30_rv30: Ratio of 30-day implied volatility to realized volatility.
+        ts_slope: Slope of the term structure.
+        has_weekly_expiries: Boolean flag indicating the presence of weekly expiries.
+        spread_score: Bid/ask spread score.
+
+    Returns:
+        A composite score between 0 and 1.
+    """
     normalized_avg_volume = min(max(avg_volume / 3000000, 0), 1)
     normalized_iv = min(max((iv30_rv30 - 0.5) / (2.0 - 0.5), 0), 1)
     normalized_ts = min(max((0.0 - ts_slope) / (0.0 - (-0.01)), 0), 1)
@@ -103,29 +215,50 @@ def compute_score(avg_volume, iv30_rv30, ts_slope, has_weekly_expiries, spread_s
                 + normalized_ts * 0.15
                 + spread_score * 0.2
         )
-    else:
-        return (
-                normalized_iv * 0.4
-                + normalized_avg_volume * 0.2
-                + normalized_ts * 0.2
-                + spread_score * 0.2
-        )
-
-
-def get_current_price(ticker):
-    spot_price_data = stock_quote(ticker)
-    quote = spot_price_data.quotes.quote
-    if quote.symbol.lower() == str(ticker).lower() and quote.last is not None:
-        return quote.last
-    logging.error(
-        f"⚠️ No quote found for {ticker=}, {quote.symbol.lower() == str(ticker).lower()}, {quote.last}"
+    return (
+            normalized_iv * 0.4
+            + normalized_avg_volume * 0.2
+            + normalized_ts * 0.2
+            + spread_score * 0.2
     )
+
+
+def get_current_price(ticker: str) -> Optional[float]:
+    """
+    Retrieve the current price for a given ticker.
+
+    Args:
+        ticker: The stock symbol.
+
+    Returns:
+        The current stock price, or None if unavailable.
+    """
+    try:
+        spot_price_data = stock_quote(ticker)
+        quote = spot_price_data.quotes.quote
+        if quote.symbol.lower() == ticker.lower() and quote.last is not None:
+            return quote.last
+        logging.error(
+            f"⚠️ No valid quote found for ticker '{ticker}'. "
+            f"Expected symbol: {ticker.lower()}, Got: {quote.symbol.lower()} with last price: {quote.last}"
+        )
+    except Exception as e:
+        logging.exception(f"Exception fetching current price for {ticker}: {e}")
     return None
 
 
-def format_number(number):
+def format_number(number: Optional[float]) -> str:
+    """
+    Format a numeric value into a human-readable currency string.
+
+    Args:
+        number: The numeric value.
+
+    Returns:
+        Formatted string in USD.
+    """
     if number is None:
-        return 'N/A'
+        return "N/A"
     if abs(number) >= 1e9:
         return f"${number/1e9:.2f}B"
     if abs(number) >= 1e6:
@@ -133,137 +266,132 @@ def format_number(number):
     return f"${number:,.2f}"
 
 
-def compute_recommendation(ticker):
+def calculate_recommendation(
+        avg_volume_threshold: bool, iv30_rv30_threshold: bool, ts_slope_0_45_threshold: bool
+) -> str:
+    """
+    Determine a recommendation based on threshold criteria.
+
+    Args:
+        avg_volume_threshold: True if volume meets the threshold.
+        iv30_rv30_threshold: True if the IV30/RV30 ratio meets the threshold.
+        ts_slope_0_45_threshold: True if the term structure slope is below threshold.
+
+    Returns:
+        Recommendation string: "Recommended", "Consider", or "Avoid".
+    """
+    if avg_volume_threshold and iv30_rv30_threshold and ts_slope_0_45_threshold:
+        return "Recommended"
+    if ts_slope_0_45_threshold and (
+            (avg_volume_threshold and not iv30_rv30_threshold)
+            or (iv30_rv30_threshold and not avg_volume_threshold)
+    ):
+        return "Consider"
+    return "Avoid"
+
+
+def compute_recommendation(ticker: str) -> Dict[str, Any]:
+    """
+    Compute market metrics and a recommendation for the given ticker.
+
+    Args:
+        ticker: The stock symbol.
+
+    Returns:
+        Dictionary with metrics including underlying price, threshold flags,
+        computed composite score, expected move, recommendation, raw metrics, and detailed metrics.
+    """
     try:
         ticker = ticker.strip().upper()
         if not ticker:
-            return "No stock symbol provided."
+            return {"error": "No stock symbol provided."}
 
+        # Retrieve expiration dates and check for weekly expiries
         expiries = option_expirations(ticker, include_expiration_type=False)
         dates = expiries.expirations.date
-        has_weekly_expiries = any(
-            (datetime.strptime(dates[i], "%Y-%m-%d").date() - datetime.strptime(dates[i - 1], "%Y-%m-%d").date()).days == 7
-            for i in range(1, len(dates))
-        )
-        exp_dates = filter_dates(expiries)
+        weekly_expiries = has_weekly_expiries_in_dates(dates)
+        valid_exp_dates = filter_dates(expiries)
+        options_chains: Dict[str, Any] = {}
 
-        options_chains = {}
-        for exp_date in exp_dates:
+        for exp_date in valid_exp_dates:
             options_chains[exp_date] = option_chain(ticker, exp_date)
 
         underlying_price = get_current_price(ticker)
         if underlying_price is None:
-            raise ValueError("No market price found.")
+            raise ValueError("No market price found for ticker " + ticker)
 
-        atm_iv = {}
-        straddle = None
-        spread_score = None
-        i = 0
-        for exp_date, chain in options_chains.items():
-            calls = [
-                option
-                for option in chain.options.option
-                if option.option_type == "call"
-            ]
-            puts = [
-                option for option in chain.options.option if option.option_type == "put"
-            ]
+        atm_iv_dict: Dict[str, float] = {}
+        straddle: Optional[float] = None
+        spread_score: Optional[float] = None
 
-            if not calls or not puts:
+        # Process each option chain and extract ATM IV and details for the first valid chain.
+        for i, (exp_date, chain) in enumerate(options_chains.items()):
+            process_result = process_option_chain(chain, underlying_price, compute_details=(i == 0))
+            if process_result is None:
                 continue
-
-            call_option = min(calls, key=lambda x: abs(x.strike - underlying_price))
-            put_option = min(puts, key=lambda x: abs(x.strike - underlying_price))
-
-            call_iv = call_option.greeks.mid_iv
-            put_iv = put_option.greeks.mid_iv
-
-            atm_iv_value = (call_iv + put_iv) / 2.0
-            atm_iv[exp_date] = atm_iv_value
-
+            atm_iv_dict[exp_date] = process_result["atm_iv"]
             if i == 0:
-                call_bid = call_option.bid
-                call_ask = call_option.ask
-                put_bid = put_option.bid
-                put_ask = put_option.ask
+                straddle = process_result.get("straddle", None)
+                spread_score = process_result.get("spread_score", 0)
 
-                call_mid = (
-                    (call_bid + call_ask) / 2.0
-                    if call_bid is not None and call_ask is not None
-                    else None
-                )
-                put_mid = (
-                    (put_bid + put_ask) / 2.0
-                    if put_bid is not None and put_ask is not None
-                    else None
-                )
+        if not atm_iv_dict:
+            return {"error": "Could not determine ATM IV for any expiration dates."}
 
-                if call_mid is not None and put_mid is not None:
-                    straddle = call_mid + put_mid
-
-                if all(v is not None for v in [call_bid, call_ask, put_bid, put_ask]):
-                    call_spread = (call_ask - call_bid) / ((call_ask + call_bid) / 2)
-                    put_spread = (put_ask - put_bid) / ((put_ask + put_bid) / 2)
-                    avg_spread = (call_spread + put_spread) / 2
-                    spread_score = max(0, min(1, 1 - (avg_spread / 0.1)))
-                else:
-                    spread_score = 0
-
-            i += 1
-
-        if not atm_iv:
-            return "Error: Could not determine ATM IV for any expiration dates."
-
-        today = datetime.today().date()
-        dtes = []
-        ivs = []
-        for exp_date, iv in atm_iv.items():
+        # Build term structure from expiry dates and corresponding ATM IV values.
+        today_date = datetime.today().date()
+        dtes: List[int] = []
+        ivs: List[float] = []
+        for exp_date, iv in atm_iv_dict.items():
             exp_date_obj = datetime.strptime(exp_date, "%Y-%m-%d").date()
-            days_to_expiry = (exp_date_obj - today).days
-            dtes.append(days_to_expiry)
+            dtes.append((exp_date_obj - today_date).days)
             ivs.append(iv)
 
-        today = datetime.now()
-        start_date = today - timedelta(days=90)
-        end_date = today
+        # Retrieve historical price data
+        now = datetime.now()
+        start_date = now - timedelta(days=90)
         historical_data = stock_historical(
             ticker,
             start=start_date.strftime("%Y-%m-%d"),
-            end=end_date.strftime("%Y-%m-%d"),
+            end=now.strftime("%Y-%m-%d"),
         )
-        price_history = pd.DataFrame(historical_data.toDict()["history"]["day"])
+        history_dict = historical_data.toDict()
+        price_history = pd.DataFrame(history_dict["history"]["day"])
         price_history["date"] = pd.to_datetime(price_history["date"])
         price_history.sort_values("date", inplace=True)
         price_history.set_index("date", inplace=True)
-        price_history["rolling_volume_mean"] = (
-            price_history["volume"].rolling(window=30).mean()
-        )
+        price_history["rolling_volume_mean"] = price_history["volume"].rolling(window=30).mean()
         avg_volume = price_history["rolling_volume_mean"].dropna().iloc[-1]
 
-        expected_move = (
-            str(round(straddle / underlying_price * 100, 2)) + "%" if straddle else None
-        )
+        expected_move = (f"{round(straddle / underlying_price * 100, 2)}%"
+                         if straddle is not None else None)
 
         term_spline = build_term_structure(dtes, ivs)
-        ts_slope_0_45 = (term_spline(45) - term_spline(dtes[0])) / (45 - dtes[0])
-        iv30_rv30 = term_spline(30) / yang_zhang(price_history)
+        # Prevent division by zero; if first expiry equals 45 days.
+        if (45 - dtes[0]) == 0:
+            ts_slope_0_45 = 0.0
+        else:
+            ts_slope_0_45 = (term_spline(45) - term_spline(dtes[0])) / (45 - dtes[0])
+        computed_yz = yang_zhang(price_history)
+        iv30_rv30 = term_spline(30) / computed_yz if computed_yz else 0
 
+        # Define threshold flags
         avg_volume_threshold = avg_volume >= 1500000
         iv30_rv30_threshold = iv30_rv30 >= 1.25
-        ts_slope_0_45_threshold = ts_slope_0_45 <= -0.00406
-        spread_threshold = spread_score >= 0.7 if spread_score is not None else False
+        ts_slope_threshold = ts_slope_0_45 <= -0.00406
+        spread_threshold = (spread_score >= 0.7) if spread_score is not None else False
 
         recommendation = calculate_recommendation(
-            avg_volume_threshold, iv30_rv30_threshold, ts_slope_0_45_threshold
+            avg_volume_threshold, iv30_rv30_threshold, ts_slope_threshold
         )
-
-        score = compute_score(avg_volume, iv30_rv30, ts_slope_0_45, has_weekly_expiries, spread_score or 0)
+        score = compute_score(
+            avg_volume, iv30_rv30, ts_slope_0_45, weekly_expiries, spread_score or 0
+        )
 
         return {
             "underlying_price": underlying_price,
             "avg_volume": avg_volume_threshold,
             "iv30_rv30": iv30_rv30_threshold,
-            "ts_slope_0_45": ts_slope_0_45_threshold,
+            "ts_slope_0_45": ts_slope_threshold,
             "spread_quality": spread_threshold,
             "expected_move": expected_move,
             "recommendation": recommendation,
@@ -272,31 +400,17 @@ def compute_recommendation(ticker):
                 "avg_volume": avg_volume,
                 "iv30_rv30": iv30_rv30,
                 "ts_slope_0_45": ts_slope_0_45,
-                "has_weekly_expiries": has_weekly_expiries,
-                "bid_ask_spread": spread_score
+                "has_weekly_expiries": weekly_expiries,
+                "bid_ask_spread": spread_score,
             },
             "detailed_metrics": {
                 "30-day Avg Volume": format_number(avg_volume),
                 "IV30/RV30 Ratio": f"{iv30_rv30:.2f}",
                 "Term Structure Slope": f"{ts_slope_0_45:.6f}",
-                "Weekly Expiries": f"{has_weekly_expiries}",
-                "Bid-Ask Spread Score": f"{spread_score:.2f}" if spread_score is not None else "N/A"
-            }
+                "Weekly Expiries": str(weekly_expiries),
+                "Bid-Ask Spread Score": f"{spread_score:.2f}" if spread_score is not None else "N/A",
+            },
         }
     except Exception as e:
-        logging.exception(e)
+        logging.exception(f"Error computing recommendation for ticker {ticker}: {e}")
         raise
-
-
-def calculate_recommendation(
-    avg_volume_threshold, iv30_rv30_threshold, ts_slope_0_45_threshold
-):
-    if avg_volume_threshold and iv30_rv30_threshold and ts_slope_0_45_threshold:
-        return "Recommended"
-    elif ts_slope_0_45_threshold and (
-        (avg_volume_threshold and not iv30_rv30_threshold)
-        or (iv30_rv30_threshold and not avg_volume_threshold)
-    ):
-        return "Consider"
-    else:
-        return "Avoid"
