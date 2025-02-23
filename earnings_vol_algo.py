@@ -24,14 +24,22 @@ def filter_dates(expiries: Any) -> List[str]:
     Returns:
         List of expiration date strings before the 45-day cutoff.
     """
+    if not hasattr(expiries, 'expirations') or not hasattr(expiries.expirations, 'date'):
+        logging.error("Invalid expiries object: missing 'expirations.date' attribute.")
+        return []
+
     today = datetime.today().date()
     cutoff_date = today + timedelta(days=45)
     expiry_dates = expiries.expirations.date
-    return [
-        date_str
-        for date_str in expiry_dates
-        if datetime.strptime(date_str, "%Y-%m-%d").date() < cutoff_date
-    ]
+    try:
+        return [
+            date_str
+            for date_str in expiry_dates
+            if datetime.strptime(date_str, "%Y-%m-%d").date() < cutoff_date
+        ]
+    except ValueError as e:
+        logging.error(f"Date parsing error in filter_dates: {e}")
+        return []
 
 
 def has_weekly_expiries_in_dates(dates: List[str]) -> bool:
@@ -44,13 +52,21 @@ def has_weekly_expiries_in_dates(dates: List[str]) -> bool:
     Returns:
         True if any pair of consecutive dates are 7 days apart.
     """
-    return any(
-        (
-                datetime.strptime(dates[i], "%Y-%m-%d").date() -
-                datetime.strptime(dates[i - 1], "%Y-%m-%d").date()
-        ).days == 7
-        for i in range(1, len(dates))
-    )
+    if not dates:
+        return False
+
+    try:
+        sorted_dates = sorted(dates)
+        return any(
+            (
+                    datetime.strptime(sorted_dates[i], "%Y-%m-%d").date() -
+                    datetime.strptime(sorted_dates[i - 1], "%Y-%m-%d").date()
+            ).days == 7
+            for i in range(1, len(sorted_dates))
+        )
+    except ValueError as e:
+        logging.error(f"Date parsing error in has_weekly_expiries_in_dates: {e}")
+        return False
 
 
 def process_option_chain(chain: Any, underlying_price: float, compute_details: bool = False) -> Optional[Dict[str, Optional[float]]]:
@@ -67,34 +83,49 @@ def process_option_chain(chain: Any, underlying_price: float, compute_details: b
         A dictionary with at least the key 'atm_iv'. If compute_details is True,
         also returns 'straddle' and 'spread_score'. Returns None if chain is invalid.
     """
+    if not hasattr(chain, 'options') or not hasattr(chain.options, 'option'):
+        logging.error("Invalid chain object: missing 'options.option' attribute.")
+        return None
+
     options = chain.options.option
-    calls = [opt for opt in options if opt.option_type == "call"]
-    puts = [opt for opt in options if opt.option_type == "put"]
+    calls = [opt for opt in options if hasattr(opt, 'option_type') and opt.option_type == "call"]
+    puts = [opt for opt in options if hasattr(opt, 'option_type') and opt.option_type == "put"]
+
     if not calls or not puts:
+        logging.warning("Missing calls or puts in option chain.")
         return None
 
     # Determine ATM options by selecting strikes closest to underlying price
-    call_option = min(calls, key=lambda opt: abs(opt.strike - underlying_price))
-    put_option = min(puts, key=lambda opt: abs(opt.strike - underlying_price))
-    call_iv = call_option.greeks.mid_iv
-    put_iv = put_option.greeks.mid_iv
-    atm_iv_value = (call_iv + put_iv) / 2.0
+    call_option = min(calls, key=lambda opt: abs(opt.strike - underlying_price) if hasattr(opt, 'strike') else float('inf'))
+    put_option = min(puts, key=lambda opt: abs(opt.strike - underlying_price) if hasattr(opt, 'strike') else float('inf'))
 
+    if not hasattr(call_option, 'greeks') or not hasattr(put_option, 'greeks'):
+        logging.error("Missing 'greeks' attribute in options.")
+        return None
+
+    call_iv = call_option.greeks.mid_iv if hasattr(call_option.greeks, 'mid_iv') else None
+    put_iv = put_option.greeks.mid_iv if hasattr(put_option.greeks, 'mid_iv') else None
+
+    if call_iv is None or put_iv is None:
+        logging.error("Missing 'mid_iv' in option greeks.")
+        return None
+
+    atm_iv_value = (call_iv + put_iv) / 2.0
     result = {"atm_iv": atm_iv_value}
 
     if compute_details:
-        call_bid = call_option.bid
-        call_ask = call_option.ask
-        put_bid = put_option.bid
-        put_ask = put_option.ask
+        call_bid = call_option.bid if hasattr(call_option, 'bid') else None
+        call_ask = call_option.ask if hasattr(call_option, 'ask') else None
+        put_bid = put_option.bid if hasattr(put_option, 'bid') else None
+        put_ask = put_option.ask if hasattr(put_option, 'ask') else None
 
-        if call_bid is not None and call_ask is not None and put_bid is not None and put_ask is not None:
+        if all(x is not None for x in [call_bid, call_ask, put_bid, put_ask]):
             call_mid = (call_bid + call_ask) / 2.0
             put_mid = (put_bid + put_ask) / 2.0
             straddle = call_mid + put_mid
 
-            call_spread = (call_ask - call_bid) / ((call_ask + call_bid) / 2)
-            put_spread = (put_ask - put_bid) / ((put_ask + put_bid) / 2)
+            call_spread = (call_ask - call_bid) / ((call_ask + call_bid) / 2) if call_ask + call_bid != 0 else float('inf')
+            put_spread = (put_ask - put_bid) / ((put_ask + put_bid) / 2) if put_ask + put_bid != 0 else float('inf')
             avg_spread = (call_spread + put_spread) / 2
             spread_score = max(0, min(1, 1 - (avg_spread / 0.1)))
             result.update({"straddle": straddle, "spread_score": spread_score})
@@ -290,17 +321,33 @@ def calculate_recommendation(
     return "Avoid"
 
 
-def compute_recommendation(ticker: str) -> Dict[str, Any]:
+def compute_recommendation(ticker: str, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Compute market metrics and a recommendation for the given ticker.
 
     Args:
         ticker: The stock symbol.
+        config: Optional configuration dictionary for thresholds and constants.
 
     Returns:
         Dictionary with metrics including underlying price, threshold flags,
         computed composite score, expected move, recommendation, raw metrics, and detailed metrics.
     """
+    default_config = {
+        "volume_threshold": 1500000,
+        "iv30_rv30_threshold": 1.25,
+        "ts_slope_threshold": -0.00406,
+        "spread_threshold": 0.7,
+        "cutoff_days": 45,
+        "trading_periods": 252,
+        "window": 30,
+        "spread_divisor": 0.1,
+    }
+    if config is None:
+        config = default_config
+    else:
+        config = {**default_config, **config}
+
     try:
         ticker = ticker.strip().upper()
         if not ticker:
@@ -335,6 +382,7 @@ def compute_recommendation(ticker: str) -> Dict[str, Any]:
                 spread_score = process_result.get("spread_score", 0)
 
         if not atm_iv_dict:
+            logging.error("No valid ATM IV found for any expiration dates.")
             return {"error": "Could not determine ATM IV for any expiration dates."}
 
         # Build term structure from expiry dates and corresponding ATM IV values.
@@ -342,9 +390,13 @@ def compute_recommendation(ticker: str) -> Dict[str, Any]:
         dtes: List[int] = []
         ivs: List[float] = []
         for exp_date, iv in atm_iv_dict.items():
-            exp_date_obj = datetime.strptime(exp_date, "%Y-%m-%d").date()
-            dtes.append((exp_date_obj - today_date).days)
-            ivs.append(iv)
+            try:
+                exp_date_obj = datetime.strptime(exp_date, "%Y-%m-%d").date()
+                dtes.append((exp_date_obj - today_date).days)
+                ivs.append(iv)
+            except ValueError as e:
+                logging.error(f"Date parsing error for {exp_date}: {e}")
+                continue
 
         # Retrieve historical price data
         now = datetime.now()
@@ -359,7 +411,7 @@ def compute_recommendation(ticker: str) -> Dict[str, Any]:
         price_history["date"] = pd.to_datetime(price_history["date"])
         price_history.sort_values("date", inplace=True)
         price_history.set_index("date", inplace=True)
-        price_history["rolling_volume_mean"] = price_history["volume"].rolling(window=30).mean()
+        price_history["rolling_volume_mean"] = price_history["volume"].rolling(window=config["window"]).mean()
         avg_volume = price_history["rolling_volume_mean"].dropna().iloc[-1]
 
         expected_move = (f"{round(straddle / underlying_price * 100, 2)}%"
@@ -367,18 +419,18 @@ def compute_recommendation(ticker: str) -> Dict[str, Any]:
 
         term_spline = build_term_structure(dtes, ivs)
         # Prevent division by zero; if first expiry equals 45 days.
-        if (45 - dtes[0]) == 0:
+        if (config["cutoff_days"] - dtes[0]) == 0:
             ts_slope_0_45 = 0.0
         else:
-            ts_slope_0_45 = (term_spline(45) - term_spline(dtes[0])) / (45 - dtes[0])
-        computed_yz = yang_zhang(price_history)
+            ts_slope_0_45 = (term_spline(config["cutoff_days"]) - term_spline(dtes[0])) / (config["cutoff_days"] - dtes[0])
+        computed_yz = yang_zhang(price_history, window=config["window"], trading_periods=config["trading_periods"])
         iv30_rv30 = term_spline(30) / computed_yz if computed_yz else 0
 
         # Define threshold flags
-        avg_volume_threshold = avg_volume >= 1500000
-        iv30_rv30_threshold = iv30_rv30 >= 1.25
-        ts_slope_threshold = ts_slope_0_45 <= -0.00406
-        spread_threshold = (spread_score >= 0.7) if spread_score is not None else False
+        avg_volume_threshold = avg_volume >= config["volume_threshold"]
+        iv30_rv30_threshold = iv30_rv30 >= config["iv30_rv30_threshold"]
+        ts_slope_threshold = ts_slope_0_45 <= config["ts_slope_threshold"]
+        spread_threshold = (spread_score >= config["spread_threshold"]) if spread_score is not None else False
 
         recommendation = calculate_recommendation(
             avg_volume_threshold, iv30_rv30_threshold, ts_slope_threshold
@@ -413,4 +465,4 @@ def compute_recommendation(ticker: str) -> Dict[str, Any]:
         }
     except Exception as e:
         logging.exception(f"Error computing recommendation for ticker {ticker}: {e}")
-        raise
+        return {"error": str(e)}
