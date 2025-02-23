@@ -62,11 +62,23 @@ def build_term_structure(days, ivs):
     days = np.array(days)
     ivs = np.array(ivs)
 
+    # Remove any duplicates
+    unique_indices = np.unique(days, return_index=True)[1]
+    days = days[unique_indices]
+    ivs = ivs[unique_indices]
+
+    # Sort the arrays
     sort_idx = days.argsort()
     days = days[sort_idx]
     ivs = ivs[sort_idx]
 
-    spline = interp1d(days, ivs, kind="linear", fill_value="extrapolate")
+    # Ensure we have at least 2 points for interpolation
+    if len(days) < 2:
+        return lambda x: ivs[0] if ivs.size > 0 else 0
+
+    # Handle potential division by zero in interpolation
+    with np.errstate(divide='ignore', invalid='ignore'):
+        spline = interp1d(days, ivs, kind='linear', fill_value='extrapolate')
 
     def term_spline(dte):
         if dte < days[0]:
@@ -79,18 +91,25 @@ def build_term_structure(days, ivs):
     return term_spline
 
 
-def compute_score(avg_volume, iv30_rv30, ts_slope, has_weekly_expiries):
-    # Normalize avg_volume between 0 and 3000000
+def compute_score(avg_volume, iv30_rv30, ts_slope, has_weekly_expiries, spread_score):
     normalized_avg_volume = min(max(avg_volume / 3000000, 0), 1)
-    # Normalize iv30_rv30 between 0.5 and 2.0
     normalized_iv = min(max((iv30_rv30 - 0.5) / (2.0 - 0.5), 0), 1)
-    # Normalize ts_slope between -0.01 and 0.0 (lower is better)
     normalized_ts = min(max((0.0 - ts_slope) / (0.0 - (-0.01)), 0), 1)
 
     if has_weekly_expiries:
-        return normalized_iv * 0.6 + normalized_avg_volume * 0.2 + normalized_ts * 0.2
+        return (
+                normalized_iv * 0.5
+                + normalized_avg_volume * 0.15
+                + normalized_ts * 0.15
+                + spread_score * 0.2
+        )
     else:
-        return normalized_iv * 0.5 + normalized_avg_volume * 0.25 + normalized_ts * 0.25
+        return (
+                normalized_iv * 0.4
+                + normalized_avg_volume * 0.2
+                + normalized_ts * 0.2
+                + spread_score * 0.2
+        )
 
 
 def get_current_price(ticker):
@@ -138,6 +157,7 @@ def compute_recommendation(ticker):
 
         atm_iv = {}
         straddle = None
+        spread_score = None
         i = 0
         for exp_date, chain in options_chains.items():
             calls = [
@@ -181,6 +201,14 @@ def compute_recommendation(ticker):
                 if call_mid is not None and put_mid is not None:
                     straddle = call_mid + put_mid
 
+                if all(v is not None for v in [call_bid, call_ask, put_bid, put_ask]):
+                    call_spread = (call_ask - call_bid) / ((call_ask + call_bid) / 2)
+                    put_spread = (put_ask - put_bid) / ((put_ask + put_bid) / 2)
+                    avg_spread = (call_spread + put_spread) / 2
+                    spread_score = max(0, min(1, 1 - (avg_spread / 0.1)))
+                else:
+                    spread_score = 0
+
             i += 1
 
         if not atm_iv:
@@ -223,18 +251,20 @@ def compute_recommendation(ticker):
         avg_volume_threshold = avg_volume >= 1500000
         iv30_rv30_threshold = iv30_rv30 >= 1.25
         ts_slope_0_45_threshold = ts_slope_0_45 <= -0.00406
+        spread_threshold = spread_score >= 0.7 if spread_score is not None else False
 
         recommendation = calculate_recommendation(
             avg_volume_threshold, iv30_rv30_threshold, ts_slope_0_45_threshold
         )
 
-        score = compute_score(avg_volume, iv30_rv30, ts_slope_0_45, has_weekly_expiries)
+        score = compute_score(avg_volume, iv30_rv30, ts_slope_0_45, has_weekly_expiries, spread_score or 0)
 
         return {
             "underlying_price": underlying_price,
             "avg_volume": avg_volume_threshold,
             "iv30_rv30": iv30_rv30_threshold,
             "ts_slope_0_45": ts_slope_0_45_threshold,
+            "spread_quality": spread_threshold,
             "expected_move": expected_move,
             "recommendation": recommendation,
             "score": score,
@@ -243,12 +273,14 @@ def compute_recommendation(ticker):
                 "iv30_rv30": iv30_rv30,
                 "ts_slope_0_45": ts_slope_0_45,
                 "has_weekly_expiries": has_weekly_expiries,
+                "bid_ask_spread": spread_score
             },
             "detailed_metrics": {
                 "30-day Avg Volume": format_number(avg_volume),
                 "IV30/RV30 Ratio": f"{iv30_rv30:.2f}",
                 "Term Structure Slope": f"{ts_slope_0_45:.6f}",
                 "Weekly Expiries": f"{has_weekly_expiries}",
+                "Bid-Ask Spread Score": f"{spread_score:.2f}" if spread_score is not None else "N/A"
             }
         }
     except Exception as e:
