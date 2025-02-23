@@ -1,3 +1,9 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "finvizfinance",
+# ]
+# ///
 """
 Downloads stocks from finviz selected using a scanner
 """
@@ -20,17 +26,12 @@ if __name__ == "__main__":
     filters_dict = {
         "Country": "USA",
         "Industry": "Stocks only (ex-Funds)",
-        "Performance": "Month Up",
-        "Performance 2": "Week Up",
-        "50-Day Simple Moving Average": "Price above SMA50",
-        "200-Day Simple Moving Average": "Price above SMA200",
+        "Market Cap.": "+Small (over $300mln)",
         "Option/Short": "Optionable",
-        # 'Change': 'Up',
-        # 'Change from Open': 'Up',
-        "50-Day High/Low": "0-10% below High",
-        "Current Volume": "Over 10M",
+        "Average Volume": "Over 1M",
+        "Earnings Date": "Tomorrow",
+        "Price": "Over $30",
     }
     overview.set_filter(filters_dict=filters_dict)
-    scanner_df = overview.ScreenerView()
-    ticker_list = ",".join([f"'{t}'" for t in scanner_df["Ticker"].tolist()])
-    run_cmd('./rbq "(symbol in ({}))"'.format(ticker_list))
+    scanner_df = overview.screener_view()
+    print(scanner_df)
