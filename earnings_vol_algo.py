@@ -78,6 +78,7 @@ def build_term_structure(days, ivs):
 
     return term_spline
 
+
 def compute_score(avg_volume, iv30_rv30, ts_slope, has_weekly_expiries):
     # Normalize avg_volume between 0 and 3000000
     normalized_avg_volume = min(max(avg_volume / 3000000, 0), 1)
@@ -91,6 +92,7 @@ def compute_score(avg_volume, iv30_rv30, ts_slope, has_weekly_expiries):
     else:
         return normalized_iv * 0.5 + normalized_avg_volume * 0.25 + normalized_ts * 0.25
 
+
 def get_current_price(ticker):
     spot_price_data = stock_quote(ticker)
     quote = spot_price_data.quotes.quote
@@ -101,6 +103,7 @@ def get_current_price(ticker):
     )
     return None
 
+
 def format_number(number):
     if number is None:
         return 'N/A'
@@ -109,6 +112,7 @@ def format_number(number):
     if abs(number) >= 1e6:
         return f"${number/1e6:.2f}M"
     return f"${number:,.2f}"
+
 
 def compute_recommendation(ticker):
     try:
