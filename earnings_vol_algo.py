@@ -78,15 +78,18 @@ def build_term_structure(days, ivs):
 
     return term_spline
 
-def compute_score(avg_volume, iv30_rv30, ts_slope):
+def compute_score(avg_volume, iv30_rv30, ts_slope, has_weekly_expiries):
     # Normalize avg_volume between 0 and 3000000
     normalized_avg_volume = min(max(avg_volume / 3000000, 0), 1)
     # Normalize iv30_rv30 between 0.5 and 2.0
     normalized_iv = min(max((iv30_rv30 - 0.5) / (2.0 - 0.5), 0), 1)
     # Normalize ts_slope between -0.01 and 0.0 (lower is better)
     normalized_ts = min(max((0.0 - ts_slope) / (0.0 - (-0.01)), 0), 1)
-    # Weighted average: 50% weight to iv30_rv30, 25% each for avg_volume and ts_slope
-    return normalized_iv * 0.5 + normalized_avg_volume * 0.25 + normalized_ts * 0.25
+
+    if has_weekly_expiries:
+        return normalized_iv * 0.6 + normalized_avg_volume * 0.2 + normalized_ts * 0.2
+    else:
+        return normalized_iv * 0.5 + normalized_avg_volume * 0.25 + normalized_ts * 0.25
 
 def get_current_price(ticker):
     spot_price_data = stock_quote(ticker)
@@ -114,6 +117,11 @@ def compute_recommendation(ticker):
             return "No stock symbol provided."
 
         expiries = option_expirations(ticker, include_expiration_type=False)
+        dates = expiries.expirations.date
+        has_weekly_expiries = any(
+            (datetime.strptime(dates[i], "%Y-%m-%d").date() - datetime.strptime(dates[i - 1], "%Y-%m-%d").date()).days == 7
+            for i in range(1, len(dates))
+        )
         exp_dates = filter_dates(expiries)
 
         options_chains = {}
@@ -216,7 +224,7 @@ def compute_recommendation(ticker):
             avg_volume_threshold, iv30_rv30_threshold, ts_slope_0_45_threshold
         )
 
-        score = compute_score(avg_volume, iv30_rv30, ts_slope_0_45)
+        score = compute_score(avg_volume, iv30_rv30, ts_slope_0_45, has_weekly_expiries)
 
         return {
             "underlying_price": underlying_price,
@@ -229,12 +237,14 @@ def compute_recommendation(ticker):
             "raw_metrics": {
                 "avg_volume": avg_volume,
                 "iv30_rv30": iv30_rv30,
-                "ts_slope_0_45": ts_slope_0_45
+                "ts_slope_0_45": ts_slope_0_45,
+                "has_weekly_expiries": has_weekly_expiries,
             },
             "detailed_metrics": {
                 "30-day Avg Volume": format_number(avg_volume),
                 "IV30/RV30 Ratio": f"{iv30_rv30:.2f}",
-                "Term Structure Slope": f"{ts_slope_0_45:.6f}"
+                "Term Structure Slope": f"{ts_slope_0_45:.6f}",
+                "Weekly Expiries": f"{has_weekly_expiries}",
             }
         }
     except Exception as e:
