@@ -1,0 +1,16 @@
+//@version=6
+indicator(title="[TVT] OBV with EMA", shorttitle="[TVT] OBV+EMA", precision=0, format=format.volume)
+
+src = close
+len1 = input.int(5, minval=1, title="Length EMA 1")
+len2 = input.int(13, minval=1, title="Length EMA 2")
+
+changesrc = ta.change(src)
+obv = ta.cum(changesrc > 0 ? volume : changesrc < 0 ? -volume : 0 * volume)
+
+ema1 = ta.ema(obv, len1)
+ema2 = ta.ema(obv, len2)
+
+plot(obv, title="OBV", color=#97c49a, linewidth=2)
+plot(ema1, title="EMA 1", color=#ef5350, linewidth=1)
+plot(ema2, title="EMA 2", color=#2196f3, linewidth=1)
