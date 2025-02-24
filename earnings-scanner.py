@@ -5,6 +5,7 @@
 #   "dotmap",
 #   "flatten-dict",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "finvizfinance",
 #   "finnhub-python",
 #   "python-dotenv",
 #   "numpy",
@@ -32,6 +33,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from finvizfinance.screener.overview import Overview
 import finnhub
 import numpy as np
 from dotenv import load_dotenv
@@ -101,6 +103,13 @@ def parse_args():
     )
     return parser.parse_args()
 
+def filter_tickers(filter_criteria):
+    overview = Overview()
+    overview.set_filter(filters_dict=filter_criteria)
+    scanner_df = overview.screener_view()
+    return scanner_df['Ticker'].tolist()
+
+
 def get_earnings_calendar(days_ahead, symbols=None):
     if symbols is None:
         symbols = []
@@ -140,7 +149,7 @@ def get_earnings_calendar(days_ahead, symbols=None):
                 except Exception as e:
                     logging.error(f"Error fetching data for {symbol}: {str(e)}")
 
-            return {'earningsCalendar': all_earnings} if all_earnings else None
+            return all_earnings if all_earnings else None
     except Exception as e:
         logging.error(f"Error fetching earnings data: {str(e)}")
         return None
@@ -297,8 +306,21 @@ def main(args):
     if args.symbols:
         logging.info(f"Fetching data for symbols: {', '.join(args.symbols)}")
 
-    earnings = get_earnings_calendar(args.days, args.symbols)
-    if not earnings:
+    if args.symbols:
+        selected_tickers = args.symbols
+    else:
+        criteria = {
+            "Country": "USA",
+            "Industry": "Stocks only (ex-Funds)",
+            "Market Cap.": "+Small (over $300mln)",
+            "Option/Short": "Optionable",
+            "Average Volume": "Over 1M",
+            "Earnings Date": "Today",
+            "Price": "Over $30",
+        }
+        selected_tickers = filter_tickers(criteria)
+    companies_with_earnings = get_earnings_calendar(args.days, selected_tickers)
+    if not companies_with_earnings:
         logging.error("Failed to retrieve earnings data")
         return
 
@@ -308,7 +330,6 @@ def main(args):
     if args.refresh_data:
         refresh_db(db_conn)
 
-    companies_with_earnings = earnings['earningsCalendar']
     logging.info(f"Found {len(companies_with_earnings)} companies with earnings in the next {args.days} day(s)")
     for entry in sorted(companies_with_earnings, key=lambda x: x['date']):
         cur = db_conn.cursor()
