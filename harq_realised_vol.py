@@ -1,4 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "yfinance",
+# ]
+# ///
 """
 HARQ Model Implementation with Future Volatility Predictions
 """
@@ -121,7 +129,7 @@ def main():
     df = yf.download(symbol, start=start_date, end=end_date)
 
     # Calculate daily returns
-    df["returns"] = df["Adj Close"].pct_change()
+    df["returns"] = df["Close"].pct_change()
 
     # Calculate realized volatility
     df["rv"] = df["returns"].rolling(window=22).std() * np.sqrt(252)
