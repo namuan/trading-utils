@@ -1,0 +1,25 @@
+//@version=6
+indicator(title="[TVT] VIX Squeeze", shorttitle="[TVT] VIX-SQ", overlay=false)
+
+// Fetch VIX high prices
+vix_high = request.security("VIX", "", high)
+
+// Input for Standard Deviation Length (defaulting to 20)
+length = input.int(20, title="Standard Deviation Length", minval=1)
+
+// Calculate Standard Deviation of high prices
+high_stdev = ta.stdev(vix_high, length)
+
+// Plot Standard Deviation
+plot(high_stdev, title="VIX High Price StdDev", color=color.purple, linewidth=2)
+
+// Thresholds
+upper_threshold = input.float(10.0, title="Upper Threshold", minval=0.0)
+lower_threshold = input.float(1.0, title="Lower Threshold", minval=0.0)
+
+// Plot threshold lines using hline
+hline(upper_threshold, "Upper Threshold", color=color.new(color.green, 2), linestyle=hline.style_solid)
+hline(lower_threshold, "Lower Threshold", color=color.new(color.red, 2), linestyle=hline.style_solid)
+
+// Highlight background when VIX std dev is below lower threshold
+bgcolor(high_stdev < lower_threshold ? color.new(color.red, 90) : na, title="Low VIX StdDev Highlight")
