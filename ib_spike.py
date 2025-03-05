@@ -1,3 +1,15 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "ib_async",
+#   "pyyaml",
+#   "pandas",
+#   "requests",
+#   "dotmap",
+#   "flatten-dict",
+#   "python-dotenv",
+# ]
+# ///
 """
 Run `j IBCMacos-3.18.0` in terminal to switch to IBC folder
 Then `./gatewaystartmacos.sh -inline` to start TWS
