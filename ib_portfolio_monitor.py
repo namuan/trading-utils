@@ -101,7 +101,6 @@ def get_latest_prices(positions: List[Position]) -> Dict[str, float]:
         index = underlyings_list.index(underlying)
         price = batch_prices[index]
         prices[storage_key] = price
-        print(f"Fetched price for {storage_key}: {price}")
 
     return prices
 
