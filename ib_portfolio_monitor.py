@@ -1,8 +1,17 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "ib_async",
+#   "pyyaml",
+#   "pandas",
+#   "requests",
+#   "dotmap",
+#   "flatten-dict",
+#   "python-dotenv",
+# ]
+# ///
 import argparse
 import math
-from abc import ABC
-from abc import abstractmethod
-from datetime import datetime
 from typing import Dict
 from typing import List
 
@@ -50,225 +59,6 @@ def group_by_expiry_dates(positions: List[Position]) -> Dict[str, List[Position]
     return grouped
 
 
-class OptionStrategy(ABC):
-    @abstractmethod
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        pass
-
-    @abstractmethod
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        pass
-
-    @abstractmethod
-    def simulate_adjustments(
-        self,
-        trades: List[Position],
-        days_to_expiry: int,
-        latest_prices: Dict[str, float],
-    ):
-        pass
-
-
-class ShortStraddle(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return (
-            len(trade_legs) == 2
-            and trade_legs[0].contract.right != trade_legs[1].contract.right
-            and trade_legs[0].position < 0
-            and trade_legs[1].position < 0
-            and trade_legs[0].contract.strike == trade_legs[1].contract.strike
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
-
-    def simulate_adjustments(
-        self,
-        trades: List[Position],
-        days_to_expiry: int,
-        latest_prices: Dict[str, float],
-    ):
-        pass
-
-
-class ShortStrangle(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return (
-            len(trade_legs) == 2
-            and trade_legs[0].contract.right != trade_legs[1].contract.right
-            and trade_legs[0].position < 0
-            and trade_legs[1].position < 0
-            and trade_legs[0].contract.strike != trade_legs[1].contract.strike
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
-
-    def simulate_adjustments(
-        self,
-        trades: List[Position],
-        days_to_expiry: int,
-        latest_prices: Dict[str, float],
-    ):
-        pass
-
-
-class IronCondor(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        if len(trade_legs) < 4:
-            return False
-
-        calls = sorted(
-            [leg for leg in trade_legs if leg.contract.right == "C"],
-            key=lambda x: x.contract.strike,
-        )
-        puts = sorted(
-            [leg for leg in trade_legs if leg.contract.right == "P"],
-            key=lambda x: x.contract.strike,
-        )
-
-        if len(calls) < 2 or len(puts) < 2:
-            return False
-
-        return (
-            calls[0].position > 0 > calls[-1].position
-            and puts[0].position > 0 > puts[-1].position
-            and puts[0].contract.strike
-            < puts[-1].contract.strike
-            < calls[0].contract.strike
-            < calls[-1].contract.strike
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
-
-    def simulate_adjustments(
-        self,
-        trades: List[Position],
-        days_to_expiry: int,
-        latest_prices: Dict[str, float],
-    ):
-        pass
-
-
-class IronButterflyStraddleAdjustment:
-    pass
-
-
-class IronButterfly(OptionStrategy):
-    def __init__(self):
-        self.adjustments = [IronButterflyStraddleAdjustment()]
-
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        if len(trade_legs) != 4:
-            return False
-        short_legs = [leg for leg in trade_legs if leg.position < 0]
-        long_legs = [leg for leg in trade_legs if leg.position > 0]
-        if len(short_legs) != 2 or len(long_legs) != 2:
-            return False
-        short_strike = short_legs[0].contract.strike
-        if not all(leg.contract.strike == short_strike for leg in short_legs):
-            return False
-        long_put = next((leg for leg in long_legs if leg.contract.right == "P"), None)
-        long_call = next((leg for leg in long_legs if leg.contract.right == "C"), None)
-        return (
-            long_put
-            and long_call
-            and long_put.contract.strike < short_strike < long_call.contract.strike
-        )
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return True
-
-    def simulate_adjustments(
-        self,
-        trades: List[Position],
-        days_to_expiry: int,
-        latest_prices: Dict[str, float],
-    ):
-        pass
-
-
-class UnknownStrategy(OptionStrategy):
-    def is_match(self, trade_legs: List[Position]) -> bool:
-        return True
-
-    def adjustment_required(
-        self, days_to_expiry: int, latest_prices: Dict[str, float]
-    ) -> bool:
-        return False
-
-    def simulate_adjustments(
-        self,
-        trades: List[Position],
-        days_to_expiry: int,
-        latest_prices: Dict[str, float],
-    ):
-        pass
-
-
-class StrategyFactory:
-    def __init__(self):
-        self.strategies = [
-            ShortStraddle(),
-            ShortStrangle(),
-            IronCondor(),
-            IronButterfly(),
-            UnknownStrategy(),
-        ]
-
-    def get_strategy(self, trade_legs: List[Position]) -> OptionStrategy:
-        for strategy in self.strategies:
-            if strategy.is_match(trade_legs):
-                return strategy
-        return UnknownStrategy()
-
-
-def determine_strategy_type(trade_legs: List[Position]) -> OptionStrategy:
-    if not trade_legs:
-        return UnknownStrategy()
-
-    factory = StrategyFactory()
-    return factory.get_strategy(trade_legs)
-
-
-def generate_pl_payoff_diagrams(position: Position) -> str:
-    if isinstance(position.contract, (Option, FuturesOption)):
-        return f"P/L and Payoff diagram for {position.contract.symbol} {position.contract.right}{position.contract.strike}"
-    return f"P/L and Payoff diagram for {position.contract.symbol}"
-
-
-def get_market_data(symbol: str, strike: float) -> Dict:
-    return {"symbol": symbol, "price": 150.0, "iv": 0.3}
-
-
-def generate_report(positions: List[Position], adjustments: Dict) -> str:
-    report = "Trade Report:\n\n"
-    # for pos in positions:
-    #     report += f"Account: {pos.account}\n"
-    #     report += f"Symbol: {pos.contract.symbol}\n"
-    #     report += f"Type: {type(pos.contract).__name__}\n"
-    #     if isinstance(pos.contract, (Option, FuturesOption)):
-    #         report += f"Strike: {pos.contract.strike}\n"
-    #         report += f"Expiry: {pos.contract.lastTradeDateOrContractMonth}\n"
-    #     report += f"Position: {pos.position}\n"
-    #     report += f"Avg Cost: {pos.avgCost}\n"
-    #     if pos.contract.localSymbol in adjustments:
-    #         report += f"Proposed Adjustments: {', '.join(adjustments[pos.contract.localSymbol])}\n"
-    #     report += "\n"
-    return report
-
-
 def get_underlying_contract(contract_symbol, contract_last_trade_date) -> Contract:
     if contract_symbol == "SPX":
         return Index("SPX", exchange="CBOE")
@@ -290,7 +80,11 @@ def get_latest_prices(positions: List[Position]) -> Dict[str, float]:
     unique_underlyings = {}
     for position in positions:
         symbol = position.contract.symbol
-        storage_key = f"{symbol}_{position.contract.lastTradeDateOrContractMonth}"
+
+        if isinstance(position.contract, FuturesOption):
+            storage_key = f"{symbol}_{position.contract.lastTradeDateOrContractMonth}"
+        else:
+            storage_key = f"{symbol}"
 
         if storage_key not in unique_underlyings:
             print(f"Getting underlying for {position.contract}")
@@ -322,36 +116,42 @@ def get_latest_price(underlyings) -> List[float]:
     return prices
 
 
-def main(args):
+def main(_):
     open_positions = ib.positions()
     options_trades = filter_open_positions_for_options_trades(open_positions)
     latest_prices = get_latest_prices(options_trades)
     print(f"Latest prices: {latest_prices}")
     grouped_trades = group_by_expiry_dates(options_trades)
-
-    adjustments = {}
+    contracts_to_query = []
     for expiry, trades in grouped_trades.items():
-        print(f"Looking at {trades} expiring on {expiry}")
-        options_strategy = determine_strategy_type(trades)
-        options_strategy_name = options_strategy.__class__.__name__
-        print(f"Options Strategy used: {options_strategy_name}")
-        days_to_expiry = (datetime.strptime(expiry, "%Y%m%d") - datetime.now()).days
+        for trade in trades:
+            if isinstance(trade.contract, FuturesOption):
+                contracts_to_query.append(FuturesOption(
+                    symbol=trade.contract.symbol,
+                    lastTradeDateOrContractMonth=trade.contract.lastTradeDateOrContractMonth,
+                    strike=trade.contract.strike,
+                    right=trade.contract.right,
+                ))
+            else:
+                contracts_to_query.append(Option(
+                    symbol=trade.contract.symbol,
+                    lastTradeDateOrContractMonth=trade.contract.lastTradeDateOrContractMonth,
+                    strike=trade.contract.strike,
+                    right=trade.contract.right,
+                    exchange='SMART',
+                ))
 
-        if options_strategy.adjustment_required(days_to_expiry, latest_prices):
-            print(f"⚠️ Adjustment required for {options_strategy_name}")
-            options_strategy.simulate_adjustments(trades, days_to_expiry, latest_prices)
-        else:
-            print(f"✅ No Adjustment required for {options_strategy_name}")
+    print(f"Total contracts found {len(contracts_to_query)}. Requesting details...")
+    contracts_details = ib.reqTickers(
+        *(ib.qualifyContracts(*contracts_to_query))
+    )
+    print("💡💡💡💡💡💡💡 POSITIONS 💡💡💡💡💡💡💡")
+    for trade in options_trades:
+        print(trade)
+    print("🤓🤓🤓🤓🤓🤓🤓 LATEST PRICES 🤓🤓🤓🤓🤓🤓🤓")
+    for contract in contracts_details:
+        print(contract)
 
-        # for trade in trades:
-        #     pl_payoff = generate_pl_payoff_diagrams(trade)
-        #     print(f"Generated: {pl_payoff}")
-        #
-        #     market_data = get_market_data(trade.contract.symbol, trade.contract.strike)
-        #     print(f"Market data for {trade.contract.symbol}: {market_data}")
-
-    report = generate_report(open_positions, adjustments)
-    print(report)
 
 
 if __name__ == "__main__":
