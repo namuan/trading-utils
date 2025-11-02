@@ -3,6 +3,7 @@ venv/
 .idea/
 .python-version
 data/
+data_spx/
 output/
 cache.sqlite
 __pycache__/
