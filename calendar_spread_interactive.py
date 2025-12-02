@@ -14,7 +14,9 @@
 import matplotlib
 
 matplotlib.use("QtAgg")
+import calendar
 import sys
+from datetime import date, datetime, timedelta
 
 import mibian
 import numpy as np
@@ -27,6 +29,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QApplication,
     QDoubleSpinBox,
+    QFrame,
     QGraphicsColorizeEffect,
     QGroupBox,
     QHBoxLayout,
@@ -34,10 +37,270 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QProgressBar,
     QPushButton,
+    QScrollArea,
+    QScroller,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
+
+TIMELINE_FRAME_STYLE = (
+    "QFrame{border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;}"
+)
+MONTH_BAR_STYLE = (
+    "QLabel{background:#eaeef2;color:#24292f;font-weight:600;padding:2px 4px;}"
+)
+DAY_BTN_STYLE = (
+    "QPushButton{border:none;background:transparent;color:#24292f;padding:2px;}"
+    "QPushButton:hover{background:#e6f0ff;border-radius:4px;}"
+)
+DAY_BTN_NEAR_SELECTED_STYLE = "QPushButton{background:#1f6feb;color:white;border:none;border-radius:4px;padding:2px;}"
+DAY_BTN_FAR_SELECTED_STYLE = "QPushButton{background:#6f42c1;color:white;border:none;border-radius:4px;padding:2px;}"
+MODE_NEAR_BTN_STYLE = (
+    "QPushButton{background:#1f6feb;color:white;border:none;border-radius:10px;padding:2px 8px;}"
+    "QPushButton:checked{background:#144ab8;}"
+)
+MODE_FAR_BTN_STYLE = (
+    "QPushButton{background:#6f42c1;color:white;border:none;border-radius:10px;padding:2px 8px;}"
+    "QPushButton:checked{background:#4b2d8a;}"
+)
+HEADER_H = 18
+DAY_BTN_W = 24
+DAY_BTN_H = 24
+TIMELINE_TOTAL_H = HEADER_H + DAY_BTN_H + 8
+
+
+class TimelineWidget(QWidget):
+    near_selected = pyqtSignal(date)
+    far_selected = pyqtSignal(date)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.expiries: list[date] = []
+        self.expiry_buttons: dict[date, QPushButton] = {}
+        self.near_expiry: date | None = None
+        self.far_expiry: date | None = None
+        self._selection_mode: str = "near"
+        self.frame = QFrame()
+        self.frame.setStyleSheet(TIMELINE_FRAME_STYLE)
+        self._root_layout = QVBoxLayout(self)
+        self._root_layout.setContentsMargins(0, 0, 0, 0)
+        self._root_layout.setSpacing(0)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setFixedHeight(TIMELINE_TOTAL_H)
+        self.frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.frame.setFixedHeight(TIMELINE_TOTAL_H)
+        self.frame_layout = QVBoxLayout(self.frame)
+        self.frame_layout.setContentsMargins(0, 0, 0, 0)
+        self.frame_layout.setSpacing(0)
+
+        class HScrollArea(QScrollArea):
+            def wheelEvent(self, e):
+                pd = e.pixelDelta()
+                h = self.horizontalScrollBar()
+                if not pd.isNull():
+                    val = h.value() - (pd.x() if pd.x() != 0 else pd.y())
+                    h.setValue(val)
+                    e.accept()
+                    return
+                ad = e.angleDelta()
+                dx = ad.x()
+                dy = ad.y()
+                if dx != 0 or dy != 0:
+                    val = h.value() - (dx if dx != 0 else dy)
+                    h.setValue(val)
+                    e.accept()
+                    return
+                super().wheelEvent(e)
+
+        self.scroll_area = HScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.scroll_area.setFixedHeight(TIMELINE_TOTAL_H)
+        vp = self.scroll_area.viewport()
+        if vp is not None:
+            QScroller.grabGesture(
+                vp, QScroller.ScrollerGestureType.LeftMouseButtonGesture
+            )
+
+        self.scroll_content = QWidget()
+        self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll_layout.setContentsMargins(0, 0, 0, 0)
+        self.scroll_layout.setSpacing(0)
+        self.scroll_content.setFixedHeight(TIMELINE_TOTAL_H)
+
+        self.month_layout = QHBoxLayout()
+        self.month_layout.setContentsMargins(5, 0, 5, 0)
+        self.scroll_layout.addLayout(self.month_layout)
+
+        self.days_layout = QHBoxLayout()
+        self.days_layout.setContentsMargins(5, 0, 5, 0)
+        self.days_layout.setSpacing(6)
+        self.scroll_layout.addLayout(self.days_layout)
+
+        self.scroll_area.setWidget(self.scroll_content)
+        self.frame_layout.addWidget(self.scroll_area)
+        self._root_layout.addWidget(self.frame)
+
+    def set_expiries(self, expiries: list[date]) -> None:
+        self.expiries = list(expiries)
+        self._render()
+
+    def select_near(self, d: date) -> None:
+        self.near_expiry = d
+        self._update_styles()
+        self.near_selected.emit(d)
+
+    def select_far(self, d: date) -> None:
+        if self.near_expiry is not None and d <= self.near_expiry:
+            candidates = [x for x in self.expiries if x > self.near_expiry]
+            if candidates:
+                d = candidates[0]
+        self.far_expiry = d
+        self._update_styles()
+        self.far_selected.emit(d)
+
+    def _render(self) -> None:
+        self._clear_layout(self.month_layout)
+        self._clear_layout(self.days_layout)
+        self.month_layout.setSpacing(0)
+        self.expiry_buttons = {}
+
+        self.near_mode_btn = QPushButton("Near")
+        self.near_mode_btn.setCheckable(True)
+        self.near_mode_btn.setChecked(True)
+        self.near_mode_btn.setStyleSheet(MODE_NEAR_BTN_STYLE)
+        self.near_mode_btn.clicked.connect(self._set_mode_near)
+        self.near_mode_btn.setFixedWidth(self.near_mode_btn.sizeHint().width())
+        self.days_layout.addWidget(self.near_mode_btn)
+
+        self.far_mode_btn = QPushButton("Far")
+        self.far_mode_btn.setCheckable(True)
+        self.far_mode_btn.setChecked(False)
+        self.far_mode_btn.setStyleSheet(MODE_FAR_BTN_STYLE)
+        self.far_mode_btn.clicked.connect(self._set_mode_far)
+        self.far_mode_btn.setFixedWidth(self.far_mode_btn.sizeHint().width())
+        self.days_layout.addWidget(self.far_mode_btn)
+
+        spacing = max(self.days_layout.spacing(), 0)
+        half = max(spacing // 2, 0)
+        prefix_width = (
+            self.near_mode_btn.sizeHint().width()
+            + spacing
+            + self.far_mode_btn.sizeHint().width()
+            + spacing
+            - half
+        )
+        prefix = QWidget()
+        prefix.setFixedWidth(prefix_width)
+        prefix.setFixedHeight(18)
+        self.month_layout.addWidget(prefix)
+
+        segments = self._compute_month_segments()
+        day_w = 24
+        for text, count in segments:
+            seg = QLabel(text)
+            seg.setStyleSheet(MONTH_BAR_STYLE)
+            seg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            width = count * day_w + max(count - 1, 0) * spacing + (2 * half)
+            seg.setFixedWidth(width)
+            seg.setFixedHeight(18)
+            self.month_layout.addWidget(seg)
+
+        for d in self.expiries:
+            btn = QPushButton(d.strftime("%d"))
+            btn.setStyleSheet(DAY_BTN_STYLE)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedWidth(24)
+            btn.clicked.connect(lambda _=False, dd=d: self._on_day_clicked(dd))
+            self.days_layout.addWidget(btn)
+            self.expiry_buttons[d] = btn
+        for i in range(self.days_layout.count()):
+            it = self.days_layout.itemAt(i)
+            w = it.widget() if it is not None else None
+            if isinstance(w, QPushButton):
+                w.setFixedHeight(DAY_BTN_H)
+        self.days_layout.addStretch()
+        if self.expiries:
+            first = self.expiries[0]
+            second = self.expiries[1] if len(self.expiries) > 1 else first
+            if second <= first and len(self.expiries) > 1:
+                second = self.expiries[1]
+            self.near_expiry = first
+            self.far_expiry = second if second > first else None
+            self._update_styles()
+
+    def _on_day_clicked(self, d: date) -> None:
+        if self._selection_mode == "near":
+            self.select_near(d)
+        else:
+            self.select_far(d)
+
+    @staticmethod
+    def _clear_layout(layout: QHBoxLayout | QVBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            if item is None:
+                continue
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+            child = item.layout()
+            if child is not None:
+                TimelineWidget._clear_layout(child)
+
+    def _compute_month_segments(self) -> list[tuple[str, int]]:
+        exps = self.expiries
+        if not exps:
+            return []
+        base_year = exps[0].year
+        segments: list[tuple[str, int]] = []
+        current = exps[0]
+        count = 0
+        for d in exps:
+            same = d.month == current.month and d.year == current.year
+            if same:
+                count += 1
+                continue
+            label = current.strftime("%b")
+            if current.year != base_year:
+                label = f"{label} '{current.strftime('%y')}"
+            segments.append((label, count))
+            current = d
+            count = 1
+        label = current.strftime("%b")
+        if current.year != base_year:
+            label = f"{label} '{current.strftime('%y')}"
+        segments.append((label, count))
+        return segments
+
+    def _set_mode_near(self):
+        self._selection_mode = "near"
+        self.near_mode_btn.setChecked(True)
+        self.far_mode_btn.setChecked(False)
+
+    def _set_mode_far(self):
+        self._selection_mode = "far"
+        self.near_mode_btn.setChecked(False)
+        self.far_mode_btn.setChecked(True)
+
+    def _update_styles(self):
+        for ed, btn in self.expiry_buttons.items():
+            if self.near_expiry is not None and ed == self.near_expiry:
+                btn.setStyleSheet(DAY_BTN_NEAR_SELECTED_STYLE)
+            elif self.far_expiry is not None and ed == self.far_expiry:
+                btn.setStyleSheet(DAY_BTN_FAR_SELECTED_STYLE)
+            else:
+                btn.setStyleSheet(DAY_BTN_STYLE)
 
 
 class _WorkerSignals(QObject):
@@ -426,12 +689,26 @@ class CalendarSpreadInteractive(QMainWindow):
         self._debounce.setSingleShot(True)
         self._debounce.setInterval(100)
         self._debounce.timeout.connect(self._start_compute)
+        self.near_expiry_date: date | None = None
+        self.far_expiry_date: date | None = None
+        self.expiry_window_days = 90
+        self.expiry_dates: list[date] = self._filter_expiries_window(
+            self._fetch_all_expiries()
+        )
         self._init_market_defaults()
         self._build_ui()
 
     def _build_ui(self):
         central = QWidget()
         layout = QVBoxLayout()
+        expiry_group = QGroupBox("Expiry Selection")
+        expiry_layout = QHBoxLayout()
+        self.timeline = TimelineWidget()
+        self.timeline.set_expiries(self.expiry_dates)
+        self.timeline.near_selected.connect(self._on_near_expiry_selected)
+        self.timeline.far_selected.connect(self._on_far_expiry_selected)
+        expiry_layout.addWidget(self.timeline)
+        expiry_group.setLayout(expiry_layout)
         controls = QGroupBox("Parameters")
         controls_layout_v = QVBoxLayout()
         controls_row1 = QHBoxLayout()
@@ -524,6 +801,7 @@ class CalendarSpreadInteractive(QMainWindow):
         self._busy_bar.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
+        layout.addWidget(expiry_group)
         layout.addWidget(controls)
         layout.addWidget(self.metrics_label)
         layout.addWidget(self._busy_bar)
@@ -534,6 +812,7 @@ class CalendarSpreadInteractive(QMainWindow):
         layout.setStretch(3, 1)
         central.setLayout(layout)
         self.setCentralWidget(central)
+        self._init_default_expiries()
 
         self.near_iv_spin.valueChanged.connect(self._on_change)
         self.far_iv_spin.valueChanged.connect(self._on_change)
@@ -598,6 +877,7 @@ class CalendarSpreadInteractive(QMainWindow):
         self.strike_far_spin.setValue(self.strike_price_far)
         self.near_iv_spin.setValue(self.iv_near)
         self.far_iv_spin.setValue(self.iv_far)
+        self._refresh_expiries()
 
     def _on_change(self):
         self.iv_near = self.near_iv_spin.value()
@@ -625,6 +905,90 @@ class CalendarSpreadInteractive(QMainWindow):
         self.far_days_spin.setValue(60.0)
         self.rate_spin.setValue(0.0)
         self.far_basis_spin.setValue(0.0)
+        self._refresh_expiries()
+
+    def _init_default_expiries(self):
+        if not self.expiry_dates:
+            return
+        base = date.today()
+        target_near = base + timedelta(days=int(round(self.days_to_expiry_near_t0)))
+        target_far = base + timedelta(days=int(round(self.days_to_expiry_far_t0)))
+        sel_near = min(self.expiry_dates, key=lambda d: abs((d - target_near).days))
+        sel_far = min(self.expiry_dates, key=lambda d: abs((d - target_far).days))
+        if sel_far <= sel_near:
+            candidates = [d for d in self.expiry_dates if d > sel_near]
+            if candidates:
+                sel_far = candidates[0]
+        self.timeline.select_near(sel_near)
+        self.timeline.select_far(sel_far)
+
+    def _on_near_expiry_selected(self, d: date):
+        self.near_expiry_date = d
+        days = max((d - date.today()).days, 0)
+        self.near_days_spin.setValue(float(days) if days > 0 else 0.001)
+
+    def _on_far_expiry_selected(self, d: date):
+        self.far_expiry_date = d
+        days = max((d - date.today()).days, 0)
+        self.far_days_spin.setValue(float(days) if days > 0 else 0.001)
+
+    def _compute_monthly_expiries(self, count: int = 12) -> list[date]:
+        out: list[date] = []
+        today = date.today()
+        y = today.year
+        m = today.month
+        for i in range(count):
+            mm = m + i
+            yy = y + (mm - 1) // 12
+            real_m = ((mm - 1) % 12) + 1
+            fridays = [
+                d
+                for d in calendar.Calendar().itermonthdates(yy, real_m)
+                if d.month == real_m and d.weekday() == 4
+            ]
+            if len(fridays) >= 3:
+                exp = fridays[2]
+            else:
+                exp = fridays[-1]
+            if exp <= today:
+                continue
+            out.append(exp)
+        return sorted(out)
+
+    def _fetch_all_expiries(self) -> list[date]:
+        syms = ["^SPX", "SPX", "SPY"]
+        today = date.today()
+        for sym in syms:
+            try:
+                t = yf.Ticker(sym)
+                opts = getattr(t, "options", None)
+                if not opts:
+                    continue
+                ds: list[date] = []
+                for s in opts:
+                    try:
+                        d = datetime.strptime(s, "%Y-%m-%d").date()
+                        if d > today:
+                            ds.append(d)
+                    except Exception:
+                        pass
+                if ds:
+                    return sorted(list(dict.fromkeys(ds)))
+            except Exception:
+                continue
+        return self._compute_monthly_expiries(14)
+
+    def _refresh_expiries(self) -> None:
+        self.expiry_dates = self._filter_expiries_window(self._fetch_all_expiries())
+        self.timeline.set_expiries(self.expiry_dates)
+        self._init_default_expiries()
+
+    def _filter_expiries_window(self, ds: list[date]) -> list[date]:
+        if not ds:
+            return []
+        today = date.today()
+        cutoff = today + timedelta(days=int(self.expiry_window_days))
+        return [d for d in ds if today <= d <= cutoff]
 
     def _compute_setup_cost(self):
         near_t0 = mibian.BS(
