@@ -1,0 +1,55 @@
+//@version=5
+indicator(title="[TVT] MA Crossover with Stop-Loss", shorttitle="TVT-MA-X-STOP", overlay=true, timeframe="", timeframe_gaps=true)
+
+// === INPUTS ===
+// MA Parameters
+src = input(close, title="Source")
+use_ema = input.bool(true, title="Use EMA over SMA?")
+fast_len = input.int(50, title="Fast MA Length", minval=1)
+slow_len = input.int(200, title="Slow MA Length", minval=1)
+
+// ATR Stop Parameters
+atr_len = input.int(14, title="ATR Length", minval=1)
+atr_mult = input.float(2.5, title="ATR Multiplier", minval=0.1)
+hhv_len = input.int(10, title="HHV Period", minval=1)
+
+// === CALCULATIONS ===
+// Calculate MAs
+fast_ma = use_ema ? ta.ema(src, fast_len) : ta.sma(src, fast_len)
+slow_ma = use_ema ? ta.ema(src, slow_len) : ta.sma(src, slow_len)
+
+// Calculate ATR Trailing Stop
+atr_val = ta.atr(atr_len)
+prev_stop = ta.highest(high - atr_mult * atr_val, hhv_len)
+trailing_stop = ta.cum(1) < 16 ? close :
+     close > ta.highest(high - atr_mult * atr_val, hhv_len) and close > close[1] ?
+     ta.highest(high - atr_mult * atr_val, hhv_len) : prev_stop
+
+// === STRATEGY LOGIC ===
+bullish = fast_ma > slow_ma
+bearish = fast_ma < slow_ma
+
+// === PLOTTING ===
+// Plot MAs
+plot(fast_ma, "Fast MA", color.new(color.blue, 0), 2)
+plot(slow_ma, "Slow MA", color.new(color.orange, 0), 2)
+
+// Plot trailing stop
+plot(trailing_stop, "Trailing Stop", color.new(color.red, 0), 2, plot.style_linebr)
+
+// Background color for trend direction
+bgcolor(bullish ? color.new(color.green, 90) : bearish ? color.new(color.red, 90) : na)
+
+// Plot crossover signals
+plotshape(ta.crossover(fast_ma, slow_ma), "Bullish Crossover", shape.labelup, location.belowbar, color.green, text="BUY", textcolor=color.white)
+plotshape(ta.crossunder(fast_ma, slow_ma), "Bearish Crossover", shape.labeldown, location.abovebar, color.red, text="SELL", textcolor=color.white)
+
+// Plot stop hits
+plotshape(ta.crossunder(close, trailing_stop) and bullish, "Stop Hit", shape.triangledown, location.abovebar, color.red, size=size.small)
+plotshape(ta.crossover(close, trailing_stop) and bearish, "Stop Hit", shape.triangleup, location.belowbar, color.green, size=size.small)
+
+// === ALERTS ===
+alertcondition(ta.crossover(fast_ma, slow_ma), "Bullish MA Crossover", "Fast MA crossed above Slow MA")
+alertcondition(ta.crossunder(fast_ma, slow_ma), "Bearish MA Crossover", "Fast MA crossed below Slow MA")
+alertcondition(ta.crossunder(close, trailing_stop), "Long Stop Hit", "Price crossed below trailing stop")
+alertcondition(ta.crossover(close, trailing_stop), "Short Stop Hit", "Price crossed above trailing stop")
