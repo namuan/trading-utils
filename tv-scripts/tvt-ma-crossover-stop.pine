@@ -1,5 +1,5 @@
-//@version=5
-indicator(title="[TVT] MA Crossover with Stop-Loss", shorttitle="TVT-MA-X-STOP", overlay=true, timeframe="", timeframe_gaps=true)
+//@version=6
+indicator(title="[TVT] MA Crossover with Stop-Loss", shorttitle="TVT-MA-STP", overlay=true, timeframe="", timeframe_gaps=true)
 
 // === INPUTS ===
 // MA Parameters
