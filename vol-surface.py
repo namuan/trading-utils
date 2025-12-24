@@ -1,4 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "highlight_text",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 Volatility Surface Plotter
 
