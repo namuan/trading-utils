@@ -8,14 +8,13 @@
 #   "yahoo_earnings_calendar",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
-# Example commands to run:
+# ///
 # uv run vix-divergence-strategy.py -v --period 2y  --interval 1d  --timeframe both
 # uv run vix-divergence-strategy.py -v --period 6mo --interval 60m --timeframe both
 # uv run vix-divergence-strategy.py -v --period 30d --interval 30m --timeframe day
 # uv run vix-divergence-strategy.py -v --period 7d  --interval 5m  --timeframe day  --swing-window 2 --confirm-window 2
 # uv run vix-divergence-strategy.py -v --period 3mo --interval 1h  --timeframe swing
 # uv run vix-divergence-strategy.py -v --period 1mo --interval 15m --timeframe both
-# ///
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
