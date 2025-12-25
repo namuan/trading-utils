@@ -445,76 +445,111 @@ def create_multi_dte_chart(symbol, hist_df, current_quote, dte_data):
     current_price = current_quote["last"]
     ax.plot(current_time, current_price, "o", color="#2E86DE", markersize=10)
 
+    # Prepare data for continuous lines
+    upper_dates = [current_time]
+    upper_prices = [current_price]
+    lower_dates = [current_time]
+    lower_prices = [current_price]
+
     # Colors for different DTEs
     colors = ["#10AC84", "#FFC312", "#EE5A6F", "#9B59B6"]
 
-    # Plot expected moves for each DTE
-    for idx, (target_dte, data) in enumerate(dte_data.items()):
+    # Collect all expiration points sorted by date
+    sorted_dte_items = sorted(
+        dte_data.items(), key=lambda x: pd.to_datetime(x[1]["expiration_date"])
+    )
+
+    for idx, (target_dte, data) in enumerate(sorted_dte_items):
+        exp_date = pd.to_datetime(data["expiration_date"])
+        expected_move = data["expected_move"]
+
+        upper_dates.append(exp_date)
+        upper_prices.append(expected_move["upper_bound"])
+        lower_dates.append(exp_date)
+        lower_prices.append(expected_move["lower_bound"])
+
+    # Plot continuous dashed lines
+    ax.plot(
+        upper_dates,
+        upper_prices,
+        color="#10AC84",
+        linestyle="--",
+        linewidth=2.5,
+        alpha=0.8,
+        label="Upper Bound (+1σ)",
+    )
+
+    ax.plot(
+        lower_dates,
+        lower_prices,
+        color="#EE5A6F",
+        linestyle="--",
+        linewidth=2.5,
+        alpha=0.8,
+        label="Lower Bound (-1σ)",
+    )
+
+    # Plot markers and labels for each DTE
+    for idx, (target_dte, data) in enumerate(sorted_dte_items):
         exp_date = pd.to_datetime(data["expiration_date"])
         expected_move = data["expected_move"]
         iv = data["iv"]
         actual_dte = (exp_date - current_time).days
 
         color = colors[idx % len(colors)]
-        alpha = 0.7
 
-        # Upper bound line
-        ax.plot(
-            [current_time, exp_date],
-            [current_price, expected_move["upper_bound"]],
-            color=color,
-            linestyle="--",
-            linewidth=2,
-            alpha=alpha,
-            label=f'{actual_dte}DTE: ±{expected_move["move_pct"]*100:.2f}% (IV: {iv*100:.1f}%)',
-        )
+        # Upper bound marker
         ax.plot(
             exp_date,
             expected_move["upper_bound"],
             "o",
             color=color,
-            markersize=8,
-            alpha=alpha,
+            markersize=10,
+            alpha=0.9,
+            markeredgewidth=2,
+            markeredgecolor="white",
         )
 
-        # Lower bound line
-        ax.plot(
-            [current_time, exp_date],
-            [current_price, expected_move["lower_bound"]],
-            color=color,
-            linestyle="--",
-            linewidth=2,
-            alpha=alpha,
-        )
+        # Lower bound marker
         ax.plot(
             exp_date,
             expected_move["lower_bound"],
             "o",
             color=color,
-            markersize=8,
-            alpha=alpha,
+            markersize=10,
+            alpha=0.9,
+            markeredgewidth=2,
+            markeredgecolor="white",
         )
 
         # Labels at expiration
         ax.text(
             exp_date,
             expected_move["upper_bound"],
-            f" ${expected_move['upper_bound']:.2f}",
+            f" ${expected_move['upper_bound']:.2f}\n {actual_dte}DTE",
             verticalalignment="center",
             fontsize=9,
             color=color,
             fontweight="bold",
-            alpha=alpha,
         )
         ax.text(
             exp_date,
             expected_move["lower_bound"],
-            f" ${expected_move['lower_bound']:.2f}",
+            f" ${expected_move['lower_bound']:.2f}\n {actual_dte}DTE",
             verticalalignment="center",
             fontsize=9,
             color=color,
             fontweight="bold",
-            alpha=alpha,
+        )
+
+        # Add legend entry for this DTE
+        ax.plot(
+            [],
+            [],
+            "o",
+            color=color,
+            markersize=8,
+            label=f'{actual_dte}DTE: ±{expected_move["move_pct"]*100:.2f}% (IV: {iv*100:.1f}%)',
         )
 
     # Format x-axis
