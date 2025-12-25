@@ -94,6 +94,15 @@ def parse_args():
         help="Display expected moves for 7, 14, 21, and 30 DTE",
     )
     parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="Don't display the chart (headless mode for automation)",
+    )
+    parser.add_argument(
+        "--output-file",
+        help="Output file path for the chart (default: auto-generated name)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -270,7 +279,16 @@ def calculate_expected_move(price, iv, days_to_expiration):
     }
 
 
-def create_chart(symbol, hist_df, current_quote, expiration_date, iv, expected_move):
+def create_chart(
+    symbol,
+    hist_df,
+    current_quote,
+    expiration_date,
+    iv,
+    expected_move,
+    output_file=None,
+    no_show=False,
+):
     """Create the expected move chart."""
     fig, ax = plt.subplots(figsize=(14, 8))
 
@@ -404,14 +422,20 @@ def create_chart(symbol, hist_df, current_quote, expiration_date, iv, expected_m
     plt.tight_layout()
 
     # Save and show
-    output_file = f"{symbol.lower()}_expected_move.png"
+    if output_file is None:
+        output_file = f"{symbol.lower()}_expected_move.png"
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     logging.info(f"Chart saved to {output_file}")
 
-    plt.show()
+    if not no_show:
+        plt.show()
+    else:
+        plt.close()
 
 
-def create_multi_dte_chart(symbol, hist_df, current_quote, dte_data):
+def create_multi_dte_chart(
+    symbol, hist_df, current_quote, dte_data, output_file=None, no_show=False
+):
     """Create a chart with multiple DTE expected moves."""
     fig, ax = plt.subplots(figsize=(16, 10))
 
@@ -596,11 +620,15 @@ def create_multi_dte_chart(symbol, hist_df, current_quote, dte_data):
     plt.tight_layout()
 
     # Save and show
-    output_file = f"{symbol.lower()}_multi_dte_expected_move.png"
+    if output_file is None:
+        output_file = f"{symbol.lower()}_multi_dte_expected_move.png"
     plt.savefig(output_file, dpi=300, bbox_inches="tight")
     logging.info(f"Chart saved to {output_file}")
 
-    plt.show()
+    if not no_show:
+        plt.show()
+    else:
+        plt.close()
 
 
 def main(args):
@@ -677,7 +705,14 @@ def main(args):
             return
 
         # Create multi-DTE chart
-        create_multi_dte_chart(symbol, hist_df, current_quote, dte_data)
+        create_multi_dte_chart(
+            symbol,
+            hist_df,
+            current_quote,
+            dte_data,
+            output_file=args.output_file,
+            no_show=args.no_show,
+        )
 
         # Print summary table
         print(f"\n{symbol} Expected Move Summary")
@@ -723,7 +758,16 @@ def main(args):
         )
 
         # Create chart
-        create_chart(symbol, hist_df, current_quote, expiration_date, iv, expected_move)
+        create_chart(
+            symbol,
+            hist_df,
+            current_quote,
+            expiration_date,
+            iv,
+            expected_move,
+            output_file=args.output_file,
+            no_show=args.no_show,
+        )
 
 
 if __name__ == "__main__":
