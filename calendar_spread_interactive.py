@@ -47,11 +47,12 @@ from PyQt6.QtWidgets import (
 TIMELINE_FRAME_STYLE = (
     "QFrame{border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;}"
 )
-MONTH_BAR_STYLE = (
-    "QLabel{background:#eaeef2;color:#24292f;font-weight:600;padding:2px 4px;}"
-)
 DAY_BTN_STYLE = (
-    "QPushButton{border:none;background:transparent;color:#24292f;padding:2px;}"
+    "QPushButton{border:none;border-bottom:2px solid #fb923c;background:transparent;color:#24292f;padding:2px;}"
+    "QPushButton:hover{background:#e6f0ff;border-radius:4px;}"
+)
+DAY_BTN_ALT_STYLE = (
+    "QPushButton{border:none;border-bottom:2px solid #2dd4bf;background:transparent;color:#24292f;padding:2px;}"
     "QPushButton:hover{background:#e6f0ff;border-radius:4px;}"
 )
 DAY_BTN_NEAR_SELECTED_STYLE = "QPushButton{background:#1f6feb;color:white;border:none;border-radius:4px;padding:2px;}"
@@ -64,10 +65,10 @@ MODE_FAR_BTN_STYLE = (
     "QPushButton{background:#6f42c1;color:white;border:none;border-radius:10px;padding:2px 8px;}"
     "QPushButton:checked{background:#4b2d8a;}"
 )
-HEADER_H = 18
 DAY_BTN_W = 24
 DAY_BTN_H = 24
-TIMELINE_TOTAL_H = HEADER_H + DAY_BTN_H + 8
+MONTH_HEADER_H = 18
+TIMELINE_TOTAL_H = DAY_BTN_H + MONTH_HEADER_H + 12
 
 
 class TimelineWidget(QWidget):
@@ -138,12 +139,15 @@ class TimelineWidget(QWidget):
         self.scroll_layout.setSpacing(0)
         self.scroll_content.setFixedHeight(TIMELINE_TOTAL_H)
 
-        self.month_layout = QHBoxLayout()
-        self.month_layout.setContentsMargins(5, 0, 5, 0)
-        self.scroll_layout.addLayout(self.month_layout)
+        # Month headers row
+        self.months_layout = QHBoxLayout()
+        self.months_layout.setContentsMargins(5, 2, 5, 0)
+        self.months_layout.setSpacing(6)
+        self.scroll_layout.addLayout(self.months_layout)
 
+        # Days row
         self.days_layout = QHBoxLayout()
-        self.days_layout.setContentsMargins(5, 0, 5, 0)
+        self.days_layout.setContentsMargins(5, 0, 5, 4)
         self.days_layout.setSpacing(6)
         self.scroll_layout.addLayout(self.days_layout)
 
@@ -170,10 +174,17 @@ class TimelineWidget(QWidget):
         self.far_selected.emit(d)
 
     def _render(self) -> None:
-        self._clear_layout(self.month_layout)
         self._clear_layout(self.days_layout)
-        self.month_layout.setSpacing(0)
+        self._clear_layout(self.months_layout)
         self.expiry_buttons = {}
+
+        # Add mode buttons placeholder in months row to align with days row
+        mode_placeholder = QWidget()
+        near_btn_w = 40  # approximate width
+        far_btn_w = 32
+        mode_placeholder.setFixedWidth(near_btn_w + far_btn_w + 6)  # 6 is spacing
+        mode_placeholder.setFixedHeight(MONTH_HEADER_H)
+        self.months_layout.addWidget(mode_placeholder)
 
         self.near_mode_btn = QPushButton("Near")
         self.near_mode_btn.setCheckable(True)
@@ -191,34 +202,37 @@ class TimelineWidget(QWidget):
         self.far_mode_btn.setFixedWidth(self.far_mode_btn.sizeHint().width())
         self.days_layout.addWidget(self.far_mode_btn)
 
-        spacing = max(self.days_layout.spacing(), 0)
-        half = max(spacing // 2, 0)
-        prefix_width = (
-            self.near_mode_btn.sizeHint().width()
-            + spacing
-            + self.far_mode_btn.sizeHint().width()
-            + spacing
-            - half
-        )
-        prefix = QWidget()
-        prefix.setFixedWidth(prefix_width)
-        prefix.setFixedHeight(18)
-        self.month_layout.addWidget(prefix)
+        # Compute month segments for headers
+        month_segments = self._compute_month_segments()
+        use_alt_style = False
+        for label, count in month_segments:
+            month_label = QLabel(label)
+            month_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            # Width: count * DAY_BTN_W + (count - 1) * spacing
+            label_width = count * DAY_BTN_W + (count - 1) * 6
+            month_label.setFixedWidth(label_width)
+            month_label.setFixedHeight(MONTH_HEADER_H)
+            color = "#2dd4bf" if use_alt_style else "#fb923c"
+            month_label.setStyleSheet(
+                f"QLabel{{color:{color};font-size:11px;font-weight:bold;}}"
+            )
+            self.months_layout.addWidget(month_label)
+            use_alt_style = not use_alt_style
 
-        segments = self._compute_month_segments()
-        day_w = 24
-        for text, count in segments:
-            seg = QLabel(text)
-            seg.setStyleSheet(MONTH_BAR_STYLE)
-            seg.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            width = count * day_w + max(count - 1, 0) * spacing + (2 * half)
-            seg.setFixedWidth(width)
-            seg.setFixedHeight(18)
-            self.month_layout.addWidget(seg)
+        self.months_layout.addStretch()
 
+        current_month = None
+        use_alt_style = False
         for d in self.expiries:
+            if current_month is None:
+                current_month = (d.year, d.month)
+            elif (d.year, d.month) != current_month:
+                current_month = (d.year, d.month)
+                use_alt_style = not use_alt_style
+
             btn = QPushButton(d.strftime("%d"))
-            btn.setStyleSheet(DAY_BTN_STYLE)
+            base_style = DAY_BTN_ALT_STYLE if use_alt_style else DAY_BTN_STYLE
+            btn.setStyleSheet(base_style)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setFixedWidth(24)
             btn.clicked.connect(lambda _=False, dd=d: self._on_day_clicked(dd))
@@ -294,13 +308,23 @@ class TimelineWidget(QWidget):
         self.far_mode_btn.setChecked(True)
 
     def _update_styles(self):
-        for ed, btn in self.expiry_buttons.items():
+        current_month = None
+        use_alt_style = False
+        for ed in sorted(self.expiry_buttons.keys()):
+            btn = self.expiry_buttons[ed]
+            if current_month is None:
+                current_month = (ed.year, ed.month)
+            elif (ed.year, ed.month) != current_month:
+                current_month = (ed.year, ed.month)
+                use_alt_style = not use_alt_style
+
             if self.near_expiry is not None and ed == self.near_expiry:
                 btn.setStyleSheet(DAY_BTN_NEAR_SELECTED_STYLE)
             elif self.far_expiry is not None and ed == self.far_expiry:
                 btn.setStyleSheet(DAY_BTN_FAR_SELECTED_STYLE)
             else:
-                btn.setStyleSheet(DAY_BTN_STYLE)
+                base_style = DAY_BTN_ALT_STYLE if use_alt_style else DAY_BTN_STYLE
+                btn.setStyleSheet(base_style)
 
 
 class _WorkerSignals(QObject):
