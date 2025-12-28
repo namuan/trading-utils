@@ -756,7 +756,21 @@ function recomputeSelectedTotal(){
             html_parts.append("<p><em>No trade data found to analyze.</em></p>")
 
         html_body = "\n".join(html_parts)
-        full_html = f"<!doctype html><html><head><meta charset=\"utf-8\"><title>{escape(title)}</title>\n<style>body{{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial;margin:20px}}table{{border-collapse:collapse}}table.table th,table.table td{{border:1px solid #ddd;padding:6px}}table.table th{{background:#f2f2f2}}</style></head><body>{html_body}</body></html>"
+        full_html = (
+            '<!doctype html><html><head><meta charset="utf-8"><title>'
+            + escape(title)
+            + "</title>\n<style>\n"
+            + "body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial;margin:20px}\n"
+            + "/* Make tables use full available width and improve wrapping */\n"
+            + "table, table.table {width:100%; max-width:100%; border-collapse:collapse}\n"
+            + "table.table th, table.table td {border:1px solid #ddd; padding:6px; text-align:left; vertical-align:top}\n"
+            + "table.table th {background:#f2f2f2}\n"
+            + "/* Allow long content to wrap instead of overflowing */\n"
+            + "table.table td {word-break:break-word; white-space:normal}\n"
+            + "</style></head><body>"
+            + html_body
+            + "</body></html>"
+        )
 
         # Write to a temporary file
         tmp_dir = None
