@@ -207,74 +207,244 @@ class CalendarTrade:
 
 
 # =============================================================================
-# Scenario Adjustments
+# Tailored Trade Advice
 # =============================================================================
 
-SCENARIO_ADJUSTMENTS = {
-    "price_up_sharply": {
-        "description": "Price moves up sharply",
-        "impact": "Call calendars gain directional delta; Put calendars lose quickly",
-        "adjustments": [
-            "Roll front short leg up (calls)",
-            "Convert to double calendar",
-            "Exit puts early if delta exceeds limit",
-        ],
-    },
-    "price_down_sharply": {
-        "description": "Price moves down sharply",
-        "impact": "Put calendars benefit directionally; Call calendars degrade",
-        "adjustments": [
-            "Roll short put down",
-            "Add opposing call calendar for neutrality",
-            "Exit broken call calendars",
-        ],
-    },
-    "volatility_expansion": {
-        "description": "Volatility expansion (ideal scenario)",
-        "impact": "Calendar value increases; Both legs gain but back leg gains more",
-        "adjustments": [
-            "Take partial profits early",
-            "Convert to diagonal for directional follow-through",
-            "Reduce front-month gamma exposure",
-        ],
-    },
-    "volatility_contraction": {
-        "description": "Volatility contraction",
-        "impact": "Calendar value compresses; IV spread may collapse",
-        "adjustments": [
-            "Close early if IV spread collapses",
-            "Roll back-month forward",
-            "Convert into vertical debit spread",
-        ],
-    },
-    "no_price_movement": {
-        "description": "No price movement (ideal decay scenario)",
-        "impact": "Front leg decays faster; Calendar gains value",
-        "adjustments": [
-            "Close short leg at 50-70% max profit",
-            "Leave back leg open as a long option",
-            "Roll short leg into next front cycle",
-        ],
-    },
-}
+
+def generate_tailored_advice(trade: CalendarTrade) -> dict:
+    """
+    Generate trade-specific advice based on the calendar's characteristics.
+    Returns a dictionary with different advice categories.
+    """
+    advice = {
+        "entry_guidance": [],
+        "position_management": [],
+        "risk_warnings": [],
+        "profit_targets": [],
+        "adjustment_triggers": [],
+    }
+
+    # === ENTRY GUIDANCE ===
+
+    # IV ratio analysis
+    if trade.iv_ratio > 1.20:
+        advice["entry_guidance"].append(
+            f"⭐ Excellent IV term structure ({trade.iv_ratio:.2f}) - back month IV is {(trade.iv_ratio-1)*100:.1f}% higher. "
+            "This is ideal for calendars. Consider entering with larger size."
+        )
+    elif trade.iv_ratio > 1.10:
+        advice["entry_guidance"].append(
+            f"✅ Good IV term structure ({trade.iv_ratio:.2f}). Solid setup for theta harvesting."
+        )
+    else:
+        advice["entry_guidance"].append(
+            f"⚠️ Moderate IV term structure ({trade.iv_ratio:.2f}). Monitor for IV expansion to improve edge."
+        )
+
+    # ATM positioning
+    atm_dist_pct = trade.atm_distance_pct * 100
+    if atm_dist_pct < 0.5:
+        advice["entry_guidance"].append(
+            f"🎯 Strike ${trade.strike:,.0f} is very close to spot (${trade.spot_price:,.0f}) - maximum vega exposure. "
+            "Best for volatility expansion plays."
+        )
+    elif atm_dist_pct < 1.5:
+        advice["entry_guidance"].append(
+            f"✅ Strike well-positioned near ATM ({atm_dist_pct:.1f}% from spot). Good balance of theta and vega."
+        )
+    else:
+        advice["entry_guidance"].append(
+            f"📍 Strike is {atm_dist_pct:.1f}% from spot. Less vega exposure but more directional."
+        )
+
+    # Liquidity assessment
+    min_oi = min(trade.front_oi, trade.back_oi)
+    if min_oi >= 5000:
+        advice["entry_guidance"].append(
+            f"💎 Excellent liquidity (OI: Front {trade.front_oi:,}, Back {trade.back_oi:,}). Easy entry/exit."
+        )
+    elif min_oi >= 1000:
+        advice["entry_guidance"].append(
+            f"✅ Good liquidity (OI: Front {trade.front_oi:,}, Back {trade.back_oi:,}). Normal slippage expected."
+        )
+    else:
+        advice["entry_guidance"].append(
+            f"⚠️ Lower liquidity (OI: Front {trade.front_oi:,}, Back {trade.back_oi:,}). Use limit orders and expect wider fills."
+        )
+
+    # === POSITION MANAGEMENT ===
+
+    # DTE-based management
+    if trade.front_dte <= 7:
+        advice["position_management"].append(
+            f"⚡ Front leg at {trade.front_dte} DTE - gamma risk increasing. Plan to roll within next 2 days to avoid assignment risk."
+        )
+    elif trade.front_dte <= 14:
+        advice["position_management"].append(
+            f"📅 Front leg at {trade.front_dte} DTE - monitor daily. Optimal roll window approaching at 5 DTE."
+        )
+    else:
+        advice["position_management"].append(
+            f"⏰ Front leg at {trade.front_dte} DTE - comfortable time remaining. Set alert for 7 DTE."
+        )
+
+    # Delta management
+    abs_net_delta = abs(trade.net_delta)
+    if abs_net_delta < 0.05:
+        advice["position_management"].append(
+            f"⚖️ Very delta-neutral (net delta: {trade.net_delta:.3f}). No directional adjustment needed."
+        )
+    elif abs_net_delta < 0.15:
+        advice["position_management"].append(
+            f"✅ Moderately delta-neutral (net delta: {trade.net_delta:.3f}). Monitor if spot moves >1%."
+        )
+    elif abs_net_delta < 0.25:
+        direction = "bullish" if trade.net_delta > 0 else "bearish"
+        advice["position_management"].append(
+            f"📊 Moderate {direction} delta exposure ({trade.net_delta:.3f}). Consider hedging if spot moves against you."
+        )
+    else:
+        direction = "bullish" if trade.net_delta > 0 else "bearish"
+        advice["position_management"].append(
+            f"⚠️ High {direction} delta ({trade.net_delta:.3f}). This calendar has directional risk. Consider rolling strike to ATM."
+        )
+
+    # Option type specific guidance
+    if trade.option_type == "CALL":
+        if trade.net_delta > 0.15:
+            advice["position_management"].append(
+                "📈 Call calendar with positive delta - benefits from moderate upside. Watch for sharp rallies that could hurt theta."
+            )
+        else:
+            advice["position_management"].append(
+                "📈 Call calendar positioned for volatility expansion. Best if market stays near strike or drifts slowly higher."
+            )
+    else:  # PUT
+        if trade.net_delta < -0.15:
+            advice["position_management"].append(
+                "📉 Put calendar with negative delta - benefits from moderate downside. Watch for sharp selloffs that could hurt theta."
+            )
+        else:
+            advice["position_management"].append(
+                "📉 Put calendar positioned for volatility expansion. Best if market stays near strike or drifts slowly lower."
+            )
+
+    # === RISK WARNINGS ===
+
+    # IV collapse risk
+    if trade.iv_ratio < 1.05:
+        advice["risk_warnings"].append(
+            f"🚨 CRITICAL: IV ratio ({trade.iv_ratio:.2f}) is too flat. High risk of IV collapse. Consider exiting if ratio drops below 1.02."
+        )
+
+    # Time compression
+    if trade.dte_gap < 20:
+        advice["risk_warnings"].append(
+            f"⏱️ Short DTE gap ({trade.dte_gap} days). Limited time for trade to work. Back month will decay faster."
+        )
+
+    # Liquidity risk
+    if trade.front_oi < 500 or trade.back_oi < 500:
+        advice["risk_warnings"].append(
+            "⚠️ Low open interest increases exit risk. May need to leg out of position instead of closing as a spread."
+        )
+
+    # Directional risk
+    move_to_concern = abs(trade.strike - trade.spot_price)
+    if move_to_concern < trade.spot_price * 0.01:
+        advice["risk_warnings"].append(
+            f"⚡ Very close to spot - high gamma risk. A ${move_to_concern:.0f} move (1%) will significantly impact delta."
+        )
+
+    # === PROFIT TARGETS ===
+
+    # Max profit guidance
+    max_profit_est = trade.net_debit * 1.3  # Rough estimate
+    advice["profit_targets"].append(
+        f"🎯 Target: Close when calendar value reaches ${max_profit_est:.2f} (30% profit on ${trade.net_debit:.2f} debit)."
+    )
+
+    # Front leg profit taking
+    front_leg_target = trade.front_mid * 0.6
+    advice["profit_targets"].append(
+        f"💰 Close front leg when it decays to ${front_leg_target:.2f} (60% profit from ${trade.front_mid:.2f})."
+    )
+
+    # Favorable market conditions
+    if trade.option_type == "CALL":
+        favorable_range_low = trade.strike * 0.995
+        favorable_range_high = trade.strike * 1.005
+        advice["profit_targets"].append(
+            f"✅ Ideal scenario: SPX stays between ${favorable_range_low:,.0f}-${favorable_range_high:,.0f} with IV expansion."
+        )
+    else:
+        favorable_range_low = trade.strike * 0.995
+        favorable_range_high = trade.strike * 1.005
+        advice["profit_targets"].append(
+            f"✅ Ideal scenario: SPX stays between ${favorable_range_low:,.0f}-${favorable_range_high:,.0f} with IV expansion."
+        )
+
+    # === ADJUSTMENT TRIGGERS ===
+
+    # Price movement triggers
+    if trade.option_type == "CALL":
+        upside_roll_trigger = trade.strike * 1.02
+        downside_exit = trade.strike * 0.97
+        advice["adjustment_triggers"].append(
+            f"🔄 If SPX moves above ${upside_roll_trigger:,.0f} (2% up): Roll short call up to maintain delta neutrality."
+        )
+        advice["adjustment_triggers"].append(
+            f"🚪 If SPX drops below ${downside_exit:,.0f} (3% down): Consider exiting - call calendar loses value on sharp drops."
+        )
+    else:
+        downside_roll_trigger = trade.strike * 0.98
+        upside_exit = trade.strike * 1.03
+        advice["adjustment_triggers"].append(
+            f"🔄 If SPX drops below ${downside_roll_trigger:,.0f} (2% down): Roll short put down to maintain delta neutrality."
+        )
+        advice["adjustment_triggers"].append(
+            f"🚪 If SPX rallies above ${upside_exit:,.0f} (3% up): Consider exiting - put calendar loses value on sharp rallies."
+        )
+
+    # IV triggers
+    advice["adjustment_triggers"].append(
+        f"📊 If IV expands >15%: Take partial profits (50%) - IV expansion is the best-case scenario for calendars."
+    )
+    advice["adjustment_triggers"].append(
+        f"📉 If IV ratio drops below 1.02: Exit immediately - edge has disappeared."
+    )
+
+    # Time-based triggers
+    advice["adjustment_triggers"].append(
+        f"⏰ At {ROLL_FRONT_DTE_THRESHOLD} DTE on front leg: Roll to next weekly expiration at same strike."
+    )
+
+    if trade.back_dte < 30:
+        advice["adjustment_triggers"].append(
+            f"📅 Back leg at {trade.back_dte} DTE - consider rolling to next monthly expiration to maintain vega exposure."
+        )
+
+    return advice
 
 
 def get_adjustment_playbook(trade: CalendarTrade) -> str:
-    """Generate a scenario-based adjustment playbook for a trade."""
+    """Generate a text-based adjustment playbook for console output."""
+    advice = generate_tailored_advice(trade)
+
     lines = [
         f"\n{'='*60}",
-        f"ADJUSTMENT PLAYBOOK: {trade.option_type} Calendar @ {trade.strike}",
+        f"TAILORED ADVICE: {trade.option_type} Calendar @ {trade.strike}",
         f"Front: {trade.front_expiration.strftime('%Y-%m-%d')} ({trade.front_dte} DTE)",
         f"Back: {trade.back_expiration.strftime('%Y-%m-%d')} ({trade.back_dte} DTE)",
         f"{'='*60}",
     ]
 
-    for scenario_key, scenario in SCENARIO_ADJUSTMENTS.items():
-        lines.append(f"\n📊 {scenario['description'].upper()}")
-        lines.append(f"   Impact: {scenario['impact']}")
-        lines.append("   Actions:")
-        for adj in scenario["adjustments"]:
-            lines.append(f"   • {adj}")
+    for category, items in advice.items():
+        if items:
+            title = category.replace("_", " ").title()
+            lines.append(f"\n📋 {title}:")
+            for item in items:
+                lines.append(f"   • {item}")
 
     return "\n".join(lines)
 
@@ -832,11 +1002,6 @@ def export_to_html(trades: list[CalendarTrade], spot_price: float, output_path: 
     data = [trade.to_dict() for trade in trades]
     df = pd.DataFrame(data)
 
-    # Add adjustment columns for each scenario
-    for scenario_key, scenario in SCENARIO_ADJUSTMENTS.items():
-        df[f"scenario_{scenario_key}"] = scenario["description"]
-        df[f"adjustment_{scenario_key}"] = " | ".join(scenario["adjustments"])
-
     # Generate HTML
     html = f"""<!DOCTYPE html>
 <html>
@@ -1277,22 +1442,79 @@ def export_to_html(trades: list[CalendarTrade], spot_price: float, output_path: 
         </div>
 """
 
-        # Add scenarios
+        # Add tailored advice
+        advice = generate_tailored_advice(trade)
+
         html += """
         <div class="scenarios">
-            <h3>Adjustment Playbook</h3>
+            <h3>📋 Tailored Trade Advice</h3>
 """
 
-        for scenario_key, scenario in SCENARIO_ADJUSTMENTS.items():
-            html += f"""
+        # Entry Guidance
+        if advice["entry_guidance"]:
+            html += """
             <div class="scenario">
-                <div class="scenario-title">{scenario['description']}</div>
-                <div class="scenario-impact">{scenario['impact']}</div>
+                <div class="scenario-title">🎯 Entry Guidance</div>
                 <ul class="scenario-actions">
 """
-            for action in scenario["adjustments"]:
-                html += f"                    <li>{action}</li>\n"
+            for item in advice["entry_guidance"]:
+                html += f"                    <li>{item}</li>\n"
+            html += """
+                </ul>
+            </div>
+"""
 
+        # Position Management
+        if advice["position_management"]:
+            html += """
+            <div class="scenario">
+                <div class="scenario-title">⚙️ Position Management</div>
+                <ul class="scenario-actions">
+"""
+            for item in advice["position_management"]:
+                html += f"                    <li>{item}</li>\n"
+            html += """
+                </ul>
+            </div>
+"""
+
+        # Risk Warnings
+        if advice["risk_warnings"]:
+            html += """
+            <div class="scenario">
+                <div class="scenario-title">⚠️ Risk Warnings</div>
+                <ul class="scenario-actions">
+"""
+            for item in advice["risk_warnings"]:
+                html += f"                    <li>{item}</li>\n"
+            html += """
+                </ul>
+            </div>
+"""
+
+        # Profit Targets
+        if advice["profit_targets"]:
+            html += """
+            <div class="scenario">
+                <div class="scenario-title">🎯 Profit Targets</div>
+                <ul class="scenario-actions">
+"""
+            for item in advice["profit_targets"]:
+                html += f"                    <li>{item}</li>\n"
+            html += """
+                </ul>
+            </div>
+"""
+
+        # Adjustment Triggers
+        if advice["adjustment_triggers"]:
+            html += """
+            <div class="scenario">
+                <div class="scenario-title">🔄 Adjustment Triggers</div>
+                <ul class="scenario-actions">
+"""
+            for item in advice["adjustment_triggers"]:
+                html += f"                    <li>{item}</li>\n"
             html += """
                 </ul>
             </div>
