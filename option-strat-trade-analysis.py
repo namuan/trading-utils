@@ -236,7 +236,10 @@ def analyze_excel(file_path, open_report=False):
             # If checkboxes are included, add an extra header for selection
             hdr_cells = ""
             if include_checkbox:
-                hdr_cells += "<th></th>"
+                if id_prefix:
+                    hdr_cells += f'<th><input type="checkbox" id="{escape(id_prefix)}-select-all" onchange="toggleSelectAll(\'{escape(id_prefix)}\', this.checked)"></th>'
+                else:
+                    hdr_cells += "<th></th>"
             hdr_cells += "".join(f"<th>{escape(str(h))}</th>" for h in headers)
             parts.append("<thead><tr>" + hdr_cells + "</tr></thead>")
 
@@ -711,8 +714,28 @@ function updateTradeSelectedPL(tradeId){
         if(total>0){ el.style.background='#eaffea'; } else if(total<0){ el.style.background='#ffecec'; } else { el.style.background=''; }
       }
     }
+    // Update header select-all checkbox state for this trade
+    updateSelectAllCheckbox(tradeId);
     // Update global selected total
     recomputeSelectedTotal();
+  }catch(e){ console.error(e); }
+}
+
+function updateSelectAllCheckbox(tradeId){
+  try{
+    const header = document.getElementById(tradeId + '-select-all');
+    if(!header) return;
+    const cbs = document.querySelectorAll('input.pos-checkbox[data-trade="'+tradeId+'"]');
+    const allChecked = Array.from(cbs).length > 0 && Array.from(cbs).every(cb=>cb.checked);
+    header.checked = allChecked;
+  }catch(e){ console.error(e); }
+}
+
+function toggleSelectAll(tradeId, checked){
+  try{
+    const cbs = document.querySelectorAll('input.pos-checkbox[data-trade="'+tradeId+'"]');
+    cbs.forEach(cb=>{ cb.checked = checked; });
+    updateTradeSelectedPL(tradeId);
   }catch(e){ console.error(e); }
 }
 
