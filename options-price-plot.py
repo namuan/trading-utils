@@ -6,13 +6,37 @@
 # ]
 # ///
 """
-A simple script
+Options Price Visualization Tool
+
+This script analyzes and visualizes options data from a SQLite database containing historical
+options chain snapshots. It generates four types of interactive Plotly charts:
+
+1. Strike Price Distribution: Shows put and call options across expiration dates with
+   marker sizes based on volume × open interest
+2. Implied Move: Calculates expected price movement based on 50Δ options premiums
+3. IV Term Structure: Displays implied volatility curves for 15Δ, 25Δ, and 50Δ options
+4. Premium Structure: Shows option premium levels across different delta strikes
+
+The tool filters options data by expiration window, excludes specified dates, and
+focuses on delta ranges between 0.10-0.50 for visualization clarity.
 
 Usage:
-./template_py_scripts.py -h
+./options-price-plot.py -h
 
-./template_py_scripts.py -v # To log INFO messages
-./template_py_scripts.py -vv # To log DEBUG messages
+# Basic usage - analyze SPX options with 14-day expiration window
+./options-price-plot.py --db-path data_spx/gamma_calculations.db --symbol spx --expiration-window 14 -v
+
+# Analyze SPY options for next 7 days (default window)
+./options-price-plot.py --db-path data_spy/gamma_calculations.db --symbol spy -v
+
+# Analyze QQQ with 21-day expiration window
+./options-price-plot.py --db-path data_qqq/gamma_calculations.db --symbol qqq --expiration-window 21 -v
+
+# Exclude specific expiration dates (e.g., monthly expiration)
+./options-price-plot.py --db-path data_spx/gamma_calculations.db --symbol spx --expiration-window 14 --exclude-dates 2025-12-20 -v
+
+# Debug logging for troubleshooting
+./options-price-plot.py --db-path data_spy/gamma_calculations.db --symbol spy --expiration-window 7 -vv
 """
 
 import logging
