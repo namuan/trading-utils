@@ -35,6 +35,12 @@ from plotly.subplots import make_subplots
 
 from common.market_data import download_ticker_data
 
+# Strategy Configuration
+EXPOSURE_LEVELS = [0.00, 0.25, 0.60]  # Available exposure buckets
+HYSTERESIS_DAYS = 10  # Days required to size up
+VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
+VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
+
 
 def setup_logging(verbosity):
     logging_level = logging.WARNING
@@ -113,19 +119,19 @@ def get_target_exposure(vol_ratio):
     """Map vol_ratio to target exposure bucket (max 50%)"""
     if pd.isna(vol_ratio):
         return np.nan
-    elif vol_ratio < 1.30:
-        return 0.60
-    elif vol_ratio < 1.60:
-        return 0.25
+    elif vol_ratio < VOL_THRESHOLD_LOW:
+        return EXPOSURE_LEVELS[2]  # Max exposure
+    elif vol_ratio < VOL_THRESHOLD_HIGH:
+        return EXPOSURE_LEVELS[1]  # Medium exposure
     else:
-        return 0.00
+        return EXPOSURE_LEVELS[0]  # No exposure
 
 
 def apply_hysteresis(target_exposures):
     """
     Apply hysteresis logic:
     - Sizing DOWN: immediate
-    - Sizing UP: requires 10 consecutive days in lower-vol bucket
+    - Sizing UP: requires HYSTERESIS_DAYS consecutive days in lower-vol bucket
     """
     current_exposure = []
     days_in_bucket = 0
@@ -148,15 +154,14 @@ def apply_hysteresis(target_exposures):
             prev_exposure = target
             current_exposure.append(target)
             days_in_bucket = 1
-        # Sizing UP - need 10 consecutive days
+        # Sizing UP - need HYSTERESIS_DAYS consecutive days
         elif target > prev_exposure:
             days_in_bucket += 1
-            if days_in_bucket >= 10:
+            if days_in_bucket >= HYSTERESIS_DAYS:
                 # Increase by ONE bucket at a time
-                exposure_levels = [0.00, 0.25, 0.60]
-                current_idx = exposure_levels.index(prev_exposure)
-                if current_idx < len(exposure_levels) - 1:
-                    prev_exposure = exposure_levels[current_idx + 1]
+                current_idx = EXPOSURE_LEVELS.index(prev_exposure)
+                if current_idx < len(EXPOSURE_LEVELS) - 1:
+                    prev_exposure = EXPOSURE_LEVELS[current_idx + 1]
                 days_in_bucket = 1
             current_exposure.append(prev_exposure)
         else:
