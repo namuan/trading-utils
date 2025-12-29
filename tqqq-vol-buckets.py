@@ -40,6 +40,7 @@ EXPOSURE_LEVELS = [0.00, 0.25, 0.60]  # Available exposure buckets
 HYSTERESIS_DAYS = 10  # Days required to size up
 VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
 VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
+TREASURY_TICKER = "BIL"  # Treasury ETF for non-TQQQ allocation (short-term bills)
 
 
 def setup_logging(verbosity):
@@ -995,7 +996,10 @@ def main(args):
     logging.info(f"Downloading TQQQ data from {start_date} to {end_date}")
     tqqq_data = download_ticker_data("TQQQ", start_date, end_date)
 
-    if qqq_data.empty or tqqq_data.empty:
+    logging.info(f"Downloading {TREASURY_TICKER} data from {start_date} to {end_date}")
+    treasury_data = download_ticker_data(TREASURY_TICKER, start_date, end_date)
+
+    if qqq_data.empty or tqqq_data.empty or treasury_data.empty:
         logging.error("Failed to download data")
         return
 
@@ -1014,16 +1018,23 @@ def main(args):
     # 5. Calculate Returns
     logging.info("Calculating strategy returns")
     tqqq_returns = tqqq_data["Close"].pct_change()
+    treasury_returns = treasury_data["Close"].pct_change()
 
     # Align indices
-    common_index = actual_exposure.dropna().index.intersection(
-        tqqq_returns.dropna().index
+    common_index = (
+        actual_exposure.dropna()
+        .index.intersection(tqqq_returns.dropna().index)
+        .intersection(treasury_returns.dropna().index)
     )
     actual_exposure = actual_exposure.loc[common_index]
     tqqq_returns = tqqq_returns.loc[common_index]
+    treasury_returns = treasury_returns.loc[common_index]
 
-    # Strategy returns
-    strategy_returns = actual_exposure * tqqq_returns
+    # Strategy returns: TQQQ portion + Treasury portion
+    # If 60% TQQQ, then 40% treasuries, etc.
+    tqqq_portion = actual_exposure * tqqq_returns
+    treasury_portion = (1 - actual_exposure) * treasury_returns
+    strategy_returns = tqqq_portion + treasury_portion
 
     # 6. Calculate Metrics
     logging.info("\n" + "=" * 80)
@@ -1064,6 +1075,9 @@ def main(args):
             "target_exposure": target_exposure,
             "actual_exposure": actual_exposure,
             "tqqq_returns": tqqq_returns,
+            "treasury_returns": treasury_returns,
+            "tqqq_portion": tqqq_portion,
+            "treasury_portion": treasury_portion,
             "strategy_returns": strategy_returns,
             "strategy_equity": (1 + strategy_returns).cumprod(),
             "tqqq_equity": (1 + tqqq_bh_returns).cumprod(),
