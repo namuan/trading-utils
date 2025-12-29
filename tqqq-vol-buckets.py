@@ -489,10 +489,26 @@ def generate_html_report(
         monthly_pivot.pivot(index="year", columns="month", values="returns") * 100
     )
 
+    # Calculate yearly returns
+    yearly_returns = (
+        results_df_data["strategy_returns"]
+        .resample("YE")
+        .apply(lambda x: (1 + x).prod() - 1)
+        * 100
+    )
+    yearly_returns_dict = {
+        year: ret for year, ret in zip(yearly_returns.index.year, yearly_returns.values)
+    }
+
+    # Add yearly returns as a new column
+    pivot_table["Year"] = [
+        yearly_returns_dict.get(year, np.nan) for year in pivot_table.index
+    ]
+
     fig7 = go.Figure(
         data=go.Heatmap(
             z=pivot_table.values,
-            x=[f"M{i}" for i in range(1, 13)],
+            x=[f"M{i}" for i in range(1, 13)] + ["Year"],
             y=pivot_table.index,
             colorscale="RdYlGn",
             zmid=0,
