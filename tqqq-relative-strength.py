@@ -1,12 +1,24 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "highlight_text",
+#   "seaborn",
+#   "stockstats",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 Analyzes and visualizes the relative performance of TQQQ against QQQ holdings.
 
 Download QQQ holdings as a CSV File (Click on the Excel Download link)
-https://www.invesco.com/us/financial-products/etfs/holdings?audienceType=Investor&ticker=QQQ
+https://www.barchart.com/etfs-funds/quotes/QQQ/constituents
 
 # Specify a custom CSV file for QQQ holdings
-python tqqq-relative-strength.py --qqq-csv path/to/qqq_holdings.csv
+uv run tqqq-relative-strength.py --qqq-csv path/to/qqq_holdings.csv
 """
 
 from argparse import ArgumentParser
@@ -21,7 +33,7 @@ from stockstats import StockDataFrame
 
 from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def parse_args():
@@ -32,6 +44,16 @@ def parse_args():
         "--qqq-csv",
         required=True,
         help="Path to the CSV file containing QQQ holdings",
+    )
+    parser.add_argument(
+        "--start-date",
+        default="2011-01-01",
+        help="Start date for historical data (YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--end-date",
+        default=datetime.now().strftime("%Y-%m-%d"),
+        help="End date for historical data (YYYY-MM-DD)",
     )
     parser.add_argument(
         "-v",
@@ -76,19 +98,48 @@ def get_asset_data(symbol, start_date, end_date):
 
 def get_qqq_holdings(csv_file_path):
     df = pd.read_csv(csv_file_path)
-    return df["Holding Ticker"].tolist()
+    # Try 'Symbol' column first (new format), fallback to 'Holding Ticker' (old format)
+    if "Symbol" in df.columns:
+        column_name = "Symbol"
+    elif "Holding Ticker" in df.columns:
+        column_name = "Holding Ticker"
+    else:
+        raise ValueError(
+            f"CSV file must contain either 'Symbol' or 'Holding Ticker' column. "
+            f"Found columns: {df.columns.tolist()}"
+        )
+
+    # Filter out invalid tickers (footer rows, missing values, etc.)
+    tickers = df[column_name].dropna().astype(str).tolist()
+    # Remove any ticker that doesn't look like a valid stock symbol
+    valid_tickers = [
+        t.strip()
+        for t in tickers
+        if t.strip()
+        and not any(c in t.lower() for c in ["downloaded", "barchart", "as of"])
+    ]
+    return valid_tickers
 
 
 def main():
     focused_stock = "TQQQ"
     qqq_holdings = get_qqq_holdings(args.qqq_csv)
     stocks = [focused_stock] + qqq_holdings
-    start_date = "2011-01-01"
-    end_date = "2024-08-01"
-    df = pd.DataFrame()
+    start_date = args.start_date
+    end_date = args.end_date
+
+    # Collect all stock data first, then combine
+    stock_data = {}
     for stock in stocks:
-        data = get_asset_data(stock, start_date, end_date)
-        df[stock] = data["close"]
+        try:
+            data = get_asset_data(stock, start_date, end_date)
+            stock_data[stock] = data["close"]
+        except Exception as e:
+            print(f"Skipping {stock}: {e}")
+            continue
+
+    # Use pd.concat for better performance instead of iterative assignment
+    df = pd.concat(stock_data, axis=1)
 
     df_pct = df.pct_change()
     df_cum_pct = (1 + df_pct).cumprod() - 1

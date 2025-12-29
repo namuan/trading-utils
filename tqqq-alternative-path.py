@@ -1,6 +1,18 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "highlight_text",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 import matplotlib.pyplot as plt
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
+
 
 # Define the custom function to adjust the data for dividends and splits, if necessary
 def adjust_data(data):

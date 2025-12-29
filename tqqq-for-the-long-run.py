@@ -1,4 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "highlight_text",
+#   "stockstats",
+#   "yfinance",
+#   "python-dotenv",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 A daily-rebalancing trading strategy that allocates to TQQQ, UVXY, SPXL, TECL, SQQQ, or BSV based on various price and RSI conditions of SPY, TQQQ, and other assets.
 
@@ -12,7 +24,7 @@ SQQQ -> LQQS/SQQQ
 BSV →  IDTG
 
 Usage:
-./tqqq-for-the-long-run.py
+uvr tqqq-for-the-long-run.py
 """
 
 from argparse import ArgumentParser
@@ -23,7 +35,7 @@ from stockstats import StockDataFrame
 
 from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 from common.tele_notifier import pushover_send_message
 
 
