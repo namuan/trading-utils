@@ -110,15 +110,11 @@ def calculate_vol_ratio(df):
 
 
 def get_target_exposure(vol_ratio):
-    """Map vol_ratio to target exposure bucket"""
+    """Map vol_ratio to target exposure bucket (max 50%)"""
     if pd.isna(vol_ratio):
         return np.nan
-    elif vol_ratio < 0.75:
-        return 1.00
-    elif vol_ratio < 1.00:
-        return 0.75
     elif vol_ratio < 1.30:
-        return 0.50
+        return 0.60
     elif vol_ratio < 1.60:
         return 0.25
     else:
@@ -129,7 +125,7 @@ def apply_hysteresis(target_exposures):
     """
     Apply hysteresis logic:
     - Sizing DOWN: immediate
-    - Sizing UP: requires 5 consecutive days in lower-vol bucket
+    - Sizing UP: requires 10 consecutive days in lower-vol bucket
     """
     current_exposure = []
     days_in_bucket = 0
@@ -152,12 +148,12 @@ def apply_hysteresis(target_exposures):
             prev_exposure = target
             current_exposure.append(target)
             days_in_bucket = 1
-        # Sizing UP - need 5 consecutive days
+        # Sizing UP - need 10 consecutive days
         elif target > prev_exposure:
             days_in_bucket += 1
-            if days_in_bucket >= 5:
+            if days_in_bucket >= 10:
                 # Increase by ONE bucket at a time
-                exposure_levels = [0.00, 0.25, 0.50, 0.75, 1.00]
+                exposure_levels = [0.00, 0.25, 0.60]
                 current_idx = exposure_levels.index(prev_exposure)
                 if current_idx < len(exposure_levels) - 1:
                     prev_exposure = exposure_levels[current_idx + 1]
