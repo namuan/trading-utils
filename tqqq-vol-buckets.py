@@ -5,7 +5,9 @@
 #   "numpy",
 #   "yfinance",
 #   "plotly",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "requests",
+#   "python-dotenv"
 # ]
 # ///
 """
@@ -25,6 +27,7 @@ Usage:
 ./tqqq-vol-buckets.py -vv # To log DEBUG messages
 ./tqqq-vol-buckets.py --open
 ./tqqq-vol-buckets.py --no-alternate # Use cash instead of ALTERNATE_TICKER
+./tqqq-vol-buckets.py --send-alert # Send Telegram alert only (skip CSV/HTML)
 """
 
 import logging
@@ -40,6 +43,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from common.market_data import download_ticker_data
+from common.tele_notifier import send_message_to_telegram
 
 # Strategy Configuration
 EXPOSURE_LEVELS = [0.00, 0.25, 0.70]  # Available exposure buckets
@@ -90,6 +94,12 @@ def parse_args():
         action="store_false",
         dest="use_alternate",
         help=f"Do not allocate uninvested portion to {ALTERNATE_TICKER} (use cash instead)",
+    )
+    parser.add_argument(
+        "--send-alert",
+        action="store_true",
+        dest="send_alert",
+        help="Send Telegram alert only (skip CSV/HTML generation)",
     )
     parser.set_defaults(use_alternate=True)
     return parser.parse_args()
@@ -224,6 +234,165 @@ def calculate_metrics(returns, label="Strategy"):
         equity,
         drawdown,
     )
+
+
+def generate_telegram_alert_message(results_df, qqq_df, use_alternate):
+    current_date = results_df.index[-1]
+    current_vol_ratio = results_df["vol_ratio"].iloc[-1]
+    current_target = results_df["target_exposure"].iloc[-1]
+    current_exposure = results_df["actual_exposure"].iloc[-1]
+
+    if len(results_df.index) >= 2:
+        prev_exposure = results_df["actual_exposure"].iloc[-2]
+    else:
+        prev_exposure = np.nan
+
+    def format_exposure(exposure):
+        if pd.isna(exposure):
+            return "N/A"
+        return f"{exposure*100:.0f}%"
+
+    def format_return(ret):
+        if pd.isna(ret):
+            return "N/A"
+        return f"{ret*100:+.2f}%"
+
+    def classify_volatility(vol_ratio_value):
+        if pd.isna(vol_ratio_value):
+            return "N/A"
+        if vol_ratio_value < VOL_THRESHOLD_LOW:
+            return "Low Volatility"
+        if vol_ratio_value < VOL_THRESHOLD_HIGH:
+            return "Medium Volatility"
+        return "High Volatility"
+
+    exposure_change = (
+        current_exposure - prev_exposure if not pd.isna(prev_exposure) else 0.0
+    )
+    if pd.isna(prev_exposure):
+        action = f"HOLD current {format_exposure(current_exposure)} position"
+    elif abs(exposure_change) < 1e-9:
+        action = f"HOLD current {format_exposure(current_exposure)} position"
+    elif exposure_change > 0:
+        action = f"INCREASE position by {exposure_change*100:.0f}%"
+    else:
+        action = f"DECREASE position by {abs(exposure_change)*100:.0f}%"
+
+    if pd.isna(current_target) or pd.isna(current_exposure):
+        days_until_size_up = "N/A"
+    elif current_exposure >= max(EXPOSURE_LEVELS):
+        days_until_size_up = "N/A"
+    elif current_target <= current_exposure:
+        days_until_size_up = "0"
+    else:
+        waiting_flags = (
+            results_df["target_exposure"] > results_df["actual_exposure"]
+        ).fillna(False)
+        streak = 0
+        for val in reversed(waiting_flags.values):
+            if bool(val):
+                streak += 1
+            else:
+                break
+        days_until_size_up = str(max(0, HYSTERESIS_DAYS - streak))
+
+    recent_n = 7
+    recent = results_df.tail(recent_n)
+    recent_lines = ["Date | QQQ | VolR | Target | Actual | StratRet"]
+    for idx, row in recent.iterrows():
+        date_str = idx.strftime("%Y-%m-%d")
+        qqq_close = row["qqq_close"]
+        volr = row["vol_ratio"]
+        tgt = row["target_exposure"]
+        act = row["actual_exposure"]
+        dret = row["strategy_returns"]
+        recent_lines.append(
+            f"{date_str} | {qqq_close:,.2f} | {volr:.2f}x | {format_exposure(tgt)} | {format_exposure(act)} | {format_return(dret)}"
+        )
+
+    def slice_metrics(df_slice, label):
+        if df_slice.empty or len(df_slice.index) < 2:
+            return f"{label}: N/A"
+        returns = df_slice["strategy_returns"].dropna()
+        bnh = df_slice["tqqq_returns"].dropna()
+        if returns.empty or bnh.empty:
+            return f"{label}: N/A"
+
+        eq = (1 + returns).cumprod()
+        bh_eq = (1 + bnh).cumprod()
+        total_ret = eq.iloc[-1] / eq.iloc[0] - 1
+        bh_ret = bh_eq.iloc[-1] / bh_eq.iloc[0] - 1
+
+        vol = returns.std() * np.sqrt(252)
+        sharpe = (returns.mean() * 252) / vol if vol > 0 else 0
+        dd = (eq / eq.cummax() - 1).min()
+
+        return (
+            f"{label}: Strategy {total_ret*100:+.1f}% | TQQQ B&H {bh_ret*100:+.1f}% | "
+            f"Sharpe {sharpe:.2f} | DD {dd*100:.1f}%"
+        )
+
+    ytd_start = datetime(current_date.year, 1, 1)
+    ytd_df = results_df[results_df.index >= ytd_start]
+    last30_df = results_df.tail(30)
+    inception_df = results_df
+
+    atr_20 = calculate_atr(qqq_df, period=20)
+    vol_raw = atr_20 / qqq_df["Close"]
+    vol_median = vol_raw.rolling(window=252, min_periods=252).median().shift(1)
+    close_now = qqq_df["Close"].iloc[-1]
+    atr_now = atr_20.iloc[-1]
+    median_now = vol_median.iloc[-1]
+    if pd.isna(median_now) or median_now <= 0:
+        median_now = vol_raw.iloc[-1]
+
+    sensitivity_moves = [-0.05, 0.0, 0.05]
+    sensitivity_lines = ["QQQ Move | VolR | Target | Action"]
+    for mv in sensitivity_moves:
+        new_close = close_now * (1 + mv)
+        new_ratio = (
+            (atr_now / new_close) / median_now if median_now > 0 else current_vol_ratio
+        )
+        new_target = get_target_exposure(new_ratio)
+        if pd.isna(new_target):
+            action_hint = "N/A"
+        elif new_target < current_exposure:
+            action_hint = f"Size down to {format_exposure(new_target)}"
+        elif new_target > current_exposure:
+            action_hint = f"Size up toward {format_exposure(new_target)}"
+        else:
+            action_hint = "Hold"
+        sensitivity_lines.append(
+            f"{mv*100:+.0f}% | {new_ratio:.2f}x | {format_exposure(new_target)} | {action_hint}"
+        )
+
+    allocation_label = f"TQQQ + {ALTERNATE_TICKER}" if use_alternate else "TQQQ + Cash"
+    vol_label = classify_volatility(current_vol_ratio)
+
+    message = "\n".join(
+        [
+            f"TQQQ Vol Bucket Strategy: {current_date.strftime('%Y-%m-%d')}",
+            "",
+            "TODAY'S SIGNAL",
+            f"Current Exposure: {format_exposure(current_exposure)} (was {format_exposure(prev_exposure)})",
+            f"Action: {action}",
+            f"Volatility: {current_vol_ratio:.2f}x median ({vol_label})",
+            f"Days Until Next Size-Up Allowed: {days_until_size_up}",
+            f"Allocation: {allocation_label}",
+            "",
+            "RECENT CONTEXT (Last 7 sessions)",
+            *recent_lines,
+            "",
+            "PERFORMANCE SNAPSHOT",
+            slice_metrics(ytd_df, "YTD"),
+            slice_metrics(last30_df, "Last 30 sessions"),
+            slice_metrics(inception_df, "Since inception"),
+            "",
+            "WHAT'S NEXT (Sensitivity, ATR held constant)",
+            *sensitivity_lines,
+        ]
+    )
+    return message
 
 
 def generate_html_report(
@@ -1081,13 +1250,6 @@ def generate_html_report(
 def main(args):
     logging.info("Starting TQQQ Volatility Bucket Strategy Backtest")
 
-    # Create temporary output directory
-    temp_base = Path(tempfile.gettempdir())
-    output_dir = temp_base / (
-        "tqqq_vol_buckets" if args.use_alternate else "tqqq_vol_buckets_cash"
-    )
-    output_dir.mkdir(exist_ok=True)
-
     # 1. Data Acquisition
     start_date = "2010-02-10"  # TQQQ inception
     end_date = datetime.today().strftime("%Y-%m-%d")
@@ -1173,19 +1335,41 @@ def main(args):
     qqq_returns = qqq_data["Close"].pct_change().loc[common_index]
     qqq_metrics, qqq_equity, qqq_dd = calculate_metrics(qqq_returns, "QQQ Buy & Hold")
 
-    # Display results
     results_df = pd.DataFrame([strategy_metrics, tqqq_metrics, qqq_metrics])
+    exposure_dist = actual_exposure.value_counts(normalize=True).sort_index()
+
+    alert_df = pd.DataFrame(
+        {
+            "qqq_close": qqq_data["Close"].loc[common_index],
+            "vol_ratio": vol_ratio.loc[common_index],
+            "target_exposure": target_exposure.loc[common_index],
+            "actual_exposure": actual_exposure,
+            "strategy_returns": strategy_returns,
+            "tqqq_returns": tqqq_returns,
+        }
+    )
+
+    if args.send_alert:
+        message = generate_telegram_alert_message(
+            alert_df, qqq_data, args.use_alternate
+        )
+        send_message_to_telegram(message, format="Markdown")
+        return
+
+    temp_base = Path(tempfile.gettempdir())
+    output_dir = temp_base / (
+        "tqqq_vol_buckets" if args.use_alternate else "tqqq_vol_buckets_cash"
+    )
+    output_dir.mkdir(exist_ok=True)
+
     print("\n" + results_df.to_string(index=False))
 
-    # Exposure distribution
     logging.info("\n" + "=" * 80)
     logging.info("EXPOSURE DISTRIBUTION")
     logging.info("=" * 80)
-    exposure_dist = actual_exposure.value_counts(normalize=True).sort_index()
     for exp, pct in exposure_dist.items():
         print(f"  {exp:.2f}: {pct:.1%} of time")
 
-    # Save detailed results
     results = pd.DataFrame(
         {
             "vol_ratio": vol_ratio,
