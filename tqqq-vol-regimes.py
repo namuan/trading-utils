@@ -53,7 +53,7 @@ class Regime(Enum):
 EXPOSURE = {
     Regime.CALM: 1.00,
     Regime.NORMAL: 0.75,
-    Regime.STRESS: 0.25,
+    Regime.STRESS: 0.50,
     Regime.PANIC: 0.00,
 }
 
@@ -72,6 +72,10 @@ PERSISTENCE_DAYS = {
     Regime.STRESS: 5,
     Regime.PANIC: 2,
 }
+
+# Panic daily drop threshold (fractional return, e.g. -0.04 == -4%)
+PANIC_DAILY_DROP = -0.04
+PANIC_DAILY_DROP_PCT = PANIC_DAILY_DROP * 100
 
 
 def setup_logging(verbosity):
@@ -211,7 +215,7 @@ def run_regime_state_machine(df, vol_ratio):
             qqq_ret = 0
 
         # PANIC OVERRIDE (highest priority)
-        if vr > 1.60 or qqq_ret < -0.04:
+        if vr >= VOL_THRESHOLDS["PANIC_ENTER"] or qqq_ret <= PANIC_DAILY_DROP:
             current_state = Regime.PANIC
             days_condition_met = 0
             regimes[i] = current_state
@@ -219,44 +223,44 @@ def run_regime_state_machine(df, vol_ratio):
 
         # STATE-SPECIFIC TRANSITION LOGIC
         if current_state == Regime.PANIC:
-            if vr < 1.30:
+            if vr < VOL_THRESHOLDS["STRESS_ENTER"]:
                 days_condition_met += 1
-                if days_condition_met >= 10:
+                if days_condition_met >= PERSISTENCE_DAYS[Regime.STRESS]:
                     current_state = Regime.STRESS
                     days_condition_met = 0
             else:
                 days_condition_met = 0
 
         elif current_state == Regime.STRESS:
-            if vr > 1.60:
+            if vr >= VOL_THRESHOLDS["PANIC_ENTER"]:
                 current_state = Regime.PANIC
                 days_condition_met = 0
-            elif vr < 1.00:
+            elif vr < VOL_THRESHOLDS["NORMAL_ENTER"]:
                 days_condition_met += 1
-                if days_condition_met >= 15:
+                if days_condition_met >= PERSISTENCE_DAYS[Regime.NORMAL]:
                     current_state = Regime.NORMAL
                     days_condition_met = 0
             else:
                 days_condition_met = 0
 
         elif current_state == Regime.NORMAL:
-            if vr > 1.30:
+            if vr >= VOL_THRESHOLDS["STRESS_ENTER"]:
                 days_condition_met += 1
-                if days_condition_met >= 5:
+                if days_condition_met >= PERSISTENCE_DAYS[Regime.STRESS]:
                     current_state = Regime.STRESS
                     days_condition_met = 0
-            elif vr < 0.80:
+            elif vr < VOL_THRESHOLDS["CALM_ENTER"]:
                 days_condition_met += 1
-                if days_condition_met >= 20:
+                if days_condition_met >= PERSISTENCE_DAYS[Regime.CALM]:
                     current_state = Regime.CALM
                     days_condition_met = 0
             else:
                 days_condition_met = 0
 
         elif current_state == Regime.CALM:
-            if vr > 1.00:
+            if vr >= VOL_THRESHOLDS["NORMAL_ENTER"]:
                 days_condition_met += 1
-                if days_condition_met >= 5:
+                if days_condition_met >= PERSISTENCE_DAYS[Regime.NORMAL]:
                     current_state = Regime.NORMAL
                     days_condition_met = 0
             else:
@@ -418,31 +422,36 @@ def generate_telegram_message(vol_ratio, regimes, exposure, qqq_df):
         vol_median.iloc[-1] if not pd.isna(vol_median.iloc[-1]) else vol_raw.iloc[-1]
     ) * 100
 
-    # Calculate QQQ daily return
-    qqq_return = (qqq_df["Close"].iloc[-1] / qqq_df["Close"].iloc[-2] - 1) * 100
+    # Calculate QQQ daily return (fractional and percent)
+    qqq_ret_frac = qqq_df["Close"].iloc[-1] / qqq_df["Close"].iloc[-2] - 1
+    qqq_return = qqq_ret_frac * 100
 
     # Distance to triggers
-    distance_to_calm = ((0.80 - current_vol_ratio) / current_vol_ratio) * 100
-    distance_to_stress = ((1.30 - current_vol_ratio) / current_vol_ratio) * 100
+    distance_to_calm = (
+        (VOL_THRESHOLDS["CALM_ENTER"] - current_vol_ratio) / current_vol_ratio
+    ) * 100
+    distance_to_stress = (
+        (VOL_THRESHOLDS["STRESS_ENTER"] - current_vol_ratio) / current_vol_ratio
+    ) * 100
 
     # Check streaks toward transitions
     streak_to_calm = 0
     for i in range(len(vol_ratio) - 1, -1, -1):
-        if vol_ratio.iloc[i] < 0.80:
+        if vol_ratio.iloc[i] < VOL_THRESHOLDS["CALM_ENTER"]:
             streak_to_calm += 1
         else:
             break
 
     streak_to_stress = 0
     for i in range(len(vol_ratio) - 1, -1, -1):
-        if vol_ratio.iloc[i] > 1.30:
+        if vol_ratio.iloc[i] > VOL_THRESHOLDS["STRESS_ENTER"]:
             streak_to_stress += 1
         else:
             break
 
     # Panic checks
-    panic_vol = current_vol_ratio >= 1.60
-    panic_drop = qqq_return <= -4.0
+    panic_vol = current_vol_ratio >= VOL_THRESHOLDS["PANIC_ENTER"]
+    panic_drop = qqq_ret_frac <= PANIC_DAILY_DROP
 
     # Determine regime color/emoji
     regime_emoji = {
@@ -486,12 +495,12 @@ Volatility is in the **{current_regime.value} regime**.
 
 **Upside (Increase Exposure → {100 if current_regime != Regime.CALM else 'MAX'}% / CALM):**
 
-* Trigger: Vol Ratio **< 0.80**
+* Trigger: Vol Ratio **< {VOL_THRESHOLDS['CALM_ENTER']:.2f}**
 * Current distance: **{distance_to_calm:+.1f}%** {'(needs further compression)' if distance_to_calm < 0 else '(close!)'}
 
 **Downside (Decrease Exposure → {25 if current_regime == Regime.NORMAL else 0}% / {'STRESS' if current_regime == Regime.NORMAL else 'PANIC'}):**
 
-* Trigger: Vol Ratio **> 1.30**
+* Trigger: Vol Ratio **> {VOL_THRESHOLDS['STRESS_ENTER']:.2f}**
 * Current distance: **{distance_to_stress:+.1f}%** {'(needs expansion)' if distance_to_stress > 0 else '(close!)'}
 
 {"Market is **not near a regime boundary** in either direction." if abs(distance_to_calm) > 10 and distance_to_stress > 10 else "Market is **approaching a regime boundary**."}
@@ -502,15 +511,15 @@ Volatility is in the **{current_regime.value} regime**.
 
 **Toward CALM (100% exposure):**
 
-* Condition: Vol Ratio < 0.80
-* Persistence required: 20 consecutive trading days
-* Current streak: **{streak_to_calm} / 20**
+* Condition: Vol Ratio < {VOL_THRESHOLDS['CALM_ENTER']:.2f}
+* Persistence required: {PERSISTENCE_DAYS[Regime.CALM]} consecutive trading days
+* Current streak: **{streak_to_calm} / {PERSISTENCE_DAYS[Regime.CALM]}**
 
 **Toward STRESS (25% exposure):**
 
-* Condition: Vol Ratio > 1.30
-* Persistence required: 5 consecutive trading days
-* Current streak: **{streak_to_stress} / 5**
+* Condition: Vol Ratio > {VOL_THRESHOLDS['STRESS_ENTER']:.2f}
+* Persistence required: {PERSISTENCE_DAYS[Regime.STRESS]} consecutive trading days
+* Current streak: **{streak_to_stress} / {PERSISTENCE_DAYS[Regime.STRESS]}**
 
 {"No transition pressure building." if streak_to_calm == 0 and streak_to_stress == 0 else "⚠️ Transition pressure building!"}
 
@@ -519,8 +528,8 @@ Volatility is in the **{current_regime.value} regime**.
 ## ⚠️ Panic Override Check
 
 * **QQQ Daily Return:** {qqq_return:+.1f}%
-* **Panic Threshold:** ≤ −4.0% {'(MET! 🚨)' if panic_drop else '(not met)'}
-* **Vol Ratio ≥ 1.60:** {'MET! 🚨' if panic_vol else 'Not met'}
+* **Panic Threshold:** ≤ {PANIC_DAILY_DROP_PCT:.1f}% {'(MET! 🚨)' if panic_drop else '(not met)'}
+* **Vol Ratio ≥ {VOL_THRESHOLDS['PANIC_ENTER']:.2f}:** {'MET! 🚨' if panic_vol else 'Not met'}
 
 {'🚨 PANIC CONDITIONS DETECTED!' if panic_drop or panic_vol else 'No panic conditions detected.'}
 
@@ -541,13 +550,13 @@ Volatility is in the **{current_regime.value} regime**.
 Exposure will change **only if** one of the following occurs:
 
 * **Increase to {100 if current_exposure < 1.0 else 'MAX'}%:**
-  Vol Ratio < 0.80 for 20 consecutive trading days
+  Vol Ratio < {VOL_THRESHOLDS['CALM_ENTER']:.2f} for {PERSISTENCE_DAYS[Regime.CALM]} consecutive trading days
 
 * **Decrease to {25 if current_exposure > 0.25 else 0}%:**
-  Vol Ratio > 1.30 for 5 consecutive trading days
+  Vol Ratio > {VOL_THRESHOLDS['STRESS_ENTER']:.2f} for {PERSISTENCE_DAYS[Regime.STRESS]} consecutive trading days
 
 * **Immediate 0%:**
-  Volatility shock or single-day QQQ loss ≥ −4%
+  Volatility shock or single-day QQQ loss ≥ {PANIC_DAILY_DROP_PCT:.1f}%
 
 Until then: **hold exposure steady.**
 
@@ -595,16 +604,28 @@ def generate_html_report(
         )
     )
     fig1.add_hline(
-        y=1.6, line_dash="dash", line_color="red", annotation_text="Panic (1.6)"
+        y=VOL_THRESHOLDS["PANIC_ENTER"],
+        line_dash="dash",
+        line_color="red",
+        annotation_text=f"Panic ({VOL_THRESHOLDS['PANIC_ENTER']:.2f})",
     )
     fig1.add_hline(
-        y=1.3, line_dash="dash", line_color="orange", annotation_text="Stress (1.3)"
+        y=VOL_THRESHOLDS["STRESS_ENTER"],
+        line_dash="dash",
+        line_color="orange",
+        annotation_text=f"Stress ({VOL_THRESHOLDS['STRESS_ENTER']:.2f})",
     )
     fig1.add_hline(
-        y=1.0, line_dash="dash", line_color="blue", annotation_text="Normal (1.0)"
+        y=VOL_THRESHOLDS["NORMAL_ENTER"],
+        line_dash="dash",
+        line_color="blue",
+        annotation_text=f"Normal ({VOL_THRESHOLDS['NORMAL_ENTER']:.2f})",
     )
     fig1.add_hline(
-        y=0.8, line_dash="dash", line_color="green", annotation_text="Calm (0.8)"
+        y=VOL_THRESHOLDS["CALM_ENTER"],
+        line_dash="dash",
+        line_color="green",
+        annotation_text=f"Calm ({VOL_THRESHOLDS['CALM_ENTER']:.2f})",
     )
     fig1.update_layout(
         title="QQQ Normalized Volatility Ratio",
