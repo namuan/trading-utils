@@ -47,8 +47,6 @@ HYSTERESIS_DAYS = 10  # Days required to size up
 VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
 VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
 ALTERNATE_TICKER = "GLD"
-ALTERNATE_TICKET = ALTERNATE_TICKER
-TREASURY_TICKER = ALTERNATE_TICKER
 
 
 def setup_logging(verbosity):
