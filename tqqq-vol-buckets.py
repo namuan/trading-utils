@@ -15,7 +15,8 @@ Implements a dynamic position sizing strategy for TQQQ based on QQQ volatility r
 Uses ATR-based volatility with hysteresis to avoid overtrading.
 
 The uninvested portion (1 - TQQQ exposure) can be allocated to an alternate ETF
-(configured via TREASURY_TICKER), or left as cash.
+(configured via ALTERNATE_TICKER; aliases: TREASURY_TICKER and ALTERNATE_TICKET),
+or left as cash.
 
 Usage:
 ./tqqq-vol-buckets.py -h
@@ -23,7 +24,7 @@ Usage:
 ./tqqq-vol-buckets.py -v # To log INFO messages
 ./tqqq-vol-buckets.py -vv # To log DEBUG messages
 ./tqqq-vol-buckets.py --open
-./tqqq-vol-buckets.py --no-alternate # Use cash instead of TREASURY_TICKER
+./tqqq-vol-buckets.py --no-alternate # Use cash instead of ALTERNATE_TICKER
 """
 
 import logging
@@ -45,7 +46,9 @@ EXPOSURE_LEVELS = [0.00, 0.25, 0.70]  # Available exposure buckets
 HYSTERESIS_DAYS = 10  # Days required to size up
 VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
 VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
-TREASURY_TICKER = "GLD"  # Alternative ETF for non-TQQQ allocation
+ALTERNATE_TICKER = "GLD"
+ALTERNATE_TICKET = ALTERNATE_TICKER
+TREASURY_TICKER = ALTERNATE_TICKER
 
 
 def setup_logging(verbosity):
@@ -88,7 +91,7 @@ def parse_args():
         "--no-alternate",
         action="store_false",
         dest="use_alternate",
-        help=f"Do not allocate uninvested portion to {TREASURY_TICKER} (use cash instead)",
+        help=f"Do not allocate uninvested portion to {ALTERNATE_TICKER} (use cash instead)",
     )
     parser.set_defaults(use_alternate=True)
     return parser.parse_args()
@@ -232,7 +235,7 @@ def generate_html_report(
     exposure_dist,
     start_date,
     end_date,
-    treasury_label,
+    alternate_label,
 ):
     """Generate HTML report with embedded interactive Plotly charts"""
 
@@ -258,6 +261,7 @@ def generate_html_report(
     tqqq_equity = (1 + results_df_data["tqqq_returns"]).cumprod()
     qqq_returns = results_df_data["tqqq_returns"].copy()
     qqq_equity = (1 + qqq_returns).cumprod() / 10  # Scale down for visibility
+    alternate_equity = (1 + results_df_data["treasury_returns"]).cumprod()
 
     strategy_dd = (
         (strategy_equity - strategy_equity.cummax()) / strategy_equity.cummax() * 100
@@ -298,6 +302,17 @@ def generate_html_report(
             opacity=0.7,
         )
     )
+    if alternate_label != "Cash":
+        fig1.add_trace(
+            go.Scatter(
+                x=alternate_equity.index,
+                y=alternate_equity.values,
+                mode="lines",
+                name=f"{alternate_label} B&H",
+                line=dict(width=2, dash="dot"),
+                opacity=0.7,
+            )
+        )
     fig1.update_layout(
         title="Equity Curves Comparison (Log Scale)",
         xaxis_title="Date",
@@ -394,7 +409,7 @@ def generate_html_report(
             x=results_df_data.index,
             y=treasury_exposure_pct,
             mode="lines",
-            name=f"{treasury_label} Allocation",
+            name=f"{alternate_label} Allocation",
             line=dict(color="darkgreen", width=2),
         )
     )
@@ -417,7 +432,7 @@ def generate_html_report(
         )
     )
     fig3_treasury.update_layout(
-        title=f"{treasury_label} Allocation with Buy/Sell Signals",
+        title=f"{alternate_label} Allocation with Buy/Sell Signals",
         xaxis_title="Date",
         yaxis_title="Allocation (%)",
         template="plotly_white",
@@ -1012,7 +1027,7 @@ def generate_html_report(
         "Equity Curves Comparison",
         "Drawdown Comparison",
         "Position Sizing with Signals",
-        f"{treasury_label} Allocation with Signals",
+        f"{alternate_label} Allocation with Signals",
         "Volatility Regime",
         "Rolling 1-Year Returns",
         "Rolling Sharpe Ratio",
@@ -1088,9 +1103,9 @@ def main(args):
     treasury_data = pd.DataFrame()
     if args.use_alternate:
         logging.info(
-            f"Downloading {TREASURY_TICKER} data from {start_date} to {end_date}"
+            f"Downloading {ALTERNATE_TICKER} data from {start_date} to {end_date}"
         )
-        treasury_data = download_ticker_data(TREASURY_TICKER, start_date, end_date)
+        treasury_data = download_ticker_data(ALTERNATE_TICKER, start_date, end_date)
 
     if (
         qqq_data.empty
@@ -1200,7 +1215,7 @@ def main(args):
         exposure_dist,
         start_date,
         end_date,
-        TREASURY_TICKER if args.use_alternate else "Cash",
+        ALTERNATE_TICKER if args.use_alternate else "Cash",
     )
 
     # Print all output files
