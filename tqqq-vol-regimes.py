@@ -951,6 +951,49 @@ def generate_html_report(
     regime_counts = regimes.value_counts()
     total_regimes = len(regimes)
 
+    # Prepare parameter display
+    exposure_rows = "".join(
+        [
+            f"<tr><td>{r.value}</td><td>{EXPOSURE[r]*100:.0f}%</td></tr>"
+            for r in [Regime.CALM, Regime.NORMAL, Regime.STRESS, Regime.PANIC]
+        ]
+    )
+    vol_rows = "".join(
+        [
+            f"<tr><td>{k.replace('_',' ').title()}</td><td>{v}</td></tr>"
+            for k, v in VOL_THRESHOLDS.items()
+        ]
+    )
+    persist_rows = "".join(
+        [
+            f"<tr><td>{r.value}</td><td>{PERSISTENCE_DAYS[r]} days</td></tr>"
+            for r in [Regime.CALM, Regime.NORMAL, Regime.STRESS, Regime.PANIC]
+        ]
+    )
+    params_html = f"""
+        <div class="params" style="margin-bottom:20px;">
+            <div class="metric-card">
+                <h3>Model Parameters</h3>
+                <div style="display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start;">
+                    <div>
+                        <h4>Exposure</h4>
+                        <table>{exposure_rows}</table>
+                    </div>
+                    <div>
+                        <h4>Vol Thresholds</h4>
+                        <table>{vol_rows}</table>
+                    </div>
+                    <div>
+                        <h4>Persistence Days</h4>
+                        <table>{persist_rows}</table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    """
+
+    # tal_regimes = len(regimes)
+
     # Generate HTML
     html_content = f"""
 <!DOCTYPE html>
@@ -1001,6 +1044,26 @@ def generate_html_report(
             border-bottom: 2px solid #667eea;
             padding-bottom: 10px;
         }}
+        /* Styling for Model Parameters card to ensure readable text */
+        .params .metric-card {{
+            background: white;
+            color: #333;
+        }}
+        .params h4 {{
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 1em;
+        }}
+        .params table {{
+            border-collapse: collapse;
+            margin: 0;
+        }}
+        .params table td {{
+            padding: 6px 8px;
+            border-bottom: 1px solid #eee;
+            color: #333;
+            font-size: 0.95em;
+        }}
         .metric-row {{
             display: flex;
             justify-content: space-between;
@@ -1038,6 +1101,8 @@ def generate_html_report(
         <h1>🎯 TQQQ Volatility Regime Strategy</h1>
         <p>📅 Period: {start_date} to {end_date}</p>
         <p>📊 Regime-Based Dynamic Position Sizing</p>
+    {params_html}
+
     </div>
 
     <div class="metrics">
