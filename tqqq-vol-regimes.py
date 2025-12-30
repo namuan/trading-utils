@@ -4,7 +4,9 @@
 #   "pandas",
 #   "numpy",
 #   "plotly",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "python-dotenv",
+#   "requests"
 # ]
 # ///
 """
@@ -35,6 +37,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from common.market_data import download_ticker_data
+from common.tele_notifier import send_message_to_telegram
 
 
 class Regime(Enum):
@@ -124,6 +127,12 @@ def parse_args():
         action="store_true",
         dest="open_html",
         help="Open HTML report in default browser",
+    )
+    parser.add_argument(
+        "--send-telegram",
+        action="store_true",
+        dest="send_telegram",
+        help="Send daily regime update to Telegram",
     )
     return parser.parse_args()
 
@@ -368,6 +377,189 @@ def calculate_diagnostics(regimes, strategy_returns, equity, bnh_equity, tqqq_re
     logging.info(f"Buy & Hold Sharpe Ratio: {bnh_sharpe:8.2f}")
     logging.info(f"\nStrategy Max Drawdown: {max_dd:8.2f}%")
     logging.info(f"Buy & Hold Max Drawdown: {bnh_max_dd:8.2f}%")
+
+
+def generate_telegram_message(vol_ratio, regimes, exposure, qqq_df):
+    """Generate and send Telegram message with current regime status."""
+
+    # Get latest values
+    current_regime = regimes.iloc[-1]
+    current_exposure = exposure.iloc[-1]
+    current_vol_ratio = vol_ratio.iloc[-1]
+
+    # Check if exposure changed today
+    exposure_changed = False
+    if len(exposure) > 1:
+        exposure_changed = exposure.iloc[-1] != exposure.iloc[-2]
+
+    # Count days in current regime
+    days_in_regime = 1
+    for i in range(len(regimes) - 2, -1, -1):
+        if regimes.iloc[i] == current_regime:
+            days_in_regime += 1
+        else:
+            break
+
+    # Count days since last exposure change
+    days_since_change = 1
+    for i in range(len(exposure) - 2, -1, -1):
+        if exposure.iloc[i] == current_exposure:
+            days_since_change += 1
+        else:
+            break
+
+    # Calculate volatility metrics
+    atr_20 = calculate_atr(qqq_df, window=20)
+    vol_raw = atr_20 / qqq_df["Close"]
+    vol_median = vol_raw.rolling(window=252, min_periods=20).median().shift(1)
+
+    atr_pct = (atr_20.iloc[-1] / qqq_df["Close"].iloc[-1]) * 100
+    median_vol = (
+        vol_median.iloc[-1] if not pd.isna(vol_median.iloc[-1]) else vol_raw.iloc[-1]
+    ) * 100
+
+    # Calculate QQQ daily return
+    qqq_return = (qqq_df["Close"].iloc[-1] / qqq_df["Close"].iloc[-2] - 1) * 100
+
+    # Distance to triggers
+    distance_to_calm = ((0.80 - current_vol_ratio) / current_vol_ratio) * 100
+    distance_to_stress = ((1.30 - current_vol_ratio) / current_vol_ratio) * 100
+
+    # Check streaks toward transitions
+    streak_to_calm = 0
+    for i in range(len(vol_ratio) - 1, -1, -1):
+        if vol_ratio.iloc[i] < 0.80:
+            streak_to_calm += 1
+        else:
+            break
+
+    streak_to_stress = 0
+    for i in range(len(vol_ratio) - 1, -1, -1):
+        if vol_ratio.iloc[i] > 1.30:
+            streak_to_stress += 1
+        else:
+            break
+
+    # Panic checks
+    panic_vol = current_vol_ratio >= 1.60
+    panic_drop = qqq_return <= -4.0
+
+    # Determine regime color/emoji
+    regime_emoji = {
+        Regime.CALM: "🟢",
+        Regime.NORMAL: "🔵",
+        Regime.STRESS: "🟠",
+        Regime.PANIC: "🔴",
+    }
+
+    change_indicator = "✅ Changed" if exposure_changed else "❌ No change"
+
+    # Build message
+    message = f"""**Volatility Regime Daily Update**
+*Model-driven | Signal-focused | Zero discretion*
+
+---
+
+## 📌 Current Regime Status
+
+**Regime:** {regime_emoji[current_regime]} {current_regime.value}
+**Model Exposure:** **{current_exposure*100:.0f}% TQQQ**
+**Change Today:** {change_indicator}
+**Days in Current Regime:** {days_in_regime}
+**Days Since Last Exposure Change:** **{days_since_change}**
+
+{"Exposure just changed today." if exposure_changed else f"Exposure has been stable for {days_since_change} days."}
+
+---
+
+## 📊 Volatility Metrics (QQQ-based)
+
+* **20D ATR / Price:** {atr_pct:.2f}%
+* **1Y Median Vol:** {median_vol:.2f}%
+* **Volatility Ratio:** **{current_vol_ratio:.2f}**
+
+Volatility is in the **{current_regime.value} regime**.
+
+---
+
+## 📏 Distance to Next Trigger
+
+**Upside (Increase Exposure → {100 if current_regime != Regime.CALM else 'MAX'}% / CALM):**
+
+* Trigger: Vol Ratio **< 0.80**
+* Current distance: **{distance_to_calm:+.1f}%** {'(needs further compression)' if distance_to_calm < 0 else '(close!)'}
+
+**Downside (Decrease Exposure → {25 if current_regime == Regime.NORMAL else 0}% / {'STRESS' if current_regime == Regime.NORMAL else 'PANIC'}):**
+
+* Trigger: Vol Ratio **> 1.30**
+* Current distance: **{distance_to_stress:+.1f}%** {'(needs expansion)' if distance_to_stress > 0 else '(close!)'}
+
+{"Market is **not near a regime boundary** in either direction." if abs(distance_to_calm) > 10 and distance_to_stress > 10 else "Market is **approaching a regime boundary**."}
+
+---
+
+## 🚨 Regime Transition Watch
+
+**Toward CALM (100% exposure):**
+
+* Condition: Vol Ratio < 0.80
+* Persistence required: 20 consecutive trading days
+* Current streak: **{streak_to_calm} / 20**
+
+**Toward STRESS (25% exposure):**
+
+* Condition: Vol Ratio > 1.30
+* Persistence required: 5 consecutive trading days
+* Current streak: **{streak_to_stress} / 5**
+
+{"No transition pressure building." if streak_to_calm == 0 and streak_to_stress == 0 else "⚠️ Transition pressure building!"}
+
+---
+
+## ⚠️ Panic Override Check
+
+* **QQQ Daily Return:** {qqq_return:+.1f}%
+* **Panic Threshold:** ≤ −4.0% {'(MET! 🚨)' if panic_drop else '(not met)'}
+* **Vol Ratio ≥ 1.60:** {'MET! 🚨' if panic_vol else 'Not met'}
+
+{'🚨 PANIC CONDITIONS DETECTED!' if panic_drop or panic_vol else 'No panic conditions detected.'}
+
+---
+
+## 🧭 Model Interpretation (Signal-Relevant Only)
+
+* Volatility is **{"elevated" if current_vol_ratio > 1.2 else "contained" if current_vol_ratio < 0.9 else "moderate"}**
+* Market is offering **{"high" if current_vol_ratio > 1.3 else "moderate" if current_vol_ratio > 1.0 else "low"} risk**
+* Model is {'fully levered' if current_exposure == 1.0 else 'partially levered' if current_exposure > 0 else 'in cash'}
+
+{'No action required.' if not exposure_changed else '⚠️ Position adjusted today.'}
+
+---
+
+## ⏭️ What Would Change Exposure
+
+Exposure will change **only if** one of the following occurs:
+
+* **Increase to {100 if current_exposure < 1.0 else 'MAX'}%:**
+  Vol Ratio < 0.80 for 20 consecutive trading days
+
+* **Decrease to {25 if current_exposure > 0.25 else 0}%:**
+  Vol Ratio > 1.30 for 5 consecutive trading days
+
+* **Immediate 0%:**
+  Volatility shock or single-day QQQ loss ≥ −4%
+
+Until then: **hold exposure steady.**
+
+---
+
+**Model Status:** Active | Fully systematic | No overrides
+
+—
+*This update reflects model output only. No discretion, forecasts, or opinions are applied.*
+"""
+
+    return message
 
 
 def generate_html_report(
@@ -964,40 +1156,51 @@ def main(args):
     tqqq_returns = tqqq_df["Close"].pct_change()
     calculate_diagnostics(regimes, strategy_returns, equity, bnh_equity, tqqq_returns)
 
-    # Step 6: Save results
-    results = pd.DataFrame(
-        {
-            "QQQ_Close": qqq_df["Close"],
-            "TQQQ_Close": tqqq_df["Close"],
-            "Vol_Ratio": vol_ratio,
-            "Regime": regimes.map(lambda x: x.value if x else None),
-            "Exposure": exposure,
-            "Strategy_Return": strategy_returns,
-            "Strategy_Equity": equity,
-            "BnH_Equity": bnh_equity,
-        }
-    )
-    results.to_csv(args.output)
-    logging.info(f"\nSaved results to {args.output}")
+    # Step 6: Send Telegram update or generate reports
+    if args.send_telegram:
+        # Telegram mode: send message only, skip CSV and HTML
+        logging.info("\nGenerating and sending Telegram update...")
+        message = generate_telegram_message(vol_ratio, regimes, exposure, qqq_df)
+        send_message_to_telegram(message, format="Markdown")
+        logging.info("Telegram message sent successfully")
+    else:
+        # Report mode: generate CSV and optionally HTML
+        # Save results to temp directory
+        temp_dir = Path(tempfile.gettempdir())
+        csv_file = temp_dir / args.output
 
-    # Step 7: Generate HTML report
-    logging.info("Generating HTML report...")
-    tqqq_returns = tqqq_df["Close"].pct_change()
-    html_file = generate_html_report(
-        vol_ratio,
-        regimes,
-        equity,
-        bnh_equity,
-        exposure,
-        strategy_returns,
-        tqqq_returns,
-        args.start_date,
-        args.end_date,
-    )
+        results = pd.DataFrame(
+            {
+                "QQQ_Close": qqq_df["Close"],
+                "TQQQ_Close": tqqq_df["Close"],
+                "Vol_Ratio": vol_ratio,
+                "Regime": regimes.map(lambda x: x.value if x else None),
+                "Exposure": exposure,
+                "Strategy_Return": strategy_returns,
+                "Strategy_Equity": equity,
+                "BnH_Equity": bnh_equity,
+            }
+        )
+        results.to_csv(csv_file)
+        logging.info(f"\nSaved results to {csv_file}")
 
-    if args.open_html:
-        logging.info(f"Opening HTML report in browser...")
-        subprocess.run(["open", str(html_file)], check=False)
+        # Generate HTML report
+        logging.info("Generating HTML report...")
+        html_file = generate_html_report(
+            vol_ratio,
+            regimes,
+            equity,
+            bnh_equity,
+            exposure,
+            strategy_returns,
+            tqqq_returns,
+            args.start_date,
+            args.end_date,
+        )
+
+        if args.open_html:
+            logging.info(f"Opening HTML report in browser...")
+            subprocess.run(["open", str(html_file)], check=False)
 
 
 if __name__ == "__main__":
