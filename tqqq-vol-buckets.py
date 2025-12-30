@@ -14,11 +14,16 @@ TQQQ Volatility Bucket Strategy
 Implements a dynamic position sizing strategy for TQQQ based on QQQ volatility regimes.
 Uses ATR-based volatility with hysteresis to avoid overtrading.
 
+The uninvested portion (1 - TQQQ exposure) can be allocated to an alternate ETF
+(configured via TREASURY_TICKER), or left as cash.
+
 Usage:
 ./tqqq-vol-buckets.py -h
 
 ./tqqq-vol-buckets.py -v # To log INFO messages
 ./tqqq-vol-buckets.py -vv # To log DEBUG messages
+./tqqq-vol-buckets.py --open
+./tqqq-vol-buckets.py --no-alternate # Use cash instead of TREASURY_TICKER
 """
 
 import logging
@@ -36,11 +41,11 @@ from plotly.subplots import make_subplots
 from common.market_data import download_ticker_data
 
 # Strategy Configuration
-EXPOSURE_LEVELS = [0.00, 0.25, 0.60]  # Available exposure buckets
+EXPOSURE_LEVELS = [0.00, 0.25, 0.70]  # Available exposure buckets
 HYSTERESIS_DAYS = 10  # Days required to size up
 VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
 VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
-TREASURY_TICKER = "BIL"  # Treasury ETF for non-TQQQ allocation (short-term bills)
+TREASURY_TICKER = "GLD"  # Alternative ETF for non-TQQQ allocation
 
 
 def setup_logging(verbosity):
@@ -79,6 +84,13 @@ def parse_args():
         dest="open_html",
         help="Open HTML report in default browser",
     )
+    parser.add_argument(
+        "--no-alternate",
+        action="store_false",
+        dest="use_alternate",
+        help=f"Do not allocate uninvested portion to {TREASURY_TICKER} (use cash instead)",
+    )
+    parser.set_defaults(use_alternate=True)
     return parser.parse_args()
 
 
@@ -214,9 +226,32 @@ def calculate_metrics(returns, label="Strategy"):
 
 
 def generate_html_report(
-    output_dir, results_df_data, metrics_df, exposure_dist, start_date, end_date
+    output_dir,
+    results_df_data,
+    metrics_df,
+    exposure_dist,
+    start_date,
+    end_date,
+    treasury_label,
 ):
     """Generate HTML report with embedded interactive Plotly charts"""
+
+    exposure_series = results_df_data["actual_exposure"].dropna()
+    total_transitions = int(exposure_series.diff().fillna(0).ne(0).sum())
+    if len(exposure_series.index) >= 2:
+        total_years = (
+            exposure_series.index[-1] - exposure_series.index[0]
+        ).days / 365.25
+    else:
+        total_years = np.nan
+    transitions_per_year = (
+        (total_transitions / total_years)
+        if (np.isfinite(total_years) and total_years > 0)
+        else np.nan
+    )
+    transitions_per_year_display = (
+        f"{transitions_per_year:.1f}" if np.isfinite(transitions_per_year) else "N/A"
+    )
 
     # Calculate equity curves and drawdowns for plotting
     strategy_equity = (1 + results_df_data["strategy_returns"]).cumprod()
@@ -351,6 +386,46 @@ def generate_html_report(
         yaxis=dict(range=[-5, 105]),
     )
     charts_html.append(fig3.to_html(full_html=False, include_plotlyjs=False))
+
+    fig3_treasury = go.Figure()
+    treasury_exposure_pct = (1 - results_df_data["actual_exposure"]) * 100
+    fig3_treasury.add_trace(
+        go.Scatter(
+            x=results_df_data.index,
+            y=treasury_exposure_pct,
+            mode="lines",
+            name=f"{treasury_label} Allocation",
+            line=dict(color="darkgreen", width=2),
+        )
+    )
+    fig3_treasury.add_trace(
+        go.Scatter(
+            x=results_df_data.index[size_down],
+            y=treasury_exposure_pct[size_down],
+            mode="markers",
+            name="Size Up",
+            marker=dict(color="green", size=10, symbol="triangle-up"),
+        )
+    )
+    fig3_treasury.add_trace(
+        go.Scatter(
+            x=results_df_data.index[size_up],
+            y=treasury_exposure_pct[size_up],
+            mode="markers",
+            name="Size Down",
+            marker=dict(color="red", size=10, symbol="triangle-down"),
+        )
+    )
+    fig3_treasury.update_layout(
+        title=f"{treasury_label} Allocation with Buy/Sell Signals",
+        xaxis_title="Date",
+        yaxis_title="Allocation (%)",
+        template="plotly_white",
+        height=500,
+        hovermode="x unified",
+        yaxis=dict(range=[-5, 105]),
+    )
+    charts_html.append(fig3_treasury.to_html(full_html=False, include_plotlyjs=False))
 
     # Chart 4: Volatility Regime
     vol_ratio = results_df_data["vol_ratio"].dropna()
@@ -917,7 +992,18 @@ def generate_html_report(
                     </div>
 """
 
-    html_content += """                </div>
+    html_content += f"""                </div>
+                <div class="exposure-stats">
+                    <h3>Transition Stats</h3>
+                    <div class="exposure-item">
+                        <span>Total Transitions:</span>
+                        <span class="highlight">{total_transitions}</span>
+                    </div>
+                    <div class="exposure-item">
+                        <span>Transitions / Year:</span>
+                        <span class="highlight">{transitions_per_year_display}</span>
+                    </div>
+                </div>
             </div>
 """
 
@@ -926,6 +1012,7 @@ def generate_html_report(
         "Equity Curves Comparison",
         "Drawdown Comparison",
         "Position Sizing with Signals",
+        f"{treasury_label} Allocation with Signals",
         "Volatility Regime",
         "Rolling 1-Year Returns",
         "Rolling Sharpe Ratio",
@@ -983,7 +1070,9 @@ def main(args):
 
     # Create temporary output directory
     temp_base = Path(tempfile.gettempdir())
-    output_dir = temp_base / "tqqq_vol_buckets"
+    output_dir = temp_base / (
+        "tqqq_vol_buckets" if args.use_alternate else "tqqq_vol_buckets_cash"
+    )
     output_dir.mkdir(exist_ok=True)
 
     # 1. Data Acquisition
@@ -996,10 +1085,18 @@ def main(args):
     logging.info(f"Downloading TQQQ data from {start_date} to {end_date}")
     tqqq_data = download_ticker_data("TQQQ", start_date, end_date)
 
-    logging.info(f"Downloading {TREASURY_TICKER} data from {start_date} to {end_date}")
-    treasury_data = download_ticker_data(TREASURY_TICKER, start_date, end_date)
+    treasury_data = pd.DataFrame()
+    if args.use_alternate:
+        logging.info(
+            f"Downloading {TREASURY_TICKER} data from {start_date} to {end_date}"
+        )
+        treasury_data = download_ticker_data(TREASURY_TICKER, start_date, end_date)
 
-    if qqq_data.empty or tqqq_data.empty or treasury_data.empty:
+    if (
+        qqq_data.empty
+        or tqqq_data.empty
+        or (args.use_alternate and treasury_data.empty)
+    ):
         logging.error("Failed to download data")
         return
 
@@ -1018,17 +1115,24 @@ def main(args):
     # 5. Calculate Returns
     logging.info("Calculating strategy returns")
     tqqq_returns = tqqq_data["Close"].pct_change()
-    treasury_returns = treasury_data["Close"].pct_change()
+    treasury_returns = (
+        treasury_data["Close"].pct_change()
+        if args.use_alternate
+        else pd.Series(dtype=float)
+    )
 
     # Align indices
-    common_index = (
-        actual_exposure.dropna()
-        .index.intersection(tqqq_returns.dropna().index)
-        .intersection(treasury_returns.dropna().index)
+    common_index = actual_exposure.dropna().index.intersection(
+        tqqq_returns.dropna().index
     )
+    if args.use_alternate:
+        common_index = common_index.intersection(treasury_returns.dropna().index)
     actual_exposure = actual_exposure.loc[common_index]
     tqqq_returns = tqqq_returns.loc[common_index]
-    treasury_returns = treasury_returns.loc[common_index]
+    if args.use_alternate:
+        treasury_returns = treasury_returns.loc[common_index]
+    else:
+        treasury_returns = pd.Series(0.0, index=common_index)
 
     # Strategy returns: TQQQ portion + Treasury portion
     # If 60% TQQQ, then 40% treasuries, etc.
@@ -1090,7 +1194,13 @@ def main(args):
     # Generate HTML report
     logging.info("\nGenerating HTML report...")
     html_file = generate_html_report(
-        output_dir, results, results_df, exposure_dist, start_date, end_date
+        output_dir,
+        results,
+        results_df,
+        exposure_dist,
+        start_date,
+        end_date,
+        TREASURY_TICKER if args.use_alternate else "Cash",
     )
 
     # Print all output files
