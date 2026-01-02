@@ -1,7 +1,6 @@
 import ccxt
 
-from common.environment import EXCHANGE_API_KEY
-from common.environment import EXCHANGE_API_SECRET
+from common.environment import EXCHANGE_API_KEY, EXCHANGE_API_SECRET
 
 
 def exchange_factory(exchange_id):

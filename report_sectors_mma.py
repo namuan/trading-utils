@@ -98,6 +98,7 @@ if __name__ == "__main__":
                 y=pct_change_df[ticker],
                 name=ticker,
                 mode="lines",
+                meta=all_tickers.get(ticker, ""),
             )
         )
 
@@ -121,7 +122,7 @@ if __name__ == "__main__":
         ],
     )
     comparison_fig.update_traces(
-        hovertemplate="%{fullData.name}<br>%{x|%Y-%m-%d}: %{y:.2f}%<extra></extra>"
+        hovertemplate="%{fullData.name}: %{meta}<br>%{x|%Y-%m-%d}: %{y:.2f}%<extra></extra>"
     )
     comparison_fig.update_xaxes(rangeslider_visible=True)
 

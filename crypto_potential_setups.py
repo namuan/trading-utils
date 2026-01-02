@@ -1,6 +1,7 @@
 """
 Find potential setups
 """
+
 import logging
 import operator
 from argparse import ArgumentParser

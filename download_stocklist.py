@@ -2,6 +2,7 @@
 Downloads available list of tickers from ftp.nasdaqtrader.com servers.
 The combined ticker list is saved as csv file in the data folder
 """
+
 import os
 from argparse import ArgumentParser
 from ftplib import FTP

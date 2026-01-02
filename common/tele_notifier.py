@@ -1,10 +1,12 @@
 import requests
 
-from common.environment import DEFAULT_BOT_TOKEN
-from common.environment import GROUP_CHAT_ID
-from common.environment import PUSHOVER_TOKEN
-from common.environment import PUSHOVER_URL
-from common.environment import PUSHOVER_USER
+from common.environment import (
+    DEFAULT_BOT_TOKEN,
+    GROUP_CHAT_ID,
+    PUSHOVER_TOKEN,
+    PUSHOVER_URL,
+    PUSHOVER_USER,
+)
 
 
 def get_url(method, token):

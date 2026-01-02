@@ -1,15 +1,14 @@
 """
 Crypto Bot running based on a given strategy
 """
+
 import logging
 
 import mplfinance as mpf
 
 from common.analyst import resample_candles
 from common.logger import init_logging
-from common.steps import parse_args
-from common.steps import procedure
-from common.steps import TradeSignal
+from common.steps import TradeSignal, parse_args, procedure
 from common.steps_runner import run_forever_with
 
 
@@ -42,9 +41,9 @@ class GenerateChart:
         args = context["args"]
         chart_title = f"{args.coin}_{args.stable_coin}_60m"
         context["chart_name"] = chart_title
-        context[
-            "chart_file_path"
-        ] = chart_file_path = f"output/{chart_title.lower()}-rsi.png"
+        context["chart_file_path"] = chart_file_path = (
+            f"output/{chart_title.lower()}-rsi.png"
+        )
         save = dict(fname=chart_file_path)
         rsi_plot = [
             mpf.make_addplot(

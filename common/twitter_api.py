@@ -4,10 +4,12 @@ import time
 import tweepy
 from dotenv import load_dotenv
 
-from common.environment import TWITTER_ACCESS_TOKEN_KEY
-from common.environment import TWITTER_ACCESS_TOKEN_SECRET
-from common.environment import TWITTER_CONSUMER_KEY
-from common.environment import TWITTER_CONSUMER_SECRET
+from common.environment import (
+    TWITTER_ACCESS_TOKEN_KEY,
+    TWITTER_ACCESS_TOKEN_SECRET,
+    TWITTER_CONSUMER_KEY,
+    TWITTER_CONSUMER_SECRET,
+)
 
 load_dotenv()
 

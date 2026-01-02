@@ -1,6 +1,7 @@
 """
 Crypto Bot running based on a given strategy
 """
+
 import logging
 
 import mplfinance as mpf
@@ -8,9 +9,7 @@ from mplfinance.plotting import make_addplot
 
 from common.analyst import resample_candles
 from common.logger import init_logging
-from common.steps import parse_args
-from common.steps import procedure
-from common.steps import TradeSignal
+from common.steps import TradeSignal, parse_args, procedure
 from common.steps_runner import run_forever_with
 
 
@@ -52,9 +51,9 @@ class GenerateChart:
                 )
             )
 
-        context[
-            "chart_file_path"
-        ] = chart_file_path = f"output/{chart_title.lower()}-mma.png"
+        context["chart_file_path"] = chart_file_path = (
+            f"output/{chart_title.lower()}-mma.png"
+        )
         save = dict(fname=chart_file_path)
         fig, axes = mpf.plot(
             df,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 Simulates stock data for a given ticker symbol over multiple generations and prints the resulting data frames along with their RSI values.
 
 Example:
@@ -22,9 +22,9 @@ To install required packages:
     or
     pip install pandas yfinance finta
 """
+
 import argparse
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pandas as pd
 from finta import TA

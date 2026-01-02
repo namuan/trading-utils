@@ -24,7 +24,9 @@ def filter_dates(expiries: Any) -> List[str]:
     Returns:
         List of expiration date strings before the 45-day cutoff.
     """
-    if not hasattr(expiries, 'expirations') or not hasattr(expiries.expirations, 'date'):
+    if not hasattr(expiries, "expirations") or not hasattr(
+        expiries.expirations, "date"
+    ):
         logging.error("Invalid expiries object: missing 'expirations.date' attribute.")
         return []
 
@@ -59,9 +61,10 @@ def has_weekly_expiries_in_dates(dates: List[str]) -> bool:
         sorted_dates = sorted(dates)
         return any(
             (
-                    datetime.strptime(sorted_dates[i], "%Y-%m-%d").date() -
-                    datetime.strptime(sorted_dates[i - 1], "%Y-%m-%d").date()
-            ).days == 7
+                datetime.strptime(sorted_dates[i], "%Y-%m-%d").date()
+                - datetime.strptime(sorted_dates[i - 1], "%Y-%m-%d").date()
+            ).days
+            == 7
             for i in range(1, len(sorted_dates))
         )
     except ValueError as e:
@@ -69,7 +72,9 @@ def has_weekly_expiries_in_dates(dates: List[str]) -> bool:
         return False
 
 
-def process_option_chain(chain: Any, underlying_price: float, compute_details: bool = False) -> Optional[Dict[str, Optional[float]]]:
+def process_option_chain(
+    chain: Any, underlying_price: float, compute_details: bool = False
+) -> Optional[Dict[str, Optional[float]]]:
     """
     Process an option chain to compute the at-the-money (ATM) implied volatility.
     Optionally compute additional metrics like straddle price and bid/ask spread score.
@@ -83,28 +88,48 @@ def process_option_chain(chain: Any, underlying_price: float, compute_details: b
         A dictionary with at least the key 'atm_iv'. If compute_details is True,
         also returns 'straddle' and 'spread_score'. Returns None if chain is invalid.
     """
-    if not hasattr(chain, 'options') or not hasattr(chain.options, 'option'):
+    if not hasattr(chain, "options") or not hasattr(chain.options, "option"):
         logging.error("Invalid chain object: missing 'options.option' attribute.")
         return None
 
     options = chain.options.option
-    calls = [opt for opt in options if hasattr(opt, 'option_type') and opt.option_type == "call"]
-    puts = [opt for opt in options if hasattr(opt, 'option_type') and opt.option_type == "put"]
+    calls = [
+        opt
+        for opt in options
+        if hasattr(opt, "option_type") and opt.option_type == "call"
+    ]
+    puts = [
+        opt
+        for opt in options
+        if hasattr(opt, "option_type") and opt.option_type == "put"
+    ]
 
     if not calls or not puts:
         logging.warning("Missing calls or puts in option chain.")
         return None
 
     # Determine ATM options by selecting strikes closest to underlying price
-    call_option = min(calls, key=lambda opt: abs(opt.strike - underlying_price) if hasattr(opt, 'strike') else float('inf'))
-    put_option = min(puts, key=lambda opt: abs(opt.strike - underlying_price) if hasattr(opt, 'strike') else float('inf'))
+    call_option = min(
+        calls,
+        key=lambda opt: abs(opt.strike - underlying_price)
+        if hasattr(opt, "strike")
+        else float("inf"),
+    )
+    put_option = min(
+        puts,
+        key=lambda opt: abs(opt.strike - underlying_price)
+        if hasattr(opt, "strike")
+        else float("inf"),
+    )
 
-    if not hasattr(call_option, 'greeks') or not hasattr(put_option, 'greeks'):
+    if not hasattr(call_option, "greeks") or not hasattr(put_option, "greeks"):
         logging.error("Missing 'greeks' attribute in options.")
         return None
 
-    call_iv = call_option.greeks.mid_iv if hasattr(call_option.greeks, 'mid_iv') else None
-    put_iv = put_option.greeks.mid_iv if hasattr(put_option.greeks, 'mid_iv') else None
+    call_iv = (
+        call_option.greeks.mid_iv if hasattr(call_option.greeks, "mid_iv") else None
+    )
+    put_iv = put_option.greeks.mid_iv if hasattr(put_option.greeks, "mid_iv") else None
 
     if call_iv is None or put_iv is None:
         logging.error("Missing 'mid_iv' in option greeks.")
@@ -114,18 +139,26 @@ def process_option_chain(chain: Any, underlying_price: float, compute_details: b
     result = {"atm_iv": atm_iv_value}
 
     if compute_details:
-        call_bid = call_option.bid if hasattr(call_option, 'bid') else None
-        call_ask = call_option.ask if hasattr(call_option, 'ask') else None
-        put_bid = put_option.bid if hasattr(put_option, 'bid') else None
-        put_ask = put_option.ask if hasattr(put_option, 'ask') else None
+        call_bid = call_option.bid if hasattr(call_option, "bid") else None
+        call_ask = call_option.ask if hasattr(call_option, "ask") else None
+        put_bid = put_option.bid if hasattr(put_option, "bid") else None
+        put_ask = put_option.ask if hasattr(put_option, "ask") else None
 
         if all(x is not None for x in [call_bid, call_ask, put_bid, put_ask]):
             call_mid = (call_bid + call_ask) / 2.0
             put_mid = (put_bid + put_ask) / 2.0
             straddle = call_mid + put_mid
 
-            call_spread = (call_ask - call_bid) / ((call_ask + call_bid) / 2) if call_ask + call_bid != 0 else float('inf')
-            put_spread = (put_ask - put_bid) / ((put_ask + put_bid) / 2) if put_ask + put_bid != 0 else float('inf')
+            call_spread = (
+                (call_ask - call_bid) / ((call_ask + call_bid) / 2)
+                if call_ask + call_bid != 0
+                else float("inf")
+            )
+            put_spread = (
+                (put_ask - put_bid) / ((put_ask + put_bid) / 2)
+                if put_ask + put_bid != 0
+                else float("inf")
+            )
             avg_spread = (call_spread + put_spread) / 2
             spread_score = max(0, min(1, 1 - (avg_spread / 0.1)))
             result.update({"straddle": straddle, "spread_score": spread_score})
@@ -135,10 +168,10 @@ def process_option_chain(chain: Any, underlying_price: float, compute_details: b
 
 
 def yang_zhang(
-        price_data: pd.DataFrame,
-        window: int = 30,
-        trading_periods: int = 252,
-        return_last_only: bool = True,
+    price_data: pd.DataFrame,
+    window: int = 30,
+    trading_periods: int = 252,
+    return_last_only: bool = True,
 ) -> Union[float, pd.Series]:
     """
     Calculate the Yang-Zhang volatility estimator.
@@ -156,27 +189,37 @@ def yang_zhang(
     log_open_low = (price_data["low"] / price_data["open"]).apply(np.log)
     log_open_close = (price_data["close"] / price_data["open"]).apply(np.log)
 
-    log_prev_close_to_open = (price_data["open"] / price_data["close"].shift(1)).apply(np.log)
-    log_prev_close_to_open_sq = log_prev_close_to_open ** 2
+    log_prev_close_to_open = (price_data["open"] / price_data["close"].shift(1)).apply(
+        np.log
+    )
+    log_prev_close_to_open_sq = log_prev_close_to_open**2
 
-    log_close_to_close = (price_data["close"] / price_data["close"].shift(1)).apply(np.log)
-    log_close_to_close_sq = log_close_to_close ** 2
+    log_close_to_close = (price_data["close"] / price_data["close"].shift(1)).apply(
+        np.log
+    )
+    log_close_to_close_sq = log_close_to_close**2
 
     # Rogers-Satchell volatility component
-    rs = log_open_high * (log_open_high - log_open_close) + log_open_low * (log_open_low - log_open_close)
+    rs = log_open_high * (log_open_high - log_open_close) + log_open_low * (
+        log_open_low - log_open_close
+    )
     close_vol = log_close_to_close_sq.rolling(window=window).sum() / (window - 1)
     open_vol = log_prev_close_to_open_sq.rolling(window=window).sum() / (window - 1)
     window_rs = rs.rolling(window=window).sum() / (window - 1)
 
     k = 0.34 / (1.34 + ((window + 1) / (window - 1)))
-    result = (open_vol + k * close_vol + (1 - k) * window_rs).apply(np.sqrt) * np.sqrt(trading_periods)
+    result = (open_vol + k * close_vol + (1 - k) * window_rs).apply(np.sqrt) * np.sqrt(
+        trading_periods
+    )
 
     if return_last_only:
         return result.iloc[-1]
     return result.dropna()
 
 
-def build_term_structure(days: List[Union[int, float]], ivs: List[Union[int, float]]) -> Callable[[float], float]:
+def build_term_structure(
+    days: List[Union[int, float]], ivs: List[Union[int, float]]
+) -> Callable[[float], float]:
     """
     Build a linear term structure for implied volatilities over expiration days.
 
@@ -216,11 +259,11 @@ def build_term_structure(days: List[Union[int, float]], ivs: List[Union[int, flo
 
 
 def compute_score(
-        avg_volume: float,
-        iv30_rv30: float,
-        ts_slope: float,
-        has_weekly_expiries: bool,
-        spread_score: float,
+    avg_volume: float,
+    iv30_rv30: float,
+    ts_slope: float,
+    has_weekly_expiries: bool,
+    spread_score: float,
 ) -> float:
     """
     Compute a composite score using normalized metrics.
@@ -241,16 +284,16 @@ def compute_score(
 
     if has_weekly_expiries:
         return (
-                normalized_iv * 0.5
-                + normalized_avg_volume * 0.15
-                + normalized_ts * 0.15
-                + spread_score * 0.2
+            normalized_iv * 0.5
+            + normalized_avg_volume * 0.15
+            + normalized_ts * 0.15
+            + spread_score * 0.2
         )
     return (
-            normalized_iv * 0.4
-            + normalized_avg_volume * 0.2
-            + normalized_ts * 0.2
-            + spread_score * 0.2
+        normalized_iv * 0.4
+        + normalized_avg_volume * 0.2
+        + normalized_ts * 0.2
+        + spread_score * 0.2
     )
 
 
@@ -298,7 +341,7 @@ def format_number(number: Optional[float]) -> str:
 
 
 def calculate_recommendation(
-        avg_volume_threshold: bool, iv30_rv30_threshold: bool, ts_slope_0_45_threshold: bool
+    avg_volume_threshold: bool, iv30_rv30_threshold: bool, ts_slope_0_45_threshold: bool
 ) -> str:
     """
     Determine a recommendation based on threshold criteria.
@@ -314,14 +357,16 @@ def calculate_recommendation(
     if avg_volume_threshold and iv30_rv30_threshold and ts_slope_0_45_threshold:
         return "Recommended"
     if ts_slope_0_45_threshold and (
-            (avg_volume_threshold and not iv30_rv30_threshold)
-            or (iv30_rv30_threshold and not avg_volume_threshold)
+        (avg_volume_threshold and not iv30_rv30_threshold)
+        or (iv30_rv30_threshold and not avg_volume_threshold)
     ):
         return "Consider"
     return "Avoid"
 
 
-def compute_recommendation(ticker: str, config: Dict[str, Any] = None) -> Dict[str, Any]:
+def compute_recommendation(
+    ticker: str, config: Dict[str, Any] = None
+) -> Dict[str, Any]:
     """
     Compute market metrics and a recommendation for the given ticker.
 
@@ -373,7 +418,9 @@ def compute_recommendation(ticker: str, config: Dict[str, Any] = None) -> Dict[s
 
         # Process each option chain and extract ATM IV and details for the first valid chain.
         for i, (exp_date, chain) in enumerate(options_chains.items()):
-            process_result = process_option_chain(chain, underlying_price, compute_details=(i == 0))
+            process_result = process_option_chain(
+                chain, underlying_price, compute_details=(i == 0)
+            )
             if process_result is None:
                 continue
             atm_iv_dict[exp_date] = process_result["atm_iv"]
@@ -411,26 +458,41 @@ def compute_recommendation(ticker: str, config: Dict[str, Any] = None) -> Dict[s
         price_history["date"] = pd.to_datetime(price_history["date"])
         price_history.sort_values("date", inplace=True)
         price_history.set_index("date", inplace=True)
-        price_history["rolling_volume_mean"] = price_history["volume"].rolling(window=config["window"]).mean()
+        price_history["rolling_volume_mean"] = (
+            price_history["volume"].rolling(window=config["window"]).mean()
+        )
         avg_volume = price_history["rolling_volume_mean"].dropna().iloc[-1]
 
-        expected_move = (f"{round(straddle / underlying_price * 100, 2)}%"
-                         if straddle is not None else None)
+        expected_move = (
+            f"{round(straddle / underlying_price * 100, 2)}%"
+            if straddle is not None
+            else None
+        )
 
         term_spline = build_term_structure(dtes, ivs)
         # Prevent division by zero; if first expiry equals 45 days.
         if (config["cutoff_days"] - dtes[0]) == 0:
             ts_slope_0_45 = 0.0
         else:
-            ts_slope_0_45 = (term_spline(config["cutoff_days"]) - term_spline(dtes[0])) / (config["cutoff_days"] - dtes[0])
-        computed_yz = yang_zhang(price_history, window=config["window"], trading_periods=config["trading_periods"])
+            ts_slope_0_45 = (
+                term_spline(config["cutoff_days"]) - term_spline(dtes[0])
+            ) / (config["cutoff_days"] - dtes[0])
+        computed_yz = yang_zhang(
+            price_history,
+            window=config["window"],
+            trading_periods=config["trading_periods"],
+        )
         iv30_rv30 = term_spline(30) / computed_yz if computed_yz else 0
 
         # Define threshold flags
         avg_volume_threshold = avg_volume >= config["volume_threshold"]
         iv30_rv30_threshold = iv30_rv30 >= config["iv30_rv30_threshold"]
         ts_slope_threshold = ts_slope_0_45 <= config["ts_slope_threshold"]
-        spread_threshold = (spread_score >= config["spread_threshold"]) if spread_score is not None else False
+        spread_threshold = (
+            (spread_score >= config["spread_threshold"])
+            if spread_score is not None
+            else False
+        )
 
         recommendation = calculate_recommendation(
             avg_volume_threshold, iv30_rv30_threshold, ts_slope_threshold
@@ -460,7 +522,9 @@ def compute_recommendation(ticker: str, config: Dict[str, Any] = None) -> Dict[s
                 "IV30/RV30 Ratio": f"{iv30_rv30:.2f}",
                 "Term Structure Slope": f"{ts_slope_0_45:.6f}",
                 "Weekly Expiries": str(weekly_expiries),
-                "Bid-Ask Spread Score": f"{spread_score:.2f}" if spread_score is not None else "N/A",
+                "Bid-Ask Spread Score": f"{spread_score:.2f}"
+                if spread_score is not None
+                else "N/A",
             },
         }
     except Exception as e:

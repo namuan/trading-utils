@@ -19,6 +19,7 @@ Usage:
 ./vix_basis_analysis.py -v # To log INFO messages
 ./vix_basis_analysis.py -vv # To log DEBUG messages
 """
+
 import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
@@ -48,7 +49,9 @@ def setup_logging(verbosity):
 
 
 def parse_args():
-    parser = ArgumentParser(description=__doc__, formatter_class=RawDescriptionHelpFormatter)
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "-v",
         "--verbose",
@@ -128,14 +131,22 @@ def plot_analysis(merged_data, spy_data, dates_crossed_below, dates_crossed_abov
     ax1.tick_params(axis="x", rotation=45)
 
     # Plot Basis
-    ax2.plot(merged_data["Date"], merged_data["basis"], label="Basis (VXF - VIX)", color="blue")
+    ax2.plot(
+        merged_data["Date"],
+        merged_data["basis"],
+        label="Basis (VXF - VIX)",
+        color="blue",
+    )
     ax2.axhline(y=0, color="red", linestyle="--", label="Zero Line")
 
     # Plot crossover points
     if dates_crossed_below:
         ax2.scatter(
             dates_crossed_below,
-            [merged_data.loc[merged_data["Date"] == date, "basis"].iloc[0] for date in dates_crossed_below],
+            [
+                merged_data.loc[merged_data["Date"] == date, "basis"].iloc[0]
+                for date in dates_crossed_below
+            ],
             color="red",
             marker="v",
             s=100,
@@ -144,7 +155,10 @@ def plot_analysis(merged_data, spy_data, dates_crossed_below, dates_crossed_abov
     if dates_crossed_above:
         ax2.scatter(
             dates_crossed_above,
-            [merged_data.loc[merged_data["Date"] == date, "basis"].iloc[0] for date in dates_crossed_above],
+            [
+                merged_data.loc[merged_data["Date"] == date, "basis"].iloc[0]
+                for date in dates_crossed_above
+            ],
             color="green",
             marker="^",
             s=100,

@@ -23,6 +23,7 @@ Usage:
 ./earnings-scanner.py -v # To log INFO messages
 ./earnings-scanner.py -vv # To log DEBUG messages
 """
+
 import json
 import logging
 import os
@@ -33,10 +34,10 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from finvizfinance.screener.overview import Overview
 import finnhub
 import numpy as np
 from dotenv import load_dotenv
+from finvizfinance.screener.overview import Overview
 
 from earnings_vol_algo import compute_recommendation, format_number
 
@@ -58,8 +59,11 @@ def setup_logging(verbosity):
     )
     logging.captureWarnings(capture=True)
 
+
 def parse_args():
-    parser = ArgumentParser(description=__doc__, formatter_class=RawDescriptionHelpFormatter)
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
     parser.add_argument(
         "-v",
         "--verbose",
@@ -93,21 +97,22 @@ def parse_args():
     parser.add_argument(
         "--refresh-data",
         action="store_true",
-        help="Refresh the database with the latest data by clearing existing records"
+        help="Refresh the database with the latest data by clearing existing records",
     )
     # New flag to open the output report automatically
     parser.add_argument(
         "--open-report",
         action="store_true",
-        help="Open the generated HTML report in the default web browser"
+        help="Open the generated HTML report in the default web browser",
     )
     return parser.parse_args()
+
 
 def filter_tickers(filter_criteria):
     overview = Overview()
     overview.set_filter(filters_dict=filter_criteria)
     scanner_df = overview.screener_view()
-    return scanner_df['Ticker'].tolist()
+    return scanner_df["Ticker"].tolist()
 
 
 def get_earnings_calendar(days_ahead, symbols=None):
@@ -129,10 +134,7 @@ def get_earnings_calendar(days_ahead, symbols=None):
     try:
         if not symbols:
             earnings = finnhub_client.earnings_calendar(
-                _from=start_date,
-                to=end_date,
-                symbol="",
-                international=False
+                _from=start_date, to=end_date, symbol="", international=False
             )
             return earnings
         else:
@@ -142,10 +144,10 @@ def get_earnings_calendar(days_ahead, symbols=None):
                         _from=start_date,
                         to=end_date,
                         symbol=symbol.strip().upper(),
-                        international=False
+                        international=False,
                     )
-                    if earnings and 'earningsCalendar' in earnings:
-                        all_earnings.extend(earnings['earningsCalendar'])
+                    if earnings and "earningsCalendar" in earnings:
+                        all_earnings.extend(earnings["earningsCalendar"])
                 except Exception as e:
                     logging.error(f"Error fetching data for {symbol}: {str(e)}")
 
@@ -156,35 +158,37 @@ def get_earnings_calendar(days_ahead, symbols=None):
 
 
 def generate_html_row(entry, recommendation):
-    report_time = entry.get('hour', '').upper()
-    if report_time == 'BMO':
-        report_time = '☀️'  # Sun emoji for Before Market Open
-    elif report_time == 'AMC':
-        report_time = '🌙'  # Moon emoji for After Market Close
+    report_time = entry.get("hour", "").upper()
+    if report_time == "BMO":
+        report_time = "☀️"  # Sun emoji for Before Market Open
+    elif report_time == "AMC":
+        report_time = "🌙"  # Moon emoji for After Market Close
     elif not report_time:
-        report_time = 'Time Not Specified'
+        report_time = "Time Not Specified"
 
     estimates = []
-    if entry.get('epsEstimate') is not None:
+    if entry.get("epsEstimate") is not None:
         estimates.append(f"EPS est: ${entry['epsEstimate']:.2f}")
-    if entry.get('epsActual') is not None:
+    if entry.get("epsActual") is not None:
         estimates.append(f"EPS act: ${entry['epsActual']:.2f}")
-    if entry.get('revenueEstimate') is not None:
+    if entry.get("revenueEstimate") is not None:
         estimates.append(f"Rev est: {format_number(entry['revenueEstimate'])}")
-    if entry.get('revenueActual') is not None:
+    if entry.get("revenueActual") is not None:
         estimates.append(f"Rev act: {format_number(entry['revenueActual'])}")
 
     if isinstance(recommendation, dict):
-        criteria_met = sum([
-            recommendation['avg_volume'],
-            recommendation['iv30_rv30'],
-            recommendation['ts_slope_0_45']
-        ])
+        criteria_met = sum(
+            [
+                recommendation["avg_volume"],
+                recommendation["iv30_rv30"],
+                recommendation["ts_slope_0_45"],
+            ]
+        )
 
         checks = [
-            ('High Volume', recommendation['avg_volume']),
-            ('IV/RV Ratio', recommendation['iv30_rv30']),
-            ('Term Structure', recommendation['ts_slope_0_45'])
+            ("High Volume", recommendation["avg_volume"]),
+            ("IV/RV Ratio", recommendation["iv30_rv30"]),
+            ("Term Structure", recommendation["ts_slope_0_45"]),
         ]
 
         criteria_html = f"{criteria_met}/3<br>" + "<br>".join(
@@ -193,11 +197,11 @@ def generate_html_row(entry, recommendation):
             for name, passed in checks
         )
 
-        expected_move = recommendation['expected_move'] or "N/A"
+        expected_move = recommendation["expected_move"] or "N/A"
 
         metrics_html = ""
-        if 'detailed_metrics' in recommendation:
-            metrics = recommendation['detailed_metrics']
+        if "detailed_metrics" in recommendation:
+            metrics = recommendation["detailed_metrics"]
             metrics_html = "<br>".join(f"{k}: {v}" for k, v in metrics.items())
 
         return f"""
@@ -221,7 +225,7 @@ def init_db(db_file="earnings_data.db"):
     # Use Row factory to access columns by name
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    cur.execute('''
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS earnings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT,
@@ -239,7 +243,7 @@ def init_db(db_file="earnings_data.db"):
             raw_metrics TEXT,
             recommendation_category TEXT
         )
-    ''')
+    """)
     conn.commit()
     return conn
 
@@ -269,11 +273,13 @@ def store_entry(conn, entry, recommendation):
     revenue_actual = entry.get("revenueActual")
 
     # Convert NumPy booleans to native bool for JSON serialization
-    criteria_met = json.dumps({
-        "High Volume": bool(recommendation.get("avg_volume")),
-        "IV/RV Ratio": bool(recommendation.get("iv30_rv30")),
-        "Term Structure": bool(recommendation.get("ts_slope_0_45"))
-    })
+    criteria_met = json.dumps(
+        {
+            "High Volume": bool(recommendation.get("avg_volume")),
+            "IV/RV Ratio": bool(recommendation.get("iv30_rv30")),
+            "Term Structure": bool(recommendation.get("ts_slope_0_45")),
+        }
+    )
     expected_move = recommendation.get("expected_move")
     detailed_metrics = json.dumps(recommendation.get("detailed_metrics", {}))
     score = recommendation.get("score")
@@ -285,18 +291,37 @@ def store_entry(conn, entry, recommendation):
 
     # Convert raw_metrics booleans to native bool if necessary
     raw_metrics_dict = recommendation.get("raw_metrics", {})
-    raw_metrics = json.dumps({k: (bool(v) if isinstance(v, (np.bool_, bool)) else v) for k, v in raw_metrics_dict.items()})
+    raw_metrics = json.dumps(
+        {
+            k: (bool(v) if isinstance(v, (np.bool_, bool)) else v)
+            for k, v in raw_metrics_dict.items()
+        }
+    )
 
-    cur.execute('''
-        INSERT INTO earnings 
-        (date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, 
+    cur.execute(
+        """
+        INSERT INTO earnings
+        (date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual,
          criteria_met, expected_move, detailed_metrics, score, underlying_price, raw_metrics, recommendation_category)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        date, symbol, report_time, eps_estimate, eps_actual,
-        revenue_estimate, revenue_actual, criteria_met, expected_move,
-        detailed_metrics, score, underlying_price, raw_metrics, recommendation_category
-    ))
+    """,
+        (
+            date,
+            symbol,
+            report_time,
+            eps_estimate,
+            eps_actual,
+            revenue_estimate,
+            revenue_actual,
+            criteria_met,
+            expected_move,
+            detailed_metrics,
+            score,
+            underlying_price,
+            raw_metrics,
+            recommendation_category,
+        ),
+    )
     conn.commit()
 
 
@@ -330,15 +355,22 @@ def main(args):
     if args.refresh_data:
         refresh_db(db_conn)
 
-    logging.info(f"Found {len(companies_with_earnings)} companies with earnings in the next {args.days} day(s)")
-    for entry in sorted(companies_with_earnings, key=lambda x: x['date']):
+    logging.info(
+        f"Found {len(companies_with_earnings)} companies with earnings in the next {args.days} day(s)"
+    )
+    for entry in sorted(companies_with_earnings, key=lambda x: x["date"]):
         cur = db_conn.cursor()
-        cur.execute("SELECT 1 FROM earnings WHERE symbol=? AND date=?", (entry.get("symbol"), entry.get("date")))
+        cur.execute(
+            "SELECT 1 FROM earnings WHERE symbol=? AND date=?",
+            (entry.get("symbol"), entry.get("date")),
+        )
         if cur.fetchone() is not None:
-            logging.info(f"Skipping existing record for {entry.get('symbol')} on {entry.get('date')}")
+            logging.info(
+                f"Skipping existing record for {entry.get('symbol')} on {entry.get('date')}"
+            )
             continue
 
-        symbol = entry['symbol']
+        symbol = entry["symbol"]
         logging.info(f"Processing {symbol} ...")
         try:
             recommendation = compute_recommendation(symbol)
@@ -351,7 +383,7 @@ def main(args):
     # Generate the report using data from the database with named columns, including recommendation_category
     cur = db_conn.cursor()
     cur.execute("""
-        SELECT date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual, 
+        SELECT date, symbol, report_time, eps_estimate, eps_actual, revenue_estimate, revenue_actual,
                criteria_met, expected_move, detailed_metrics, score, underlying_price, recommendation_category
         FROM earnings
     """)
@@ -362,11 +394,7 @@ def main(args):
         return
 
     # Group rows by recommendation_category
-    grouped_rows = {
-        "Recommended": [],
-        "Consider": [],
-        "Avoid": []
-    }
+    grouped_rows = {"Recommended": [], "Consider": [], "Avoid": []}
 
     for row in db_rows:
         category = row["recommendation_category"]
@@ -395,9 +423,15 @@ def main(args):
             )
             detailed_metrics = json.loads(row["detailed_metrics"])
             metrics_html = "<br>".join(f"{k}: {v}" for k, v in detailed_metrics.items())
-            expected_move = row["expected_move"] if row["expected_move"] is not None else "N/A"
+            expected_move = (
+                row["expected_move"] if row["expected_move"] is not None else "N/A"
+            )
             score_str = f"{row['score']:.2f}" if row["score"] is not None else "N/A"
-            underlying_price = row["underlying_price"] if row["underlying_price"] is not None else "N/A"
+            underlying_price = (
+                row["underlying_price"]
+                if row["underlying_price"] is not None
+                else "N/A"
+            )
 
             html_row = f"""
                 <tr>
@@ -412,7 +446,9 @@ def main(args):
                     <td>{score_str}</td>
                 </tr>
             """
-            html_rows.append((row["score"] if row["score"] is not None else 0, html_row))
+            html_rows.append(
+                (row["score"] if row["score"] is not None else 0, html_row)
+            )
         # Sort each group descending by score
         html_rows.sort(key=lambda x: x[0], reverse=True)
         # Only keep the HTML portion of the rows
@@ -421,7 +457,7 @@ def main(args):
     generate_report(args.output, grouped_html)
 
     if args.open_report:
-        webbrowser.open('file://' + os.path.abspath(args.output))
+        webbrowser.open("file://" + os.path.abspath(args.output))
 
 
 def generate_report(output_file, grouped_html):
@@ -525,7 +561,7 @@ def generate_report(output_file, grouped_html):
 </body>
 </html>
 """
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         f.write(html_template)
     logging.info(f"\nReport generated successfully: {output_file}")
 

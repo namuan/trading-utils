@@ -32,8 +32,6 @@ macro_etfs = {
     "EWZ": "Brazil",
     "EWY": "Korea",
     "FXI": "China",
-    "INDA": "iShares MSCI India ETF",
-    "PAK": "Global X MSCI Pakistan ETF",
     "BKF": "BRIC (Brazil, Russia, India, China)",
     "EWG": "Germany",
     "EWU": "United Kingdom",
@@ -96,5 +94,4 @@ macro_etfs = {
     "FXF": "Swiss Franc",
     "CYB": "Chinese Yuan",
     "CEW": "Emerging Currency",
-    "DBV": "G10 Currency Harvest",
 }

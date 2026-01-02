@@ -12,20 +12,20 @@
 # ///
 import argparse
 import math
-from typing import Dict
-from typing import List
+from typing import Dict, List
 
-from ib_async import Contract
-from ib_async import Future
-from ib_async import FuturesOption
-from ib_async import Index
-from ib_async import Option
-from ib_async import Position
-from ib_async import Stock
-from ib_async import Ticker
+from ib_async import (
+    Contract,
+    Future,
+    FuturesOption,
+    Index,
+    Option,
+    Position,
+    Stock,
+    Ticker,
+)
 
-from common.ib import get_next_futures_expiry
-from common.ib import setup_ib
+from common.ib import get_next_futures_expiry, setup_ib
 
 ib = setup_ib()
 ib.reqMarketDataType(2)
@@ -125,32 +125,33 @@ def main(_):
     for expiry, trades in grouped_trades.items():
         for trade in trades:
             if isinstance(trade.contract, FuturesOption):
-                contracts_to_query.append(FuturesOption(
-                    symbol=trade.contract.symbol,
-                    lastTradeDateOrContractMonth=trade.contract.lastTradeDateOrContractMonth,
-                    strike=trade.contract.strike,
-                    right=trade.contract.right,
-                ))
+                contracts_to_query.append(
+                    FuturesOption(
+                        symbol=trade.contract.symbol,
+                        lastTradeDateOrContractMonth=trade.contract.lastTradeDateOrContractMonth,
+                        strike=trade.contract.strike,
+                        right=trade.contract.right,
+                    )
+                )
             else:
-                contracts_to_query.append(Option(
-                    symbol=trade.contract.symbol,
-                    lastTradeDateOrContractMonth=trade.contract.lastTradeDateOrContractMonth,
-                    strike=trade.contract.strike,
-                    right=trade.contract.right,
-                    exchange='SMART',
-                ))
+                contracts_to_query.append(
+                    Option(
+                        symbol=trade.contract.symbol,
+                        lastTradeDateOrContractMonth=trade.contract.lastTradeDateOrContractMonth,
+                        strike=trade.contract.strike,
+                        right=trade.contract.right,
+                        exchange="SMART",
+                    )
+                )
 
     print(f"Total contracts found {len(contracts_to_query)}. Requesting details...")
-    contracts_details = ib.reqTickers(
-        *(ib.qualifyContracts(*contracts_to_query))
-    )
+    contracts_details = ib.reqTickers(*(ib.qualifyContracts(*contracts_to_query)))
     print("💡💡💡💡💡💡💡 POSITIONS 💡💡💡💡💡💡💡")
     for trade in options_trades:
         print(trade)
     print("🤓🤓🤓🤓🤓🤓🤓 LATEST PRICES 🤓🤓🤓🤓🤓🤓🤓")
     for contract in contracts_details:
         print(contract)
-
 
 
 if __name__ == "__main__":

@@ -2,8 +2,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from jinja2 import Environment
-from jinja2 import FileSystemLoader
+from jinja2 import Environment, FileSystemLoader
 from slug import slug
 
 from common.external_charts import build_chart_link

@@ -8,12 +8,9 @@ from finta import TA
 from stockstats import StockDataFrame
 
 from common.candle_pattern import identify_candle_pattern
-from common.environment import TRADING_ACCOUNT_VALUE
-from common.environment import TRADING_RISK_FACTOR
-from common.filesystem import earnings_file_path
-from common.filesystem import output_dir
-from common.market import download_ticker_data
-from common.market import large_cap_companies
+from common.environment import TRADING_ACCOUNT_VALUE, TRADING_RISK_FACTOR
+from common.filesystem import earnings_file_path, output_dir
+from common.market import download_ticker_data, large_cap_companies
 
 DAYS_IN_MONTH = 22
 MINIMUM_DAYS_DATA_REQUIRED = 200

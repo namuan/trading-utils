@@ -12,6 +12,7 @@ Usage:
 
 If start_date and end_date are not provided, the script defaults to the start of the current year and today, respectively.
 """
+
 import argparse
 import os
 from datetime import datetime

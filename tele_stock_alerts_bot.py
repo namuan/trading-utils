@@ -1,14 +1,15 @@
 import logging
 
 from telegram import Update
-from telegram.ext import CallbackContext
-from telegram.ext import CommandHandler
-from telegram.ext import Filters
-from telegram.ext import MessageHandler
-from telegram.ext import Updater
+from telegram.ext import (
+    CallbackContext,
+    CommandHandler,
+    Filters,
+    MessageHandler,
+    Updater,
+)
 
-from common.bot_wrapper import help_command
-from common.bot_wrapper import start
+from common.bot_wrapper import help_command, start
 from common.environment import (
     TELEGRAM_STOCK_ALERT_BOT,
 )

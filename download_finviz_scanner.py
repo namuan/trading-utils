@@ -7,11 +7,10 @@
 """
 Downloads stocks from finviz selected using a scanner
 """
+
 from argparse import ArgumentParser
 
 from finvizfinance.screener.overview import Overview
-
-from common.subprocess_runner import run_cmd
 
 
 def parse_args():
