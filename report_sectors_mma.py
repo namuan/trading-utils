@@ -5,6 +5,7 @@
 #   "numpy",
 #   "yfinance",
 #   "mplfinance",
+#   "plotly",
 #   "stockstats",
 #   "tqdm",
 #   "Jinja2",
@@ -17,10 +18,12 @@ Generate Multiple Moving Average charts for different sectors
 """
 
 import argparse
+from datetime import datetime
 from time import time_ns
 
 import mplfinance as mpf
 import pandas as pd
+import plotly.graph_objects as go
 from stockstats import StockDataFrame
 from tqdm import tqdm
 
@@ -65,6 +68,68 @@ if __name__ == "__main__":
     stocks_df = {
         ticker: read_from_csv(ticker) for ticker in tqdm(all_tickers, "Reading data")
     }
+
+    close_series = []
+    for ticker, df in stocks_df.items():
+        if df is None or df.empty or "close" not in df.columns:
+            continue
+        close_series.append(df["close"].rename(ticker))
+
+    close_df = pd.concat(close_series, axis=1, join="outer").dropna(how="all")
+    close_df.sort_index(inplace=True)
+    close_df = close_df.tail(252)
+    close_df = close_df.loc[:, close_df.notna().any(axis=0)]
+
+    pct_change_df = close_df.copy()
+    for ticker in pct_change_df.columns:
+        first_valid = close_df[ticker].dropna()
+        if first_valid.empty:
+            pct_change_df.drop(columns=[ticker], inplace=True)
+            continue
+        pct_change_df[ticker] = (
+            close_df[ticker].divide(first_valid.iloc[0]).subtract(1).multiply(100)
+        )
+
+    comparison_fig = go.Figure()
+    for ticker in pct_change_df.columns:
+        comparison_fig.add_trace(
+            go.Scatter(
+                x=pct_change_df.index,
+                y=pct_change_df[ticker],
+                name=ticker,
+                mode="lines",
+            )
+        )
+
+    comparison_fig.update_layout(
+        title="Macro ETFs Comparison",
+        xaxis_title="Date",
+        yaxis_title="% Gain/Loss",
+        hovermode="closest",
+        legend_title="Ticker",
+        shapes=[
+            {
+                "type": "line",
+                "x0": pct_change_df.index.min(),
+                "x1": pct_change_df.index.max(),
+                "y0": 0,
+                "y1": 0,
+                "xref": "x",
+                "yref": "y",
+                "line": {"color": "rgba(128,128,128,0.5)", "width": 1},
+            }
+        ],
+    )
+    comparison_fig.update_traces(
+        hovertemplate="%{fullData.name}<br>%{x|%Y-%m-%d}: %{y:.2f}%<extra></extra>"
+    )
+    comparison_fig.update_xaxes(rangeslider_visible=True)
+
+    comparison_chart_file = (
+        f"{datetime.now().strftime('%Y-%m-%d')}-macro-etfs-comparison.html"
+    )
+    comparison_chart_path = f"{output_dir()}/{comparison_chart_file}"
+    comparison_fig.write_html(comparison_chart_path, include_plotlyjs="cdn")
 
     # price / vol plot
     for ticker, desc in all_tickers.items():
@@ -118,6 +183,7 @@ if __name__ == "__main__":
     template_data = {
         "random_prefix": time_ns(),
         "sector_stocks": all_tickers.keys(),
+        "comparison_chart_file": comparison_chart_file,
     }
     output_file = generate_report(
         "Macro ETFs MMA", template_data, report_file_name="macro-mma.md"

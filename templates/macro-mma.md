@@ -1,5 +1,9 @@
 ## {{ now().strftime('%B %Y') }} Sectors Multiple Moving Averages
 
+### Macro ETFs Comparison (Interactive)
+
+[Open interactive comparison chart]({{ stocks["comparison_chart_file"] }})
+
 ### Sectors
 
 {% for stock in stocks["sector_stocks"] %}
