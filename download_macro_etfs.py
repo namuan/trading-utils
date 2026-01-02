@@ -1,6 +1,20 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "matplotlib",
+#   "numpy",
+#   "highlight_text",
+#   "yfinance",
+#   "tqdm",
+#   "yahoo_earnings_calendar",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 Download open, close, high, low and volume data for all available ETFs.
 """
+
 from argparse import ArgumentParser
 from datetime import datetime
 
