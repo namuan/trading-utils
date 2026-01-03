@@ -7,7 +7,8 @@
 #   "plotly",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
 #   "requests",
-#   "python-dotenv"
+#   "python-dotenv",
+#   "schedule"
 # ]
 # ///
 """
@@ -33,6 +34,7 @@ Usage:
 import logging
 import subprocess
 import tempfile
+import time
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +42,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import schedule
 from plotly.subplots import make_subplots
 
 from common.market_data import download_ticker_data
@@ -51,6 +54,11 @@ HYSTERESIS_DAYS = 10  # Days required to size up
 VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
 VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
 ALTERNATE_TICKER = "GLD"
+
+
+def is_weekday():
+    """Check if today is a weekday (Monday-Friday)."""
+    return datetime.now().weekday() < 5
 
 
 def setup_logging(verbosity):
@@ -100,6 +108,13 @@ def parse_args():
         action="store_true",
         dest="send_alert",
         help="Send Telegram alert only (skip CSV/HTML generation)",
+    )
+    parser.add_argument(
+        "-b",
+        "--run-as-bot",
+        action="store_true",
+        default=False,
+        help="Run as bot (scheduled at 9:00 AM on weekdays)",
     )
     parser.set_defaults(use_alternate=True)
     return parser.parse_args()
@@ -1247,13 +1262,13 @@ def generate_html_report(
     return html_file
 
 
-def main(args):
-    logging.info("Starting TQQQ Volatility Bucket Strategy Backtest")
+def run_analysis(start_date, end_date, use_alternate=True):
+    """Run the complete analysis and return all results.
 
-    # 1. Data Acquisition
-    start_date = "2010-02-10"  # TQQQ inception
-    end_date = datetime.today().strftime("%Y-%m-%d")
-
+    Returns:
+        tuple: (qqq_data, tqqq_data, treasury_data, vol_ratio, target_exposure,
+                actual_exposure, strategy_returns, tqqq_returns, treasury_returns, common_index)
+    """
     logging.info(f"Downloading QQQ data from {start_date} to {end_date}")
     qqq_data = download_ticker_data("QQQ", start_date, end_date)
 
@@ -1261,53 +1276,161 @@ def main(args):
     tqqq_data = download_ticker_data("TQQQ", start_date, end_date)
 
     treasury_data = pd.DataFrame()
-    if args.use_alternate:
+    if use_alternate:
         logging.info(
             f"Downloading {ALTERNATE_TICKER} data from {start_date} to {end_date}"
         )
         treasury_data = download_ticker_data(ALTERNATE_TICKER, start_date, end_date)
 
-    if (
-        qqq_data.empty
-        or tqqq_data.empty
-        or (args.use_alternate and treasury_data.empty)
-    ):
+    if qqq_data.empty or tqqq_data.empty or (use_alternate and treasury_data.empty):
         logging.error("Failed to download data")
-        return
+        return None
 
-    # 2. Calculate Volatility Ratio on QQQ
+    # Calculate Volatility Ratio on QQQ
     logging.info("Calculating volatility metrics on QQQ")
     vol_ratio = calculate_vol_ratio(qqq_data)
 
-    # 3. Determine Target Exposure
+    # Determine Target Exposure
     logging.info("Mapping volatility to exposure buckets")
     target_exposure = vol_ratio.apply(get_target_exposure)
 
-    # 4. Apply Hysteresis
+    # Apply Hysteresis
     logging.info("Applying hysteresis logic")
     actual_exposure = apply_hysteresis(target_exposure)
 
-    # 5. Calculate Returns
+    # Calculate Returns
     logging.info("Calculating strategy returns")
     tqqq_returns = tqqq_data["Close"].pct_change()
     treasury_returns = (
-        treasury_data["Close"].pct_change()
-        if args.use_alternate
-        else pd.Series(dtype=float)
+        treasury_data["Close"].pct_change() if use_alternate else pd.Series(dtype=float)
     )
 
     # Align indices
     common_index = actual_exposure.dropna().index.intersection(
         tqqq_returns.dropna().index
     )
-    if args.use_alternate:
+    if use_alternate:
         common_index = common_index.intersection(treasury_returns.dropna().index)
     actual_exposure = actual_exposure.loc[common_index]
     tqqq_returns = tqqq_returns.loc[common_index]
-    if args.use_alternate:
+    if use_alternate:
         treasury_returns = treasury_returns.loc[common_index]
     else:
         treasury_returns = pd.Series(0.0, index=common_index)
+
+    # Strategy returns: TQQQ portion + Treasury portion
+    tqqq_portion = actual_exposure * tqqq_returns
+    treasury_portion = (1 - actual_exposure) * treasury_returns
+    strategy_returns = tqqq_portion + treasury_portion
+
+    return (
+        qqq_data,
+        tqqq_data,
+        treasury_data,
+        vol_ratio,
+        target_exposure,
+        actual_exposure,
+        strategy_returns,
+        tqqq_returns,
+        treasury_returns,
+        common_index,
+    )
+
+
+def run_bot(use_alternate=True):
+    """Run the daily update and send to Telegram."""
+    if not is_weekday():
+        logging.info("Not a weekday, skipping...")
+        return
+
+    logging.info(f"Running bot at {datetime.now()}")
+
+    # Calculate lookback to ensure we have enough data
+    start_date = "2010-02-10"  # TQQQ inception
+    end_date = datetime.today().strftime("%Y-%m-%d")
+
+    # Run analysis
+    result = run_analysis(start_date, end_date, use_alternate)
+    if result is None:
+        logging.error("Analysis failed, skipping Telegram update")
+        return
+
+    (
+        qqq_data,
+        _,
+        _,
+        vol_ratio,
+        target_exposure,
+        actual_exposure,
+        strategy_returns,
+        tqqq_returns,
+        _,
+        common_index,
+    ) = result
+
+    # Prepare alert dataframe
+    alert_df = pd.DataFrame(
+        {
+            "qqq_close": qqq_data["Close"].loc[common_index],
+            "vol_ratio": vol_ratio.loc[common_index],
+            "target_exposure": target_exposure.loc[common_index],
+            "actual_exposure": actual_exposure,
+            "strategy_returns": strategy_returns,
+            "tqqq_returns": tqqq_returns,
+        }
+    )
+
+    # Generate and send Telegram message
+    message = generate_telegram_alert_message(alert_df, qqq_data, use_alternate)
+    send_message_to_telegram(message, format="Markdown")
+    logging.info("Telegram message sent successfully")
+
+
+def schedule_bot(use_alternate=True):
+    """Schedule the bot to run at 9:00 AM on weekdays."""
+    logging.info("Starting TQQQ Volatility Bucket Bot...")
+    logging.info("Scheduled to run at 9:00 AM on weekdays")
+
+    # Schedule for weekdays only
+    schedule.every().monday.at("09:00").do(lambda: run_bot(use_alternate))
+    schedule.every().tuesday.at("09:00").do(lambda: run_bot(use_alternate))
+    schedule.every().wednesday.at("09:00").do(lambda: run_bot(use_alternate))
+    schedule.every().thursday.at("09:00").do(lambda: run_bot(use_alternate))
+    schedule.every().friday.at("09:00").do(lambda: run_bot(use_alternate))
+
+    # Run immediately on startup if it's a trading day
+    logging.info("Running initial check...")
+    run_bot(use_alternate)
+
+    # Keep the bot running
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
+
+def main(args):
+    logging.info("Starting TQQQ Volatility Bucket Strategy Backtest")
+
+    # Run complete analysis
+    start_date = "2010-02-10"  # TQQQ inception
+    end_date = datetime.today().strftime("%Y-%m-%d")
+
+    result = run_analysis(start_date, end_date, args.use_alternate)
+    if result is None:
+        return
+
+    (
+        qqq_data,
+        tqqq_data,
+        treasury_data,
+        vol_ratio,
+        target_exposure,
+        actual_exposure,
+        strategy_returns,
+        tqqq_returns,
+        treasury_returns,
+        common_index,
+    ) = result
 
     # Strategy returns: TQQQ portion + Treasury portion
     # If 60% TQQQ, then 40% treasuries, etc.
@@ -1426,4 +1549,8 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     setup_logging(args.verbose)
-    main(args)
+
+    if args.run_as_bot:
+        schedule_bot(args.use_alternate)
+    else:
+        main(args)
