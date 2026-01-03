@@ -1,0 +1,53 @@
+[project]
+name = "trading-utils"
+version = "0.1.0"
+description = "A collection of trading utilities and backtesting strategies for stocks, options, and cryptocurrency trading analysis"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "yfinance",
+    "pandas",
+    "numpy",
+    "tqdm",
+    "yahoo-finance",
+    "requests",
+    "requests-cache",
+    "pandas-datareader",
+    "stockstats",
+    "Jinja2",
+    "matplotlib",
+    "mplfinance",
+    "schedule",
+    "python-dotenv",
+    "pytz",
+    "yahoo_earnings_calendar",
+    "ccxt",
+    "dataset",
+    "tweepy",
+    "peewee",
+    "dotmap",
+    "flatten-dict",
+    "python-telegram-bot",
+    "justpy",
+    "finta",
+    "slug",
+    "finvizfinance",
+    "squarify",
+    "py-executable-checklist==1.4.0",
+    "backtrader[plotting]",
+    "quantstats",
+    "ib_insync",
+    "ib_async",
+    "pandasai",
+    "gradio",
+    "seaborn",
+    "persistent-cache@git+https://github.com/namuan/persistent-cache",
+    "tabulate",
+]
+
+[dependency-groups]
+dev = [
+    "black",
+    "bpython",
+    "pre-commit",
+]

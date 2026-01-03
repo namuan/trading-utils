@@ -4,6 +4,7 @@
 #   "pandas",
 #   "numpy",
 #   "plotly",
+#   "yfinance",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
 #   "python-dotenv",
 #   "requests"

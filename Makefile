@@ -51,6 +51,8 @@ deploy: clean ## Copies any changed file to the server
 	ssh ${PROJECTNAME} -C 'bash -l -c "mkdir -vp ./${PROJECTNAME}/output"'
 	rsync -avzr \
 		.env \
+		pyproject.toml \
+		uv.lock \
 		data \
 		common \
 		scripts \
@@ -65,6 +67,8 @@ deploy: clean ## Copies any changed file to the server
 		tele_spx_theta_gang_bot.py \
 		tele_stock_alerts_bot.py \
 		tqqq-for-the-long-run.py \
+		tqqq-vol-buckets.py \
+		tqqq-vol-regimes.py \
 		yfinance-box.py \
 		webpages.txt \
 		requirements \
