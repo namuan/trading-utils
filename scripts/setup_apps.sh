@@ -3,4 +3,4 @@ bash ./scripts/start_screen.sh tele-spy-trade-bot 'uv run --no-project tele_spy_
 bash ./scripts/start_screen.sh tele-theta-gang-bot 'uv run --no-project tele_theta_gang_bot.py --run-as-bot -v'
 bash ./scripts/start_screen.sh tele-spx-theta-gang-bot 'uv run --no-project tele_spx_theta_gang_bot.py --run-as-bot -v'
 bash ./scripts/start_screen.sh tqqq-vol-buckets 'uv run tqqq-vol-buckets.py -v --send-alert'
-bash ./scripts/start_screen.sh tqqq-vol-regimes 'uv run tqqq-vol-regimes.py -v --send-telegram'
+bash ./scripts/start_screen.sh tqqq-vol-regimes 'uv run tqqq-vol-regimes.py --run-as-bot -v'

@@ -7,7 +7,8 @@
 #   "yfinance",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
 #   "python-dotenv",
-#   "requests"
+#   "requests",
+#   "schedule"
 # ]
 # ///
 """
@@ -28,6 +29,7 @@ Usage:
 import logging
 import subprocess
 import tempfile
+import time
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 from enum import Enum
@@ -36,6 +38,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import schedule
 
 from common.market_data import download_ticker_data
 from common.tele_notifier import send_message_to_telegram
@@ -77,6 +80,11 @@ PERSISTENCE_DAYS = {
 # Panic daily drop threshold (fractional return, e.g. -0.04 == -4%)
 PANIC_DAILY_DROP = -0.04
 PANIC_DAILY_DROP_PCT = PANIC_DAILY_DROP * 100
+
+
+def is_weekday():
+    """Check if today is a weekday (Monday-Friday)."""
+    return datetime.now().weekday() < 5
 
 
 def setup_logging(verbosity):
@@ -138,6 +146,13 @@ def parse_args():
         action="store_true",
         dest="send_telegram",
         help="Send daily regime update to Telegram",
+    )
+    parser.add_argument(
+        "-b",
+        "--run-as-bot",
+        action="store_true",
+        default=False,
+        help="Run as bot (scheduled at 9:00 AM on weekdays)",
     )
     return parser.parse_args()
 
@@ -1217,30 +1232,112 @@ def generate_html_report(
     return html_file
 
 
+def run_analysis(start_date, end_date):
+    """Run the complete analysis and return all results.
+
+    Returns:
+        tuple: (qqq_df, tqqq_df, vol_ratio, vol_raw, vol_median, regimes,
+                strategy_returns, equity, bnh_equity, exposure, tqqq_returns)
+    """
+    # Load data
+    qqq_df, tqqq_df = load_data(start_date, end_date)
+
+    # Calculate volatility ratio
+    vol_ratio, vol_raw, vol_median = calculate_volatility_ratio(qqq_df)
+
+    # Run regime state machine
+    regimes = run_regime_state_machine(qqq_df, vol_ratio)
+
+    # Calculate strategy returns
+    strategy_returns, equity, bnh_equity, exposure = calculate_strategy_returns(
+        tqqq_df, regimes
+    )
+
+    # Calculate TQQQ returns
+    tqqq_returns = tqqq_df["Close"].pct_change()
+
+    return (
+        qqq_df,
+        tqqq_df,
+        vol_ratio,
+        vol_raw,
+        vol_median,
+        regimes,
+        strategy_returns,
+        equity,
+        bnh_equity,
+        exposure,
+        tqqq_returns,
+    )
+
+
+def run_bot():
+    """Run the daily update and send to Telegram."""
+    if not is_weekday():
+        logging.info("Not a weekday, skipping...")
+        return
+
+    logging.info(f"Running bot at {datetime.now()}")
+
+    # Calculate lookback to ensure we have enough data
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = "2015-01-01"  # Use consistent start date for regime calculation
+
+    # Run analysis
+    (qqq_df, _, vol_ratio, _, _, regimes, _, _, _, exposure, _) = run_analysis(
+        start_date, end_date
+    )
+
+    # Generate and send Telegram message
+    message = generate_telegram_message(vol_ratio, regimes, exposure, qqq_df)
+    send_message_to_telegram(message, format="Markdown")
+    logging.info("Telegram message sent successfully")
+
+
+def schedule_bot():
+    """Schedule the bot to run at 9:00 AM on weekdays."""
+    logging.info("Starting TQQQ Volatility Regime Bot...")
+    logging.info("Scheduled to run at 9:00 AM on weekdays")
+
+    # Schedule for weekdays only
+    schedule.every().monday.at("09:00").do(run_bot)
+    schedule.every().tuesday.at("09:00").do(run_bot)
+    schedule.every().wednesday.at("09:00").do(run_bot)
+    schedule.every().thursday.at("09:00").do(run_bot)
+    schedule.every().friday.at("09:00").do(run_bot)
+
+    # Run immediately on startup if it's a trading day
+    logging.info("Running initial check...")
+    run_bot()
+
+    # Keep the bot running
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
+
 def main(args):
     logging.info("=" * 60)
     logging.info("TQQQ VOLATILITY REGIME STRATEGY")
     logging.info("=" * 60)
 
-    # Step 1: Load data
-    qqq_df, tqqq_df = load_data(args.start_date, args.end_date)
+    # Run complete analysis
+    logging.info("Running analysis...")
+    (
+        qqq_df,
+        tqqq_df,
+        vol_ratio,
+        vol_raw,
+        vol_median,
+        regimes,
+        strategy_returns,
+        equity,
+        bnh_equity,
+        exposure,
+        tqqq_returns,
+    ) = run_analysis(args.start_date, args.end_date)
 
-    # Step 2: Calculate volatility ratio
-    logging.info("Calculating volatility metrics...")
-    vol_ratio, vol_raw, vol_median = calculate_volatility_ratio(qqq_df)
-
-    # Step 3: Run regime state machine
-    logging.info("Running regime state machine...")
-    regimes = run_regime_state_machine(qqq_df, vol_ratio)
-
-    # Step 4: Calculate strategy returns
-    logging.info("Calculating strategy returns...")
-    strategy_returns, equity, bnh_equity, exposure = calculate_strategy_returns(
-        tqqq_df, regimes
-    )
-
-    # Step 5: Calculate diagnostics
-    tqqq_returns = tqqq_df["Close"].pct_change()
+    # Calculate diagnostics
     calculate_diagnostics(regimes, strategy_returns, equity, bnh_equity, tqqq_returns)
 
     # Step 6: Send Telegram update or generate reports
@@ -1293,4 +1390,8 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     setup_logging(args.verbose)
-    main(args)
+
+    if args.run_as_bot:
+        schedule_bot()
+    else:
+        main(args)
