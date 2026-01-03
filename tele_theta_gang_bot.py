@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = [
+#   "python-telegram-bot",
+#   "requests",
+#   "pandas",
+#   "dotmap",
+#   "flatten-dict",
+#   "python-dotenv",
+# ]
+# ///
 """
 Telegram bot to provide options trading ideas for theta strategies
 It can be used in a group chat or run once for a specific ticker
@@ -13,6 +23,7 @@ Run as bot:
 $ python3 tele_theta_gang_bot.py -b
 """
 
+import asyncio
 import logging
 import os
 from argparse import ArgumentParser
@@ -20,11 +31,11 @@ from datetime import datetime
 
 from telegram import Update
 from telegram.ext import (
-    CallbackContext,
+    ApplicationBuilder,
     CommandHandler,
-    Filters,
+    ContextTypes,
     MessageHandler,
-    Updater,
+    filters,
 )
 
 from common import RawTextWithDefaultsFormatter
@@ -136,44 +147,44 @@ def build_response_message(ticker):
     return os.linesep + additional_info + os.linesep + disclaimer
 
 
-def generate_report(ticker, update: Update, context: CallbackContext):
+async def generate_report(ticker, update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot = context.bot
     cid = update.effective_chat.id
-    bot.send_message(cid, f"Looking up options for #{ticker}")
+    await bot.send_message(cid, f"Looking up options for #{ticker}")
 
     try:
-        full_message = build_response_message(ticker)
-        bot.send_message(
-            cid, full_message, disable_web_page_preview=True, parse_mode="Markdown"
+        loop = asyncio.get_running_loop()
+        full_message = await loop.run_in_executor(None, build_response_message, ticker)
+        await bot.send_message(
+            cid,
+            full_message,
+            disable_web_page_preview=True,
+            parse_mode="Markdown",
         )
     except (NameError, AttributeError) as e:
-        bot.send_message(cid, str(e))
+        await bot.send_message(cid, str(e))
 
 
-def handle_cmd(update: Update, context: CallbackContext) -> None:
+async def handle_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message_text: str = update.message.text
     print(message_text)
 
     if message_text.startswith("$"):
         ticker = message_text[1:]
-        generate_report(ticker, update, context)
+        await generate_report(ticker, update, context)
 
 
 def run_bot():
-    """Start the bot."""
+    """Start the bot using Application (python-telegram-bot v20+)."""
     logging.info("Starting tele-theta-gang bot")
-    updater = Updater(TELEGRAM_THETA_GANG_BOT, use_context=True)
+    app = ApplicationBuilder().token(TELEGRAM_THETA_GANG_BOT).build()
 
-    dispatcher = updater.dispatcher
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
 
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_cmd))
 
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_cmd))
-
-    updater.start_polling()
-
-    updater.idle()
+    app.run_polling()
 
 
 def run_once(ticker):

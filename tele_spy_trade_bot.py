@@ -1,4 +1,20 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "schedule",
+#   "matplotlib",
+#   "numpy",
+#   "pandas",
+#   "yfinance",
+#   "yahoo_earnings_calendar",
+#   "tqdm",
+#   "requests",
+#   "pytz",
+#   "finta",
+#   "stockstats",
+#   "python-dotenv",
+# ]
+# ///
 """
 Generate volatility report for SPY and send to telegram
 """

@@ -4,9 +4,9 @@ from telegram import Update
 from telegram.ext import (
     CallbackContext,
     CommandHandler,
-    Filters,
     MessageHandler,
     Updater,
+    filters,
 )
 
 from common.bot_wrapper import help_command, start
@@ -42,7 +42,7 @@ def main():
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help_command))
 
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_cmd))
+    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_cmd))
 
     updater.start_polling()
 
