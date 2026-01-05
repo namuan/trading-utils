@@ -1,0 +1,117 @@
+//@version=6
+indicator("Expiration Highlights: Opex, Quarterly Opex & VIX with Vanna/Charm", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// ==========================
+// Inputs (customizable)
+// ==========================
+showOpexLines   = input.bool(true,  "Show monthly opex lines")
+showQuarterly   = input.bool(true,  "Show quarterly opex lines")
+showVIXLines    = input.bool(true,  "Show VIX expiration lines")
+
+vannaStartDays  = input.int(11, "Vanna/Charm start (days before opex)", minval=5, maxval=20)
+endVannaOnTue   = input.bool(true, "End vanna/charm on Tue of opex week")
+
+startWeakOnWed  = input.bool(true, "Start weakness on Wed of opex week")
+endWeakNextTue  = input.bool(true, "End weakness on Tue after opex")
+
+colOpex     = input.color(color.new(color.blue, 10),   "Opex line color")
+colQuarter  = input.color(color.new(color.purple, 10), "Quarterly opex line color")
+colVIX      = input.color(color.new(color.orange, 10), "VIX line color")
+colVanna    = input.color(color.new(color.green, 85),  "Vanna/Charm fill")
+colWeak     = input.color(color.new(color.red,   85),  "Weakness fill")
+
+// ================
+// 1) Monthly Opex
+// ================
+isOpex = (dayofweek == dayofweek.friday) and (dayofmonth >= 15 and dayofmonth <= 21)
+
+// Quarterly months: Mar (3), Jun (6), Sep (9), Dec (12)
+isQuarterlyOpex = isOpex and (month == 3 or month == 6 or month == 9 or month == 12)
+
+// Helper: is current bar in "opex week"? (Friday of this week is 15..21)
+f_isOpexWeek() =>
+    toFri = dayofweek.friday - dayofweek
+    toFri < 0 ? false : (dayofmonth + toFri >= 15 and dayofmonth + toFri <= 21)
+
+// =========================
+// 2) Next month + VIX exp
+// =========================
+yearCur  = year(time)
+monthCur = month(time)
+nextMonth = monthCur == 12 ? 1 : monthCur + 1
+nextYear  = monthCur == 12 ? yearCur + 1 : yearCur
+
+// Find 3rd Friday of next month
+var int thirdFriNext = na
+thirdFriNext := na
+for d = 15 to 21
+    if dayofweek(timestamp(nextYear, nextMonth, d)) == dayofweek.friday
+        thirdFriNext := d
+        break
+
+targetOpexTime = timestamp(nextYear, nextMonth, thirdFriNext)               // next month's opex
+vixExpTime     = targetOpexTime - 30 * 24 * 60 * 60 * 1000                  // ~30 days earlier
+vixYear  = year(vixExpTime)
+vixMonth = month(vixExpTime)
+vixDay   = dayofmonth(vixExpTime)
+isVIXexp = (dayofweek == dayofweek.wednesday) and (year == vixYear) and (month == vixMonth) and (dayofmonth == vixDay)
+
+// =====================================
+// 3) Draw vertical lines (line-throttle)
+// =====================================
+var int lastOpexBar = na
+var int lastQuarterBar = na
+var int lastVIXBar  = na
+
+if showOpexLines and isOpex and (na(lastOpexBar) or bar_index - lastOpexBar > 5)
+    line.new(bar_index, high, bar_index, low, extend=extend.both, color=colOpex, style=line.style_solid, width=2)
+    lastOpexBar := bar_index
+
+if showQuarterly and isQuarterlyOpex and (na(lastQuarterBar) or bar_index - lastQuarterBar > 5)
+    line.new(bar_index, high, bar_index, low, extend=extend.both, color=colQuarter, style=line.style_dotted, width=2)
+    lastQuarterBar := bar_index
+
+if showVIXLines and isVIXexp and (na(lastVIXBar) or bar_index - lastVIXBar > 5)
+    line.new(bar_index, high, bar_index, low, extend=extend.both, color=colVIX, style=line.style_dashed, width=2)
+    lastVIXBar := bar_index
+
+// ===================================
+// 4) State flags for shaded windows
+// ===================================
+var bool inVanna    = false
+var bool inWeakness = false
+
+// Convenience checks
+f_isMondayBeforeOpexWeek() =>
+    (dayofweek == dayofweek.monday) and (dayofmonth + vannaStartDays >= 15 and dayofmonth + vannaStartDays <= 21)
+
+f_isWedOfOpexWeek() => (dayofweek == dayofweek.wednesday) and f_isOpexWeek()
+f_isTueOfOpexWeek() => (dayofweek == dayofweek.tuesday)   and f_isOpexWeek()
+
+// ---------------------------
+// Start windows
+// ---------------------------
+if not inVanna and f_isMondayBeforeOpexWeek()
+    inVanna := true
+
+if not inWeakness and startWeakOnWed and f_isWedOfOpexWeek()
+    inWeakness := true
+
+// ---------------------------
+// Determine background color
+// ---------------------------
+color bg = na
+if inWeakness
+    bg := colWeak
+else if inVanna
+    bg := colVanna
+bgcolor(bg)
+
+// ---------------------------
+// End windows
+// ---------------------------
+if inVanna and endVannaOnTue and f_isTueOfOpexWeek()
+    inVanna := false
+
+if inWeakness and endWeakNextTue and (dayofweek == dayofweek.tuesday) and not f_isOpexWeek()
+    inWeakness := false
