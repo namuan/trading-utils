@@ -848,17 +848,30 @@ def main(args):
             end_date,
         )
 
-        # Save HTML report
-        with open(args.report_path, "w") as f:
-            f.write(html_content)
+        # Determine report path
+        if args.report_path == "daily_rebalance_report.html":
+            # Create temporary file in the system temp directory
+            temp_file = tempfile.NamedTemporaryFile(
+                delete=False, suffix=".html", mode="w"
+            )
+            report_path = temp_file.name
+            # Write content to temporary file
+            with open(report_path, "w") as f:
+                f.write(html_content)
+            temp_file.close()
+        else:
+            # Use the provided path
+            with open(args.report_path, "w") as f:
+                f.write(html_content)
+            report_path = args.report_path
 
-        logging.info(f"Report saved to {args.report_path}")
-        print(f"\n✅ Report successfully generated: {args.report_path}")
+        logging.info(f"Report saved to {report_path}")
+        print(f"\n✅ Report successfully generated: {report_path}")
 
         # Open report in browser if requested
         if args.open:
             logging.info("Opening report in browser...")
-            webbrowser.open(f"file://{os.path.abspath(args.report_path)}")
+            webbrowser.open(f"file://{os.path.abspath(report_path)}")
 
         return 0
 
