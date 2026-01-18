@@ -2,6 +2,7 @@
 # /// script
 # dependencies = [
 #   "python-telegram-bot",
+#   "python-dotenv",
 # ]
 # ///
 import logging

@@ -1030,7 +1030,7 @@ def parse_args() -> argparse.Namespace:
         default=0.09,
         help=(
             "Signal rate per rebalance period as decimal, "
-            "e.g. 0.09 for 9%. Default: 0.09."
+            "e.g. 0.09 for 9%%. Default: 0.09."
         ),
     )
     parser.add_argument(

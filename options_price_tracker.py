@@ -2,7 +2,18 @@
 # /// script
 # dependencies = [
 #   "dataset",
-#   "tqdm"
+#   "tqdm",
+#   "numpy",
+#   "pandas",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "finta",
+#   "stockstats",
+#   "python-dotenv",
+#   "tqdm",
+#   "yahoo_earnings_calendar",
+#   "dotmap",
+#   "flatten-dict",
 # ]
 # ///
 import logging

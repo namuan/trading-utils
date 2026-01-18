@@ -1,6 +1,12 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
+#   "pandas",
+#   "yfinance",
+#   "tqdm",
+#   "yahoo_earnings_calendar",
+#   "stockstats",
+#   "python-dotenv",
 # ]
 # ///
 import json

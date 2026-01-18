@@ -6,7 +6,9 @@
 #   "yfinance",
 #   "pandas",
 #   "tqdm",
-#   "yahoo_earnings_calendar"
+#   "yahoo_earnings_calendar",
+#   "python-dotenv",
+#   "tweepy",
 # ]
 # ///
 """

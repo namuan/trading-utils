@@ -1,7 +1,9 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "pandas"
+#   "pandas",
+#   "jinja2",
+#   "slug",
 # ]
 # ///
 import argparse
