@@ -1,3 +1,16 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "numpy",
+#   "yfinance",
+#   "plotly",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "requests",
+#   "python-dotenv",
+#   "schedule"
+# ]
+# ///
 from datetime import datetime
 
 import matplotlib.font_manager as fm
@@ -19,7 +32,7 @@ def fetch_data(symbol, start, end):
 
 
 def millions_formatter(x, pos):
-    return f"${x/1e6:.1f}M"
+    return f"${x / 1e6:.1f}M"
 
 
 def create_plots(reit_data, market_data, start_date, end_date):

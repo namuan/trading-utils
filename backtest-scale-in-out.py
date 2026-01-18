@@ -1,4 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "numpy",
+#   "yfinance",
+#   "plotly",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "requests",
+#   "python-dotenv",
+#   "schedule"
+# ]
+# ///
 """
 Backtest a moving average trading strategy by simulating buy and sell signals based on price crossovers with moving averages of varying durations.
 $ python3 backtest-scale-in-out.py --help

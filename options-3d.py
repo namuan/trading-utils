@@ -1,3 +1,16 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "numpy",
+#   "yfinance",
+#   "plotly",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "requests",
+#   "python-dotenv",
+#   "schedule"
+# ]
+# ///
 """
 https://www.reddit.com/r/options/comments/gvmluu/thought_id_share_a_project_i_just_finished_3d/
 

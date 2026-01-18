@@ -1,3 +1,16 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "numpy",
+#   "yfinance",
+#   "plotly",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "requests",
+#   "python-dotenv",
+#   "schedule"
+# ]
+# ///
 """
 Plot best and worst performing stocks against a base ticker.
 By default it compares the whole market against SPY

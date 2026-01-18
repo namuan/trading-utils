@@ -1,4 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "numpy",
+#   "yfinance",
+#   "plotly",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "requests",
+#   "python-dotenv",
+#   "schedule"
+# ]
+# ///
 """
 9-Sig (9% per rebalance period) Kelly-style value averaging helper.
 
@@ -1157,7 +1169,7 @@ def parse_args() -> argparse.Namespace:
         )
         if abs(alloc_sum - 1.0) > 1e-6:
             print(
-                f"error: start allocations must sum to 1.0 " f"(got {alloc_sum:.6f}).",
+                f"error: start allocations must sum to 1.0 (got {alloc_sum:.6f}).",
                 file=sys.stderr,
             )
             sys.exit(1)

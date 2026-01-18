@@ -1,4 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "numpy",
+#   "yfinance",
+#   "plotly",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "requests",
+#   "python-dotenv",
+#   "schedule"
+# ]
+# ///
 r"""
 Simulates stock data for a given ticker symbol over multiple generations and prints the resulting data frames along with their RSI values.
 
@@ -79,5 +91,5 @@ if __name__ == "__main__":
         print("-----")
         gen_date = (datetime.now() + timedelta(days=gen)).strftime("%Y-%m-%d")
         print(
-            f"Date: {gen_date}, Gen: {gen}, DF: {i+1}, Close: {df['Close'].iloc[-1]:.2f}, RSI:{TA.RSI(df, period=3).iloc[-1]:.2f}"
+            f"Date: {gen_date}, Gen: {gen}, DF: {i + 1}, Close: {df['Close'].iloc[-1]:.2f}, RSI:{TA.RSI(df, period=3).iloc[-1]:.2f}"
         )
