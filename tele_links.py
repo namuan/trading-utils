@@ -9,7 +9,6 @@ Usage:
 ./tele_links.py               # Run on schedule
 """
 
-import logging
 import time
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
@@ -18,25 +17,8 @@ from pathlib import Path
 import schedule
 
 from common.environment import GROUP_CHAT_ID
+from common.logger import setup_logging
 from common.tele_notifier import send_message_to_telegram
-
-
-def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
-    )
-    logging.captureWarnings(capture=True)
 
 
 def parse_args():

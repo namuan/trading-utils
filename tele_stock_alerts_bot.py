@@ -9,7 +9,6 @@ Usage:
 ./tele_stock_alerts_bot.py -v
 """
 
-import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from telegram import Update
@@ -25,25 +24,7 @@ from common.bot_wrapper import help_command, start
 from common.environment import (
     TELEGRAM_STOCK_ALERT_BOT,
 )
-from common.logger import init_logging
-
-
-def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
-    )
-    logging.captureWarnings(capture=True)
+from common.logger import setup_logging
 
 
 def parse_args():

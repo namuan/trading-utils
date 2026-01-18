@@ -21,7 +21,6 @@ Usage:
 ./calendar_spread_interactive.py
 """
 
-import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 import matplotlib
@@ -56,6 +55,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from common.logger import setup_logging
 
 TIMELINE_FRAME_STYLE = (
     "QFrame{border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;}"
@@ -1460,24 +1461,6 @@ def parse_args():
         help="Increase verbosity of logging output",
     )
     return parser.parse_args()
-
-
-def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
-    )
-    logging.captureWarnings(capture=True)
 
 
 def main():

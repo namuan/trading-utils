@@ -19,32 +19,14 @@ Usage:
 ./bt_simple_beta_baller_strategy.py --start-date 2020-01-01 --end-date 2024-12-30
 """
 
-import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import datetime
 
 import backtrader as bt
 
 from common.backtest_analysis import add_trade_analyzers, print_trade_analysis
+from common.logger import setup_logging
 from common.market_data import download_ticker_data
-
-
-def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
-
-    logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
-        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
-    )
-    logging.captureWarnings(capture=True)
 
 
 def parse_args():
