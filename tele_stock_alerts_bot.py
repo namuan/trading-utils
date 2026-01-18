@@ -1,18 +1,31 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "python-telegram-bot",
+#   "python-telegram-bot>=21.0",
 #   "python-dotenv",
+#   "apscheduler>=3.10.4",
 # ]
 # ///
+"""
+Telegram Stock Alerts Bot
+
+A Telegram bot that sets up price alerts for stocks based on user-defined criteria.
+
+Usage:
+./tele_stock_alerts_bot.py -h
+./tele_stock_alerts_bot.py
+./tele_stock_alerts_bot.py -v
+"""
+
 import logging
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from telegram import Update
 from telegram.ext import (
-    CallbackContext,
+    Application,
     CommandHandler,
     MessageHandler,
-    Updater,
+    ContextTypes,
     filters,
 )
 
@@ -20,10 +33,25 @@ from common.bot_wrapper import help_command, start
 from common.environment import (
     TELEGRAM_STOCK_ALERT_BOT,
 )
-from common.logger import init_logging
+from common.logger import setup_logging
 
 
-def handle_cmd(update: Update, context: CallbackContext) -> None:
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    return parser.parse_args()
+
+
+def handle_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message_text: str = update.message.text
     if len(message_text.split(" ")) < 3:
         print(
@@ -40,22 +68,18 @@ def handle_cmd(update: Update, context: CallbackContext) -> None:
 
 
 def main():
-    """Start the bot."""
+    """Start bot."""
     logging.info("Starting tele-stock-alerts-bot")
-    updater = Updater(TELEGRAM_STOCK_ALERT_BOT, use_context=True)
+    application = Application.builder().token(TELEGRAM_STOCK_ALERT_BOT).build()
 
-    dispatcher = updater.dispatcher
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_cmd))
 
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
-
-    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_cmd))
-
-    updater.start_polling()
-
-    updater.idle()
+    application.run_polling()
 
 
 if __name__ == "__main__":
-    init_logging()
+    args = parse_args()
+    setup_logging(args.verbose)
     main()
