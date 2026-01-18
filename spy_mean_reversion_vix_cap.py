@@ -20,6 +20,7 @@ Usage:
 ./spy_mean_reversion_vix_cap.py -v --lookback 10
 """
 
+import logging
 import os
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime

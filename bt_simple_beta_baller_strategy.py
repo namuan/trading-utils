@@ -19,8 +19,9 @@ Usage:
 ./bt_simple_beta_baller_strategy.py --start-date 2020-01-01 --end-date 2024-12-30
 """
 
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import datetime
+import logging
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 import backtrader as bt
 

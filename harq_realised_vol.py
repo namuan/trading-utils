@@ -15,6 +15,7 @@ Usage:
 ./harq_realised_vol.py --symbol SPY --days 5
 """
 
+import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 
