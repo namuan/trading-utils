@@ -1,3 +1,14 @@
+"""
+REIT vs S&P 500 Correlation Analysis
+
+Compares the performance of REIT index (IYR) against S&P 500 (SPY) over different time periods.
+
+Usage:
+./reit-correlation.py -h
+./reit-correlation.py -v
+"""
+
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 
 import matplotlib.font_manager as fm
@@ -6,7 +17,23 @@ import pytz
 import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 
+from common.logger import setup_logging
 from common.market import download_ticker_data
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    return parser.parse_args()
 
 
 def fetch_data(symbol, start, end):
@@ -212,4 +239,6 @@ def main():
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    setup_logging(args.verbose)
     main()

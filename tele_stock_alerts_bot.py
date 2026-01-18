@@ -1,4 +1,16 @@
+"""
+Telegram Stock Alerts Bot
+
+A Telegram bot that sets up price alerts for stocks based on user-defined criteria.
+
+Usage:
+./tele_stock_alerts_bot.py -h
+./tele_stock_alerts_bot.py
+./tele_stock_alerts_bot.py -v
+"""
+
 import logging
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from telegram import Update
 from telegram.ext import (
@@ -13,7 +25,22 @@ from common.bot_wrapper import help_command, start
 from common.environment import (
     TELEGRAM_STOCK_ALERT_BOT,
 )
-from common.logger import init_logging
+from common.logger import setup_logging
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    return parser.parse_args()
 
 
 def handle_cmd(update: Update, context: CallbackContext) -> None:
@@ -50,5 +77,6 @@ def main():
 
 
 if __name__ == "__main__":
-    init_logging()
+    args = parse_args()
+    setup_logging(args.verbose)
     main()
