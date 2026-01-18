@@ -1,3 +1,16 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "peewee",
+#   "requests",
+#   "yfinance",
+#   "pandas",
+#   "tqdm",
+#   "yahoo_earnings_calendar",
+#   "python-dotenv",
+#   "tweepy",
+# ]
+# ///
 """
 Twitter -> Telegram
 """

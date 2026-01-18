@@ -1,4 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "pandas",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 Stock Weekly Returns Script
 
@@ -21,7 +29,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def calculate_max_drawdown(prices):

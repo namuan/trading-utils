@@ -1,3 +1,13 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "seaborn",
+#   "pytz",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 """
 REIT vs S&P 500 Correlation Analysis
 
@@ -18,7 +28,7 @@ import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 
 from common.logger import setup_logging
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def parse_args():
@@ -46,7 +56,7 @@ def fetch_data(symbol, start, end):
 
 
 def millions_formatter(x, pos):
-    return f"${x/1e6:.1f}M"
+    return f"${x / 1e6:.1f}M"
 
 
 def create_plots(reit_data, market_data, start_date, end_date):
@@ -220,6 +230,12 @@ def main():
     full_market_data = fetch_data(market_symbol, initial_start_date, end_date)
 
     if full_reit_data is not None and full_market_data is not None:
+        # Ensure the dataframe index is timezone-aware
+        if full_reit_data.index.tz is None:
+            full_reit_data.index = full_reit_data.index.tz_localize(pytz.UTC)
+        if full_market_data.index.tz is None:
+            full_market_data.index = full_market_data.index.tz_localize(pytz.UTC)
+
         # Generate plots for different start dates
         current_start_date = initial_start_date
 

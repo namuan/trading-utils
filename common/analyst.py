@@ -10,7 +10,8 @@ from stockstats import StockDataFrame
 from common.candle_pattern import identify_candle_pattern
 from common.environment import TRADING_ACCOUNT_VALUE, TRADING_RISK_FACTOR
 from common.filesystem import earnings_file_path, output_dir
-from common.market import download_ticker_data, large_cap_companies
+from common.market import large_cap_companies
+from common.market_data import download_ticker_data
 
 DAYS_IN_MONTH = 22
 MINIMUM_DAYS_DATA_REQUIRED = 200

@@ -1,3 +1,19 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "mplfinance",
+#   "finta",
+#   "stockstats",
+#   "python-dotenv",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "tqdm",
+#   "yahoo_earnings_calendar",
+#   "dataset",
+#   "flatten-dict",
+#   "ccxt",
+# ]
+# ///
 """
 Crypto Bot running based on a given strategy
 """

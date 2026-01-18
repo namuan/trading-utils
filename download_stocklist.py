@@ -1,3 +1,12 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "yfinance",
+#   "pandas",
+#   "tqdm",
+#   "yahoo_earnings_calendar"
+# ]
+# ///
 """
 Downloads available list of tickers from ftp.nasdaqtrader.com servers.
 The combined ticker list is saved as csv file in the data folder

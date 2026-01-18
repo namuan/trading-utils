@@ -1,4 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "yfinance",
+#   "stockstats"
+# ]
+# ///
 """
 Analyse what happened in the next N days when a stock price has changed by more than the given%
 

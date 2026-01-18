@@ -1,3 +1,14 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "ib-async",
+#   "matplotlib",
+#   "yfinance",
+#   "pandas",
+#   "tqdm",
+#   "yahoo_earnings_calendar"
+# ]
+# ///
 """
 Simulate adjusting an IronFly position by adding another ATM IronFly
 Assumptions:

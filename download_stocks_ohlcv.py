@@ -1,4 +1,14 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "yfinance",
+#   "tqdm",
+#   "yahoo_earnings_calendar",
+#   "stockstats",
+#   "python-dotenv",
+# ]
+# ///
 """
 Download stocks open, close, high, low and volume data for all available stocks.
 Make sure you have downloaded the list of tickers using download_stocklist.py script.

@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+# ]
+# ///
 """
 9-Sig (9% per rebalance period) Kelly-style value averaging helper.
 
@@ -1026,7 +1030,7 @@ def parse_args() -> argparse.Namespace:
         default=0.09,
         help=(
             "Signal rate per rebalance period as decimal, "
-            "e.g. 0.09 for 9%. Default: 0.09."
+            "e.g. 0.09 for 9%%. Default: 0.09."
         ),
     )
     parser.add_argument(
@@ -1157,7 +1161,7 @@ def parse_args() -> argparse.Namespace:
         )
         if abs(alloc_sum - 1.0) > 1e-6:
             print(
-                f"error: start allocations must sum to 1.0 " f"(got {alloc_sum:.6f}).",
+                f"error: start allocations must sum to 1.0 (got {alloc_sum:.6f}).",
                 file=sys.stderr,
             )
             sys.exit(1)

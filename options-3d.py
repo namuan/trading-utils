@@ -1,3 +1,11 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "yfinance",
+#   "scipy"
+# ]
+# ///
 """
 https://www.reddit.com/r/options/comments/gvmluu/thought_id_share_a_project_i_just_finished_3d/
 

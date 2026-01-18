@@ -1,3 +1,11 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "python-telegram-bot>=21.0",
+#   "python-dotenv",
+#   "apscheduler>=3.10.4",
+# ]
+# ///
 """
 Telegram Stock Alerts Bot
 
@@ -14,10 +22,10 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from telegram import Update
 from telegram.ext import (
-    CallbackContext,
+    Application,
     CommandHandler,
+    ContextTypes,
     MessageHandler,
-    Updater,
     filters,
 )
 
@@ -43,7 +51,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def handle_cmd(update: Update, context: CallbackContext) -> None:
+def handle_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message_text: str = update.message.text
     if len(message_text.split(" ")) < 3:
         print(
@@ -60,20 +68,15 @@ def handle_cmd(update: Update, context: CallbackContext) -> None:
 
 
 def main():
-    """Start the bot."""
+    """Start bot."""
     logging.info("Starting tele-stock-alerts-bot")
-    updater = Updater(TELEGRAM_STOCK_ALERT_BOT, use_context=True)
+    application = Application.builder().token(TELEGRAM_STOCK_ALERT_BOT).build()
 
-    dispatcher = updater.dispatcher
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_cmd))
 
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
-
-    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_cmd))
-
-    updater.start_polling()
-
-    updater.idle()
+    application.run_polling()
 
 
 if __name__ == "__main__":

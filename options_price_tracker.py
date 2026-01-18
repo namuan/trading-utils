@@ -1,3 +1,21 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "dataset",
+#   "tqdm",
+#   "numpy",
+#   "pandas",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "finta",
+#   "stockstats",
+#   "python-dotenv",
+#   "tqdm",
+#   "yahoo_earnings_calendar",
+#   "dotmap",
+#   "flatten-dict",
+# ]
+# ///
 import logging
 import os
 import time

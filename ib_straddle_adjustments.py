@@ -10,6 +10,9 @@
 #   "python-dotenv",
 #   "matplotlib",
 #   "seaborn",
+#   "yfinance",
+#   "tqdm",
+#   "yahoo_earnings_calendar"
 # ]
 # ///
 """

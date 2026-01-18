@@ -4,8 +4,6 @@
 #   "pandas",
 #   "stockstats",
 #   "yfinance",
-#   "tqdm",
-#   "yahoo_earnings_calendar",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
@@ -22,7 +20,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from stockstats import wrap
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 try:
     from common.market import download_ticker_with_interval

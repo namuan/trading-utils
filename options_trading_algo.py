@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+# ]
+# ///
 """
 Options Trading Algorithm
 Implements the process flow for tracking options trades with SQLite database.
@@ -246,7 +250,7 @@ def run_tests():
 
         trade_ids = []
         for i in range(3):
-            print(f"\n--- Run {i+1} ---")
+            print(f"\n--- Run {i + 1} ---")
             trade_id = run_options_algorithm(symbol, test_db_path)
             trade_ids.append(trade_id)
 

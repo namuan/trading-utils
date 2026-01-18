@@ -1,4 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "pandas",
+#   "yfinance",
+#   "tqdm",
+#   "yahoo_earnings_calendar"
+# ]
+# ///
 """
 A script to analyze stock price changes and visualize the distribution.
 

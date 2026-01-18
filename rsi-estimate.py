@@ -1,4 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "yfinance",
+#   "finta",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 r"""
 Simulates stock data for a given ticker symbol over multiple generations and prints the resulting data frames along with their RSI values.
 
@@ -29,7 +37,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from finta import TA
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def generate(df, generations, current_gen, all_dfs):
@@ -79,5 +87,5 @@ if __name__ == "__main__":
         print("-----")
         gen_date = (datetime.now() + timedelta(days=gen)).strftime("%Y-%m-%d")
         print(
-            f"Date: {gen_date}, Gen: {gen}, DF: {i+1}, Close: {df['Close'].iloc[-1]:.2f}, RSI:{TA.RSI(df, period=3).iloc[-1]:.2f}"
+            f"Date: {gen_date}, Gen: {gen}, DF: {i + 1}, Close: {df['Close'].iloc[-1]:.2f}, RSI:{TA.RSI(df, period=3).iloc[-1]:.2f}"
         )

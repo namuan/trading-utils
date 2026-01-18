@@ -1,3 +1,11 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "pandas",
+#   "jinja2",
+#   "slug",
+# ]
+# ///
 import argparse
 import logging
 from datetime import datetime
