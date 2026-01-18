@@ -8,7 +8,9 @@
 #   "stockstats",
 #   "yfinance",
 #   "python-dotenv",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "tqdm",
+#   "yahoo_earnings_calendar"
 # ]
 # ///
 """

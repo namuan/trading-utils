@@ -1,14 +1,10 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "pandas",
-#   "numpy",
+#   "matplotlib",
 #   "yfinance",
-#   "plotly",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "requests",
-#   "python-dotenv",
-#   "schedule"
+#   "pandas",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 """
@@ -24,7 +20,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from common import RawTextWithDefaultsFormatter
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def get_price_data(ticker, start_date, end_date):

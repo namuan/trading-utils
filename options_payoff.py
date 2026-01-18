@@ -1,14 +1,16 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "pandas",
+#   "matplotlib",
 #   "numpy",
+#   "seaborn",
+#   "pyyaml",
 #   "yfinance",
-#   "plotly",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "requests",
-#   "python-dotenv",
-#   "schedule"
+#   "ib-async",
+#   "dotmap",
+#   "flatten-dict",
+#   "python-dotenv"
 # ]
 # ///
 """

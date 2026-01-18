@@ -1,14 +1,11 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "pandas",
-#   "numpy",
+#   "matplotlib",
+#   "seaborn",
+#   "pytz",
 #   "yfinance",
-#   "plotly",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "requests",
-#   "python-dotenv",
-#   "schedule"
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 from datetime import datetime
@@ -19,7 +16,7 @@ import pytz
 import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def fetch_data(symbol, start, end):

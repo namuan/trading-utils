@@ -1,14 +1,12 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "pandas",
-#   "numpy",
+#   "ib-async",
+#   "matplotlib",
 #   "yfinance",
-#   "plotly",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "requests",
-#   "python-dotenv",
-#   "schedule"
+#   "pandas",
+#   "tqdm",
+#   "yahoo_earnings_calendar"
 # ]
 # ///
 """

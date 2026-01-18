@@ -2,13 +2,10 @@
 # /// script
 # dependencies = [
 #   "pandas",
-#   "numpy",
+#   "matplotlib",
+#   "seaborn",
 #   "yfinance",
-#   "plotly",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "requests",
-#   "python-dotenv",
-#   "schedule"
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 """
@@ -33,7 +30,7 @@ import seaborn as sns
 
 from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def parse_args():

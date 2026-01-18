@@ -2,13 +2,9 @@
 # /// script
 # dependencies = [
 #   "pandas",
-#   "numpy",
 #   "yfinance",
-#   "plotly",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "requests",
-#   "python-dotenv",
-#   "schedule"
+#   "finta",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 r"""
@@ -41,7 +37,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from finta import TA
 
-from common.market import download_ticker_data
+from common.market_data import download_ticker_data
 
 
 def generate(df, generations, current_gen, all_dfs):

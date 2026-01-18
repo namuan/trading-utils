@@ -7,7 +7,10 @@
 #   "dotmap",
 #   "flatten-dict",
 #   "python-dotenv",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "yfinance",
+#   "tqdm",
+#   "yahoo_earnings_calendar"
 # ]
 # ///
 """
