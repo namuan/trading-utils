@@ -203,6 +203,12 @@ def main():
     full_market_data = fetch_data(market_symbol, initial_start_date, end_date)
 
     if full_reit_data is not None and full_market_data is not None:
+        # Ensure the dataframe index is timezone-aware
+        if full_reit_data.index.tz is None:
+            full_reit_data.index = full_reit_data.index.tz_localize(pytz.UTC)
+        if full_market_data.index.tz is None:
+            full_market_data.index = full_market_data.index.tz_localize(pytz.UTC)
+
         # Generate plots for different start dates
         current_start_date = initial_start_date
 
