@@ -1,14 +1,13 @@
-"""
-REIT vs S&P 500 Correlation Analysis
-
-Compares the performance of REIT index (IYR) against S&P 500 (SPY) over different time periods.
-
-Usage:
-./reit-correlation.py -h
-./reit-correlation.py -v
-"""
-
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# dependencies = [
+#   "matplotlib",
+#   "seaborn",
+#   "pytz",
+#   "yfinance",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+# ]
+# ///
 from datetime import datetime
 
 import matplotlib.font_manager as fm
@@ -17,23 +16,7 @@ import pytz
 import seaborn as sns
 from matplotlib.ticker import FuncFormatter
 
-from common.logger import setup_logging
-from common.market import download_ticker_data
-
-
-def parse_args():
-    parser = ArgumentParser(
-        description=__doc__, formatter_class=RawDescriptionHelpFormatter
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=0,
-        dest="verbose",
-        help="Increase verbosity of logging output",
-    )
-    return parser.parse_args()
+from common.market_data import download_ticker_data
 
 
 def fetch_data(symbol, start, end):
@@ -46,7 +29,7 @@ def fetch_data(symbol, start, end):
 
 
 def millions_formatter(x, pos):
-    return f"${x/1e6:.1f}M"
+    return f"${x / 1e6:.1f}M"
 
 
 def create_plots(reit_data, market_data, start_date, end_date):
@@ -220,6 +203,12 @@ def main():
     full_market_data = fetch_data(market_symbol, initial_start_date, end_date)
 
     if full_reit_data is not None and full_market_data is not None:
+        # Ensure the dataframe index is timezone-aware
+        if full_reit_data.index.tz is None:
+            full_reit_data.index = full_reit_data.index.tz_localize(pytz.UTC)
+        if full_market_data.index.tz is None:
+            full_market_data.index = full_market_data.index.tz_localize(pytz.UTC)
+
         # Generate plots for different start dates
         current_start_date = initial_start_date
 
@@ -239,6 +228,4 @@ def main():
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    setup_logging(args.verbose)
     main()
