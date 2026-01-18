@@ -1,12 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "pandas",
-#   "yfinance",
-#   "tqdm",
-#   "yahoo_earnings_calendar"
-# ]
-# ///
+#!/usr/bin/env python3
 """
 Download list of SP500 companies from Wikipedia
 """

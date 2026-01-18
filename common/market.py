@@ -49,6 +49,17 @@ def load_all_tickers(market_type="all"):
     return pd.read_csv(file_to_load).Symbol.tolist()
 
 
+def download_ticker_data(ticker, start, end):
+    try:
+        ticker_df = yf.download(ticker, start=start, end=end)
+        ticker_df.columns = ticker_df.columns.droplevel("Ticker")
+        ticker_df.to_csv(f"{output_dir()}/{ticker}.csv")
+        return ticker_df
+    except:
+        print(f"Unable to fetch data for ticker: {ticker}")
+        return pd.DataFrame()
+
+
 def get_cached_data(symbol, start, end, force_download=False):
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)

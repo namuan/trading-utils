@@ -1,10 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "requests",
-#   "beautifulsoup4"
-# ]
-# ///
 import time
 from argparse import ArgumentParser
 from datetime import datetime, timedelta

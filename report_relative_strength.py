@@ -1,17 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "pandas",
-#   "matplotlib",
-#   "finta",
-#   "stockstats",
-#   "python-dotenv",
-#   "yfinance",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "tqdm",
-#   "yahoo_earnings_calendar",
-# ]
-# ///
 """
 Plot best and worst performing stocks against a base ticker.
 By default it compares the whole market against SPY

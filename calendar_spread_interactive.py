@@ -11,6 +11,18 @@
 #   "PyQt6"
 # ]
 # ///
+"""
+Interactive Calendar Spread Analyzer
+
+A PyQt6 GUI application for analyzing calendar spread options strategies with scenario analysis.
+
+Usage:
+./calendar_spread_interactive.py -h
+./calendar_spread_interactive.py
+"""
+
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+
 import matplotlib
 
 matplotlib.use("QtAgg")
@@ -43,6 +55,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from common.logger import setup_logging
 
 TIMELINE_FRAME_STYLE = (
     "QFrame{border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;}"
@@ -1434,6 +1448,21 @@ class CalendarSpreadInteractive(QMainWindow):
         self.canvas.draw_idle()
 
 
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    return parser.parse_args()
+
+
 def main():
     app = QApplication(sys.argv)
     w = CalendarSpreadInteractive()
@@ -1442,4 +1471,6 @@ def main():
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    setup_logging(args.verbose)
     main()

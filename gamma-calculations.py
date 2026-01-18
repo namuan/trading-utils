@@ -6,6 +6,7 @@
 #   "numpy",
 #   "yfinance",
 #   "scipy",
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 """

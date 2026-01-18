@@ -1,13 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "numpy",
-#   "seaborn",
-#   "yfinance",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
-# ]
-# ///
+#!/usr/bin/env python3
 """
 Stock performance comparison tool that allows users to compare the historical performance of multiple stocks.
 
@@ -33,7 +24,7 @@ import seaborn as sns
 from matplotlib.dates import DateFormatter
 
 from common import RawTextWithDefaultsFormatter
-from common.market_data import download_ticker_data
+from common.market import download_ticker_data
 
 
 def fetch_stock_data(ticker, start_date, end_date):

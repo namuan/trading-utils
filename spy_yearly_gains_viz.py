@@ -1,11 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "pandas",
-#   "pillow"
-# ]
-# ///
 import argparse
 import csv
 import os

@@ -1,18 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "numpy",
-#   "seaborn",
-#   "pyyaml",
-#   "yfinance",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "ib-async",
-#   "dotmap",
-#   "flatten-dict",
-#   "python-dotenv"
-# ]
-# ///
+#!/usr/bin/env python3
 """
 This Python script generates payoff plots for option trading strategies. It visualizes the potential profit or loss of a set of option contracts at different underlying asset prices.
 

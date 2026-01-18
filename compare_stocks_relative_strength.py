@@ -1,13 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "pandas",
-#   "matplotlib",
-#   "seaborn",
-#   "yfinance",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
-# ]
-# ///
+#!/usr/bin/env uv run
 """
 Compare multiple stocks using Relative Strength (RS) over a specific date range.
 
@@ -34,7 +25,7 @@ import seaborn as sns
 
 from common import RawTextWithDefaultsFormatter
 from common.logger import setup_logging
-from common.market_data import download_ticker_data
+from common.market import download_ticker_data
 
 
 def parse_args():

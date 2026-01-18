@@ -1,9 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "requests"
-# ]
-# ///
 """
 Find potential setups
 """

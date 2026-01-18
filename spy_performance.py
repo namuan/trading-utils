@@ -1,10 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "pandas",
-#   "matplotlib"
-# ]
-# ///
+#!/usr/bin/env python3
 """
 Stock Performance Comparison Script
 

@@ -1,19 +1,10 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "pandas",
-#   "yfinance",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
-# ]
-# ///
 import argparse
 from datetime import datetime
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from common.market_data import download_ticker_data
+from common.market import download_ticker_data
 
 
 def parse_arguments():

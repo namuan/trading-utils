@@ -1,12 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "yfinance",
-#   "pandas",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
-# ]
-# ///
+#!/usr/bin/env python3
 """
 Backtest a moving average trading strategy by simulating buy and sell signals based on price crossovers with moving averages of varying durations.
 $ python3 backtest-scale-in-out.py --help
@@ -20,7 +12,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from common import RawTextWithDefaultsFormatter
-from common.market_data import download_ticker_data
+from common.market import download_ticker_data
 
 
 def get_price_data(ticker, start_date, end_date):

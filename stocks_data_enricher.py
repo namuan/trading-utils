@@ -1,9 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "pandas"
-# ]
-# ///
 """
 Enrich Stocks and ETF data with different indicators and generates a CSV file for analysis
 """

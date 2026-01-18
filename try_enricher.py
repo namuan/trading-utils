@@ -1,13 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "pandas",
-#   "yfinance",
-#   "tqdm",
-#   "yahoo_earnings_calendar"
-# ]
-# ///
+#!/usr/bin/env python3
 """
 Download Stock OLHC data from Yahoo Finance and generate stats
 

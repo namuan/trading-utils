@@ -10,13 +10,9 @@ def output_dir():
 
 
 @PersistentCache()
-def download_ticker_data(ticker, start, end, auto_adjust=False):
+def download_ticker_data(ticker, start, end):
     try:
-        df = yf.download(ticker, start=start, end=end, auto_adjust=auto_adjust)
-        # yfinance returns MultiIndex columns for single ticker, flatten them
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        return df
+        return yf.download(ticker, start=start, end=end, multi_level_index=False)
     except:
         print(f"Unable to fetch data for ticker: {ticker}")
         return pd.DataFrame()

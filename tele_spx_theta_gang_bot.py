@@ -7,9 +7,6 @@
 #   "dotmap",
 #   "flatten-dict",
 #   "python-dotenv",
-#   "yfinance",
-#   "tqdm",
-#   "yahoo_earnings_calendar"
 # ]
 # ///
 """

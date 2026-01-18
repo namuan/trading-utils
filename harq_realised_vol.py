@@ -9,14 +9,51 @@
 # ///
 """
 HARQ Model Implementation with Future Volatility Predictions
+
+Usage:
+./harq_realised_vol.py -h
+./harq_realised_vol.py --symbol SPY --days 5
 """
 
+import logging
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+from common.logger import setup_logging
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    parser.add_argument(
+        "-s",
+        "--symbol",
+        type=str,
+        default="SPY",
+        help="Stock symbol to analyze (default: SPY)",
+    )
+    parser.add_argument(
+        "-d",
+        "--days",
+        type=int,
+        default=5,
+        help="Number of days to forecast (default: 5)",
+    )
+    return parser.parse_args()
 
 
 class HARQModel:
@@ -120,12 +157,13 @@ class HARQModel:
         return forecasts
 
 
-def main():
+def main(args):
     # Download data
-    symbol = "SPY"
+    symbol = args.symbol
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365)
 
+    logging.info(f"Downloading data for {symbol}")
     df = yf.download(symbol, start=start_date, end=end_date)
 
     # Calculate daily returns
@@ -139,7 +177,7 @@ def main():
     _, _ = model.fit(df["returns"], df["rv"])
 
     # Make predictions
-    n_days = 5
+    n_days = args.days
     forecasts = model.forecast_n_days(df["returns"], df["rv"], n_days)
 
     # Generate forecast dates
@@ -171,4 +209,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    setup_logging(args.verbose)
+    main(args)

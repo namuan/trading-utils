@@ -1,11 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "pandas",
-#   "yfinance",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-# ]
-# ///
 import argparse
 import os
 

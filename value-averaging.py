@@ -1,10 +1,3 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "pandas",
-#   "yfinance"
-# ]
-# ///
 import argparse
 from datetime import datetime, timedelta
 

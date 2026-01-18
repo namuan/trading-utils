@@ -6,12 +6,13 @@
 #   "numpy",
 #   "pandas",
 #   "yfinance",
+#   "yahoo_earnings_calendar",
+#   "tqdm",
 #   "requests",
 #   "pytz",
 #   "finta",
 #   "stockstats",
 #   "python-dotenv",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
 # ]
 # ///
 """
@@ -57,8 +58,8 @@ def parse_args():
 
 def compile_report(spy_data):
     heading = f"""
-*Last Close* ({"%0.2f" % spy_data["last_close"]})
-RSI2 ({"%0.2f" % spy_data["day_0_rsi_2"]}), RSI4 ({"%0.2f" % spy_data["day_0_rsi_4"]}), RSI9 ({"%0.2f" % spy_data["day_0_rsi_9"]}), RSI14 ({"%0.2f" % spy_data["day_0_rsi_14"]})
+*Last Close* ({'%0.2f' % spy_data["last_close"]})
+RSI2 ({'%0.2f' % spy_data['day_0_rsi_2']}), RSI4 ({'%0.2f' % spy_data['day_0_rsi_4']}), RSI9 ({'%0.2f' % spy_data['day_0_rsi_9']}), RSI14 ({'%0.2f' % spy_data['day_0_rsi_14']})
         """
     reports = [
         "------------ *{}*  ------------".format(

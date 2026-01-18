@@ -1,14 +1,4 @@
-#!/usr/bin/env -S uv run --quiet --script
-# /// script
-# dependencies = [
-#   "matplotlib",
-#   "pandas",
-#   "seaborn",
-#   "yfinance",
-#   "tqdm",
-#   "yahoo_earnings_calendar"
-# ]
-# ///
+#!/usr/bin/env python3
 """
 Script for plotting moving averages of stock prices.
 
