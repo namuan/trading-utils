@@ -9,6 +9,7 @@ Usage:
 ./tele_stock_alerts_bot.py -v
 """
 
+import logging
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 
 from telegram import Update
