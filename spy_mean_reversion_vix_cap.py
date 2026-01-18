@@ -8,12 +8,71 @@
 #   "yfinance",
 # ]
 # ///
+"""
+SPY Mean Reversion Strategy with VIX-based Position Caps
+
+A backtest implementation of a mean reversion strategy for SPY that dynamically
+adjusts position sizes based on VIX volatility levels.
+
+Usage:
+./spy_mean_reversion_vix_cap.py -h
+./spy_mean_reversion_vix_cap.py
+./spy_mean_reversion_vix_cap.py -v --lookback 10
+"""
+
+import logging
 import os
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+
+def setup_logging(verbosity):
+    logging_level = logging.WARNING
+    if verbosity == 1:
+        logging_level = logging.INFO
+    elif verbosity >= 2:
+        logging_level = logging.DEBUG
+
+    logging.basicConfig(
+        handlers=[
+            logging.StreamHandler(),
+        ],
+        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging_level,
+    )
+    logging.captureWarnings(capture=True)
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    parser.add_argument(
+        "--lookback",
+        type=int,
+        default=5,
+        help="Rolling window length for z-score calculation (default: 5)",
+    )
+    parser.add_argument(
+        "--initial-equity",
+        type=float,
+        default=100000.0,
+        help="Initial investment amount (default: 100000)",
+    )
+    return parser.parse_args()
 
 
 def ensure_data_dir(path: str) -> None:
@@ -435,38 +494,35 @@ def summarize_performance(df: pd.DataFrame) -> dict:
     }
 
 
-def main():
+def main(args):
     """
-    Example usage:
-
-    1) Download SPY and ^VIX daily data as CSVs:
-       - e.g. from Yahoo Finance:
-         - SPY: https://query1.finance.yahoo.com/v7/finance/download/SPY
-         - ^VIX: https://query1.finance.yahoo.com/v7/finance/download/%5EVIX
-
-    2) Run:
-         python spy_mean_reversion_vix_cap.py
-
-       (Update the CSV paths below.)
+    Run the SPY mean reversion strategy with VIX-based position caps.
     """
     spy_csv_path = "data/SPY.csv"
     vix_csv_path = "data/VIX.csv"
 
+    logging.info(f"Loading data from {spy_csv_path} and {vix_csv_path}")
     df = load_data(spy_csv_path, vix_csv_path)
-    df = compute_mean_reversion_signal(df, lookback=5)
+    
+    logging.info(f"Computing mean reversion signal with lookback={args.lookback}")
+    df = compute_mean_reversion_signal(df, lookback=args.lookback)
+    
+    logging.info(f"Running backtest with initial equity=${args.initial_equity}")
     df_bt = run_backtest(
         df,
-        initial_equity=100_000.0,
+        initial_equity=args.initial_equity,
         max_leverage=1.0,
         transaction_cost_bps=1.0,
         max_position_notional_cap=1.0,
     )
     stats = summarize_performance(df_bt)
 
-    print("Backtest summary for SPY mean reversion with VIX-based caps:")
+    print("\nBacktest summary for SPY mean reversion with VIX-based caps:")
     for k, v in stats.items():
         print(f"{k}: {v:.4f}")
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    setup_logging(args.verbose)
+    main(args)

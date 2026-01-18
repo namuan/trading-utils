@@ -11,6 +11,19 @@
 #   "PyQt6"
 # ]
 # ///
+"""
+Interactive Calendar Spread Analyzer
+
+A PyQt6 GUI application for analyzing calendar spread options strategies with scenario analysis.
+
+Usage:
+./calendar_spread_interactive.py -h
+./calendar_spread_interactive.py
+"""
+
+import logging
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
+
 import matplotlib
 
 matplotlib.use("QtAgg")
@@ -1434,6 +1447,39 @@ class CalendarSpreadInteractive(QMainWindow):
         self.canvas.draw_idle()
 
 
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    return parser.parse_args()
+
+
+def setup_logging(verbosity):
+    logging_level = logging.WARNING
+    if verbosity == 1:
+        logging_level = logging.INFO
+    elif verbosity >= 2:
+        logging_level = logging.DEBUG
+
+    logging.basicConfig(
+        handlers=[
+            logging.StreamHandler(),
+        ],
+        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging_level,
+    )
+    logging.captureWarnings(capture=True)
+
+
 def main():
     app = QApplication(sys.argv)
     w = CalendarSpreadInteractive()
@@ -1442,4 +1488,6 @@ def main():
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    setup_logging(args.verbose)
     main()

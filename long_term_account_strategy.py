@@ -10,15 +10,63 @@
 """
 Long term account strategy
 
-https://app.composer.trade/symphony/iptXKvpNqUuYcUwH8mIB
+Implements a strategy based on relative strength indicators and moving averages
+to determine optimal allocation between TQQQ, SQQQ, and cash.
+
+Reference: https://app.composer.trade/symphony/iptXKvpNqUuYcUwH8mIB
+
+Usage:
+./long_term_account_strategy.py -h
+./long_term_account_strategy.py
+./long_term_account_strategy.py -v
 """
 
+import logging
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime, timedelta
 
 from stockstats import StockDataFrame
 
 from common.market_data import download_ticker_data
 from common.tele_notifier import pushover_send_message
+
+
+def setup_logging(verbosity):
+    logging_level = logging.WARNING
+    if verbosity == 1:
+        logging_level = logging.INFO
+    elif verbosity >= 2:
+        logging_level = logging.DEBUG
+
+    logging.basicConfig(
+        handlers=[
+            logging.StreamHandler(),
+        ],
+        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging_level,
+    )
+    logging.captureWarnings(capture=True)
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    parser.add_argument(
+        "--no-notify",
+        action="store_true",
+        help="Disable Pushover notification",
+    )
+    return parser.parse_args()
 
 
 def under_moving_average(symbol, sma_days):
@@ -77,7 +125,13 @@ def relative_strength_index(symbol, days):
 
 
 if __name__ == "__main__":
+    args = parse_args()
+    setup_logging(args.verbose)
+    
     result = simple_beta_baller_signal()
     signal = f"{datetime.now().strftime('%Y-%m-%d')} - {result}"
-    pushover_send_message("Long Term Account Rebalance", result)
+    
+    if not args.no_notify:
+        pushover_send_message("Long Term Account Rebalance", result)
+    
     print(result)

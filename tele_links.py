@@ -1,4 +1,17 @@
+"""
+Telegram Link Sender
+
+Sends links from a text file to a Telegram group chat on scheduled times.
+
+Usage:
+./tele_links.py -h
+./tele_links.py --run-once    # Run once immediately
+./tele_links.py               # Run on schedule
+"""
+
+import logging
 import time
+from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 from pathlib import Path
 
@@ -6,6 +19,44 @@ import schedule
 
 from common.environment import GROUP_CHAT_ID
 from common.tele_notifier import send_message_to_telegram
+
+
+def setup_logging(verbosity):
+    logging_level = logging.WARNING
+    if verbosity == 1:
+        logging_level = logging.INFO
+    elif verbosity >= 2:
+        logging_level = logging.DEBUG
+
+    logging.basicConfig(
+        handlers=[
+            logging.StreamHandler(),
+        ],
+        format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging_level,
+    )
+    logging.captureWarnings(capture=True)
+
+
+def parse_args():
+    parser = ArgumentParser(
+        description=__doc__, formatter_class=RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        dest="verbose",
+        help="Increase verbosity of logging output",
+    )
+    parser.add_argument(
+        "--run-once",
+        action="store_true",
+        help="Run once immediately instead of on schedule",
+    )
+    return parser.parse_args()
 
 
 def send_link(website_url):
@@ -52,5 +103,9 @@ def check_if_run():
 
 
 if __name__ == "__main__":
-    check_if_run()
-    # main()
+    args = parse_args()
+    setup_logging(args.verbose)
+    if args.run_once:
+        main()
+    else:
+        check_if_run()
