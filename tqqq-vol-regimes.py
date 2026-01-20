@@ -154,6 +154,12 @@ def parse_args():
         default=False,
         help="Run as bot (scheduled at 9:00 AM on weekdays)",
     )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        default=False,
+        help="Send Telegram alert once and exit (alias for --send-telegram)",
+    )
     return parser.parse_args()
 
 
@@ -1390,6 +1396,10 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     setup_logging(args.verbose)
+
+    # --once is an alias for --send-telegram
+    if args.once:
+        args.send_telegram = True
 
     if args.run_as_bot:
         schedule_bot()
