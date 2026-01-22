@@ -97,58 +97,15 @@ REGIME_PERSISTENCE_DAYS = {
 PANIC_DAILY_DROP = -0.04
 
 
-# TQQQ Volatility Regimes Strategy Configuration
-class Regime(Enum):
-    """Volatility regime states."""
-
-    CALM = "CALM"
-    NORMAL = "NORMAL"
-    STRESS = "STRESS"
-    PANIC = "PANIC"
-
-
-# Exposure allocation per regime
-REGIME_EXPOSURE = {
-    Regime.CALM: 1.00,
-    Regime.NORMAL: 0.75,
-    Regime.STRESS: 0.50,
-    Regime.PANIC: 0.00,
-}
-
-# Volatility ratio thresholds for regime transitions
-REGIME_VOL_THRESHOLDS = {
-    "CALM_ENTER": 0.80,
-    "NORMAL_ENTER": 1.00,
-    "STRESS_ENTER": 1.30,
-    "PANIC_ENTER": 1.60,
-}
-
-# Required consecutive days to confirm regime change
-REGIME_PERSISTENCE_DAYS = {
-    Regime.CALM: 20,
-    Regime.NORMAL: 15,
-    Regime.STRESS: 5,
-    Regime.PANIC: 2,
-}
-
-# Panic daily drop threshold
-PANIC_DAILY_DROP = -0.04
-
-
 def setup_logging(verbosity):
-    logging_level = logging.WARNING
-    if verbosity == 1:
-        logging_level = logging.INFO
-    elif verbosity >= 2:
-        logging_level = logging.DEBUG
+    levels = {0: logging.WARNING, 1: logging.INFO}
+    level = levels.get(verbosity, logging.DEBUG)
 
     logging.basicConfig(
-        handlers=[
-            logging.StreamHandler(),
-        ],
+        handlers=[logging.StreamHandler()],
         format="%(asctime)s - %(filename)s:%(lineno)d - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        level=logging_level,
+        level=level,
     )
     logging.captureWarnings(capture=True)
 
@@ -601,63 +558,46 @@ def generate_credit_market_stats(data) -> str:
 # ============================================================================
 
 
+def extract_column(df, column_name):
+    """Extract column from DataFrame, handling MultiIndex."""
+    if isinstance(df.columns, pd.MultiIndex):
+        col = df[column_name]
+        return col.iloc[:, 0] if len(col.shape) > 1 else col
+    return df[column_name]
+
+
 def calculate_atr(df, period=20):
     """Calculate Average True Range"""
-    # Handle MultiIndex columns from yfinance
-    if isinstance(df.columns, pd.MultiIndex):
-        high = df["High"].iloc[:, 0] if len(df["High"].shape) > 1 else df["High"]
-        low = df["Low"].iloc[:, 0] if len(df["Low"].shape) > 1 else df["Low"]
-        close = df["Close"].iloc[:, 0] if len(df["Close"].shape) > 1 else df["Close"]
-    else:
-        high = df["High"]
-        low = df["Low"]
-        close = df["Close"]
-
+    high = extract_column(df, "High")
+    low = extract_column(df, "Low")
+    close = extract_column(df, "Close")
     prev_close = close.shift(1)
 
-    tr1 = high - low
-    tr2 = abs(high - prev_close)
-    tr3 = abs(low - prev_close)
+    tr_values = pd.concat(
+        [high - low, abs(high - prev_close), abs(low - prev_close)], axis=1
+    )
 
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.rolling(window=period).mean()
-
-    return atr
+    return tr_values.max(axis=1).rolling(window=period).mean()
 
 
 def calculate_vol_ratio(df):
     """Calculate normalized volatility ratio"""
-    # Calculate ATR(20)
     atr_20 = calculate_atr(df, period=20)
-
-    # Handle MultiIndex columns from yfinance
-    if isinstance(df.columns, pd.MultiIndex):
-        close = df["Close"].iloc[:, 0] if len(df["Close"].shape) > 1 else df["Close"]
-    else:
-        close = df["Close"]
-
-    # Normalize by close price
+    close = extract_column(df, "Close")
     vol_raw = atr_20 / close
-
-    # Calculate 252-day rolling median and shift by 1 day (no lookahead)
     vol_median = vol_raw.rolling(window=252, min_periods=252).median().shift(1)
-
-    # Calculate ratio
-    vol_ratio = vol_raw / vol_median
-
-    return vol_ratio
+    return vol_raw / vol_median
 
 
 def get_target_exposure(vol_ratio):
     """Map vol_ratio to target exposure bucket"""
     if pd.isna(vol_ratio):
         return np.nan
-    elif vol_ratio < VOL_THRESHOLD_LOW:
-        return EXPOSURE_LEVELS[2]  # Max exposure
-    elif vol_ratio < VOL_THRESHOLD_HIGH:
-        return EXPOSURE_LEVELS[1]  # Medium exposure
-    else:
-        return EXPOSURE_LEVELS[0]  # No exposure
+    if vol_ratio < VOL_THRESHOLD_LOW:
+        return EXPOSURE_LEVELS[2]
+    if vol_ratio < VOL_THRESHOLD_HIGH:
+        return EXPOSURE_LEVELS[1]
+    return EXPOSURE_LEVELS[0]
 
 
 def apply_hysteresis(target_exposures):
@@ -705,11 +645,25 @@ def apply_hysteresis(target_exposures):
     return pd.Series(current_exposure, index=target_exposures.index)
 
 
+def calculate_strategy_returns(actual_exposure, tqqq_returns, alternate_returns):
+    """Calculate combined strategy returns."""
+    tqqq_portion = actual_exposure * tqqq_returns
+    alternate_portion = (1 - actual_exposure) * alternate_returns
+    return tqqq_portion + alternate_portion
+
+
+def get_common_index(series_list):
+    """Find common index across multiple series."""
+    common = series_list[0].dropna().index
+    for series in series_list[1:]:
+        common = common.intersection(series.dropna().index)
+    return common
+
+
 def run_tqqq_analysis(market_data: Dict[str, pd.DataFrame], use_alternate: bool = True):
     """Run TQQQ volatility bucket analysis."""
     logging.info("Running TQQQ Volatility Bucket Analysis...")
 
-    # Extract data from pre-fetched market data
     qqq_data = market_data.get("QQQ", pd.DataFrame())
     tqqq_data = market_data.get("TQQQ", pd.DataFrame())
     alternate_data = (
@@ -722,77 +676,39 @@ def run_tqqq_analysis(market_data: Dict[str, pd.DataFrame], use_alternate: bool 
         logging.error("Failed to get TQQQ analysis data from market data")
         return None
 
-    # Calculate volatility ratio
     vol_ratio = calculate_vol_ratio(qqq_data)
-
-    # Determine target exposure
     target_exposure = vol_ratio.apply(get_target_exposure)
-
-    # Apply hysteresis
     actual_exposure = apply_hysteresis(target_exposure)
 
-    # Calculate returns
-    if isinstance(tqqq_data.columns, pd.MultiIndex):
-        tqqq_close = (
-            tqqq_data["Close"].iloc[:, 0]
-            if len(tqqq_data["Close"].shape) > 1
-            else tqqq_data["Close"]
-        )
-    else:
-        tqqq_close = tqqq_data["Close"]
-    tqqq_returns = tqqq_close.pct_change()
-
-    if use_alternate:
-        if isinstance(alternate_data.columns, pd.MultiIndex):
-            alternate_close = (
-                alternate_data["Close"].iloc[:, 0]
-                if len(alternate_data["Close"].shape) > 1
-                else alternate_data["Close"]
-            )
-        else:
-            alternate_close = alternate_data["Close"]
-        alternate_returns = alternate_close.pct_change()
-    else:
-        alternate_returns = pd.Series(dtype=float)
-
-    # Align indices
-    common_index = actual_exposure.dropna().index.intersection(
-        tqqq_returns.dropna().index
+    tqqq_returns = extract_column(tqqq_data, "Close").pct_change()
+    alternate_returns = (
+        extract_column(alternate_data, "Close").pct_change()
+        if use_alternate
+        else pd.Series(dtype=float)
     )
-    if use_alternate:
-        common_index = common_index.intersection(alternate_returns.dropna().index)
 
-    logging.info(f"Common index length: {len(common_index)}")
+    series_to_align = [actual_exposure, tqqq_returns]
+    if use_alternate:
+        series_to_align.append(alternate_returns)
+
+    common_index = get_common_index(series_to_align)
+
     if len(common_index) == 0:
         logging.error("No common dates found between datasets")
-        logging.error(f"Actual exposure dates: {len(actual_exposure.dropna())}")
-        logging.error(f"TQQQ returns dates: {len(tqqq_returns.dropna())}")
-        if use_alternate:
-            logging.error(f"Alternate returns dates: {len(alternate_returns.dropna())}")
         return None
 
     actual_exposure = actual_exposure.loc[common_index]
     tqqq_returns = tqqq_returns.loc[common_index]
+    alternate_returns = (
+        alternate_returns.loc[common_index]
+        if use_alternate
+        else pd.Series(0.0, index=common_index)
+    )
 
-    if use_alternate:
-        alternate_returns = alternate_returns.loc[common_index]
-    else:
-        alternate_returns = pd.Series(0.0, index=common_index)
-
-    # Strategy returns: TQQQ portion + Alternate portion
-    tqqq_portion = actual_exposure * tqqq_returns
-    alternate_portion = (1 - actual_exposure) * alternate_returns
-    strategy_returns = tqqq_portion + alternate_portion
-
-    # Build results dataframe
-    if isinstance(qqq_data.columns, pd.MultiIndex):
-        qqq_close = (
-            qqq_data["Close"].iloc[:, 0]
-            if len(qqq_data["Close"].shape) > 1
-            else qqq_data["Close"]
-        )
-    else:
-        qqq_close = qqq_data["Close"]
+    strategy_returns = calculate_strategy_returns(
+        actual_exposure, tqqq_returns, alternate_returns
+    )
+    qqq_close = extract_column(qqq_data, "Close")
 
     results_df = pd.DataFrame(
         {
@@ -909,6 +825,46 @@ def create_tqqq_chart(results_df, use_alternate: bool = True):
     return fig
 
 
+def calculate_cagr(equity, years):
+    """Calculate annualized return."""
+    return (equity ** (1 / years)) - 1 if years > 0 else 0
+
+
+def calculate_sharpe(returns, volatility):
+    """Calculate Sharpe ratio."""
+    return (returns.mean() * 252) / volatility if volatility > 0 else 0
+
+
+def calculate_max_drawdown(equity):
+    """Calculate maximum drawdown."""
+    return ((equity - equity.cummax()) / equity.cummax()).min()
+
+
+def calculate_performance_metrics(results_df):
+    """Calculate all performance metrics."""
+    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
+    benchmark_equity = (1 + results_df["tqqq_returns"]).cumprod()
+    total_years = len(results_df) / 252
+
+    return {
+        "strategy_equity": strategy_equity,
+        "benchmark_equity": benchmark_equity,
+        "strategy_cagr": calculate_cagr(strategy_equity.iloc[-1], total_years),
+        "benchmark_cagr": calculate_cagr(benchmark_equity.iloc[-1], total_years),
+        "strategy_vol": results_df["strategy_returns"].std() * np.sqrt(252),
+        "benchmark_vol": results_df["tqqq_returns"].std() * np.sqrt(252),
+        "strategy_sharpe": calculate_sharpe(
+            results_df["strategy_returns"],
+            results_df["strategy_returns"].std() * np.sqrt(252),
+        ),
+        "benchmark_sharpe": calculate_sharpe(
+            results_df["tqqq_returns"], results_df["tqqq_returns"].std() * np.sqrt(252)
+        ),
+        "strategy_dd": calculate_max_drawdown(strategy_equity),
+        "benchmark_dd": calculate_max_drawdown(benchmark_equity),
+    }
+
+
 def generate_tqqq_stats(results_df, use_alternate: bool = True) -> str:
     """Generate statistics summary for TQQQ volatility bucket strategy."""
     if results_df.empty:
@@ -916,47 +872,18 @@ def generate_tqqq_stats(results_df, use_alternate: bool = True) -> str:
         return "<h3>TQQQ Analysis Unavailable</h3><p>Insufficient data for analysis period.</p>"
 
     latest = results_df.iloc[-1]
-
-    # Calculate performance metrics
-    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
-    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
-
-    total_years = len(results_df) / 252
-    strategy_cagr = (
-        (strategy_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
-    )
-    tqqq_cagr = (
-        (tqqq_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
-    )
-
-    strategy_vol = results_df["strategy_returns"].std() * np.sqrt(252)
-    tqqq_vol = results_df["tqqq_returns"].std() * np.sqrt(252)
-
-    strategy_sharpe = (
-        (results_df["strategy_returns"].mean() * 252) / strategy_vol
-        if strategy_vol > 0
-        else 0
-    )
-    tqqq_sharpe = (
-        (results_df["tqqq_returns"].mean() * 252) / tqqq_vol if tqqq_vol > 0 else 0
-    )
-
-    strategy_dd = (
-        (strategy_equity - strategy_equity.cummax()) / strategy_equity.cummax()
-    ).min()
-    tqqq_dd = ((tqqq_equity - tqqq_equity.cummax()) / tqqq_equity.cummax()).min()
-
+    metrics = calculate_performance_metrics(results_df)
     alternate_label = ALTERNATE_TICKER if use_alternate else "Cash"
 
     stats = f"""
     <h3>TQQQ Volatility Bucket Strategy Statistics</h3>
     <table>
         <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
-        <tr><td>CAGR</td><td>{strategy_cagr:.2%}</td><td>{tqqq_cagr:.2%}</td></tr>
-        <tr><td>Volatility</td><td>{strategy_vol:.2%}</td><td>{tqqq_vol:.2%}</td></tr>
-        <tr><td>Sharpe Ratio</td><td>{strategy_sharpe:.2f}</td><td>{tqqq_sharpe:.2f}</td></tr>
-        <tr><td>Max Drawdown</td><td>{strategy_dd:.2%}</td><td>{tqqq_dd:.2%}</td></tr>
-        <tr><td>Final Equity</td><td>${strategy_equity.iloc[-1]:.2f}</td><td>${tqqq_equity.iloc[-1]:.2f}</td></tr>
+        <tr><td>CAGR</td><td>{metrics['strategy_cagr']:.2%}</td><td>{metrics['benchmark_cagr']:.2%}</td></tr>
+        <tr><td>Volatility</td><td>{metrics['strategy_vol']:.2%}</td><td>{metrics['benchmark_vol']:.2%}</td></tr>
+        <tr><td>Sharpe Ratio</td><td>{metrics['strategy_sharpe']:.2f}</td><td>{metrics['benchmark_sharpe']:.2f}</td></tr>
+        <tr><td>Max Drawdown</td><td>{metrics['strategy_dd']:.2%}</td><td>{metrics['benchmark_dd']:.2%}</td></tr>
+        <tr><td>Final Equity</td><td>${metrics['strategy_equity'].iloc[-1]:.2f}</td><td>${metrics['benchmark_equity'].iloc[-1]:.2f}</td></tr>
     </table>
     <h3>Current Position</h3>
     <table>
@@ -1047,7 +974,6 @@ def run_regime_analysis(market_data: Dict[str, pd.DataFrame]):
     """Run TQQQ volatility regime analysis."""
     logging.info("Running TQQQ Volatility Regime Analysis...")
 
-    # Extract data from pre-fetched market data
     qqq_data = market_data.get("QQQ", pd.DataFrame())
     tqqq_data = market_data.get("TQQQ", pd.DataFrame())
 
@@ -1055,33 +981,13 @@ def run_regime_analysis(market_data: Dict[str, pd.DataFrame]):
         logging.error("Failed to get regime analysis data from market data")
         return None
 
-    # Calculate volatility ratio (reuse existing function)
     vol_ratio = calculate_vol_ratio(qqq_data)
-
-    # Run regime state machine
     regimes = run_regime_state_machine(qqq_data, vol_ratio)
-
-    # Calculate returns
-    if isinstance(tqqq_data.columns, pd.MultiIndex):
-        tqqq_close = (
-            tqqq_data["Close"].iloc[:, 0]
-            if len(tqqq_data["Close"].shape) > 1
-            else tqqq_data["Close"]
-        )
-    else:
-        tqqq_close = tqqq_data["Close"]
-
-    tqqq_returns = tqqq_close.pct_change()
-
-    # Map regimes to exposure
+    tqqq_returns = extract_column(tqqq_data, "Close").pct_change()
     exposure = regimes.map(REGIME_EXPOSURE)
-
-    # Calculate strategy returns (exposure lagged by 1 day)
     strategy_returns = exposure.shift(1) * tqqq_returns
 
-    # Align all data
-    common_index = regimes.dropna().index.intersection(tqqq_returns.dropna().index)
-
+    common_index = get_common_index([regimes, tqqq_returns])
     if len(common_index) == 0:
         logging.error("No common dates for regime analysis")
         return None
@@ -1091,16 +997,7 @@ def run_regime_analysis(market_data: Dict[str, pd.DataFrame]):
     exposure = exposure.loc[common_index]
     strategy_returns = strategy_returns.loc[common_index]
     tqqq_returns = tqqq_returns.loc[common_index]
-
-    # Build results dataframe
-    if isinstance(qqq_data.columns, pd.MultiIndex):
-        qqq_close = (
-            qqq_data["Close"].iloc[:, 0]
-            if len(qqq_data["Close"].shape) > 1
-            else qqq_data["Close"]
-        )
-    else:
-        qqq_close = qqq_data["Close"]
+    qqq_close = extract_column(qqq_data, "Close")
 
     results_df = pd.DataFrame(
         {
@@ -1266,37 +1163,7 @@ def generate_regime_stats(results_df) -> str:
         return "<h3>TQQQ Regime Analysis Unavailable</h3><p>Insufficient data for analysis period.</p>"
 
     latest = results_df.iloc[-1]
-
-    # Calculate performance metrics
-    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
-    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
-
-    total_years = len(results_df) / 252
-    strategy_cagr = (
-        (strategy_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
-    )
-    tqqq_cagr = (
-        (tqqq_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
-    )
-
-    strategy_vol = results_df["strategy_returns"].std() * np.sqrt(252)
-    tqqq_vol = results_df["tqqq_returns"].std() * np.sqrt(252)
-
-    strategy_sharpe = (
-        (results_df["strategy_returns"].mean() * 252) / strategy_vol
-        if strategy_vol > 0
-        else 0
-    )
-    tqqq_sharpe = (
-        (results_df["tqqq_returns"].mean() * 252) / tqqq_vol if tqqq_vol > 0 else 0
-    )
-
-    strategy_dd = (
-        (strategy_equity - strategy_equity.cummax()) / strategy_equity.cummax()
-    ).min()
-    tqqq_dd = ((tqqq_equity - tqqq_equity.cummax()) / tqqq_equity.cummax()).min()
-
-    # Regime statistics
+    metrics = calculate_performance_metrics(results_df)
     regime_counts = results_df["regime"].value_counts()
     total_days = len(results_df)
 
@@ -1304,11 +1171,11 @@ def generate_regime_stats(results_df) -> str:
     <h3>TQQQ Volatility Regime Strategy Statistics</h3>
     <table>
         <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
-        <tr><td>CAGR</td><td>{strategy_cagr:.2%}</td><td>{tqqq_cagr:.2%}</td></tr>
-        <tr><td>Volatility</td><td>{strategy_vol:.2%}</td><td>{tqqq_vol:.2%}</td></tr>
-        <tr><td>Sharpe Ratio</td><td>{strategy_sharpe:.2f}</td><td>{tqqq_sharpe:.2f}</td></tr>
-        <tr><td>Max Drawdown</td><td>{strategy_dd:.2%}</td><td>{tqqq_dd:.2%}</td></tr>
-        <tr><td>Final Equity</td><td>${strategy_equity.iloc[-1]:.2f}</td><td>${tqqq_equity.iloc[-1]:.2f}</td></tr>
+        <tr><td>CAGR</td><td>{metrics['strategy_cagr']:.2%}</td><td>{metrics['benchmark_cagr']:.2%}</td></tr>
+        <tr><td>Volatility</td><td>{metrics['strategy_vol']:.2%}</td><td>{metrics['benchmark_vol']:.2%}</td></tr>
+        <tr><td>Sharpe Ratio</td><td>{metrics['strategy_sharpe']:.2f}</td><td>{metrics['benchmark_sharpe']:.2f}</td></tr>
+        <tr><td>Max Drawdown</td><td>{metrics['strategy_dd']:.2%}</td><td>{metrics['benchmark_dd']:.2%}</td></tr>
+        <tr><td>Final Equity</td><td>${metrics['strategy_equity'].iloc[-1]:.2f}</td><td>${metrics['benchmark_equity'].iloc[-1]:.2f}</td></tr>
     </table>
     <h3>Current Regime Status</h3>
     <table>
@@ -1336,35 +1203,38 @@ def generate_regime_stats(results_df) -> str:
 # ============================================================================
 
 
+def run_options_script(symbol, output_path):
+    """Run options expected move script."""
+    script_dir = Path(__file__).parent
+    options_script = script_dir / "options-expected-move.py"
+    cmd = [
+        str(options_script),
+        "-s",
+        symbol,
+        "--multi-dte",
+        "--no-show",
+        "--output-file",
+        output_path,
+    ]
+    logging.info(f"Running command: {' '.join(cmd)}")
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+
+def encode_png_to_base64(file_path):
+    """Encode PNG file to base64 string."""
+    with open(file_path, "rb") as f:
+        return b64encode(f.read()).decode("utf-8")
+
+
 def generate_options_expected_move(symbol: str = "SPY") -> str:
-    """
-    Generate options expected move chart by calling options-expected-move.py as subprocess.
-    Returns base64 encoded PNG image.
-    """
+    """Generate options expected move chart and return base64 encoded PNG."""
     logging.info(f"Generating options expected move chart for {symbol}...")
 
-    # Create a temporary file for the output
     with tempfile.NamedTemporaryFile(mode="w", suffix=".png", delete=False) as tmp_file:
         output_path = tmp_file.name
 
     try:
-        # Get the path to options-expected-move.py
-        script_dir = Path(__file__).parent
-        options_script = script_dir / "options-expected-move.py"
-
-        # Call the script with headless mode and specified output file
-        cmd = [
-            str(options_script),
-            "-s",
-            symbol,
-            "--multi-dte",
-            "--no-show",
-            "--output-file",
-            output_path,
-        ]
-
-        logging.info(f"Running command: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        result = run_options_script(symbol, output_path)
 
         if result.returncode != 0:
             logging.error(
@@ -1372,12 +1242,8 @@ def generate_options_expected_move(symbol: str = "SPY") -> str:
             )
             return None
 
-        # Read the generated PNG and encode to base64
-        with open(output_path, "rb") as f:
-            img_data = f.read()
-            img_base64 = b64encode(img_data).decode("utf-8")
-
-        logging.info(f"Successfully generated options expected move chart")
+        img_base64 = encode_png_to_base64(output_path)
+        logging.info("Successfully generated options expected move chart")
         return img_base64
 
     except subprocess.TimeoutExpired:
@@ -1387,12 +1253,11 @@ def generate_options_expected_move(symbol: str = "SPY") -> str:
         logging.error(f"Error generating options expected move: {e}", exc_info=True)
         return None
     finally:
-        # Clean up temporary file
-        try:
-            if os.path.exists(output_path):
+        if os.path.exists(output_path):
+            try:
                 os.unlink(output_path)
-        except Exception as e:
-            logging.warning(f"Failed to delete temporary file {output_path}: {e}")
+            except Exception as e:
+                logging.warning(f"Failed to delete temporary file {output_path}: {e}")
 
 
 # ============================================================================
@@ -1579,6 +1444,113 @@ def generate_html_report(
 # ============================================================================
 
 
+def run_vix_signals_analysis(start_date, end_date):
+    """Run VIX signals analysis."""
+    logging.info("Running VIX Signals Analysis...")
+    vix_symbols = ["^VIX9D", "^VIX", "SPY"]
+    vix_market_data = fetch_all_symbols(
+        vix_symbols, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
+    )
+    vix_df = calculate_ivts(vix_market_data)
+    vix_df = calculate_vix_signals(vix_df)
+    return create_vix_signals_chart(vix_df), generate_vix_signals_stats(vix_df)
+
+
+def run_vix_comparative_analysis(start_date, end_date):
+    """Run VIX comparative analysis."""
+    logging.info("Running VIX Comparative Analysis...")
+    comparative_symbols = ["SPY", "^VIX", "^VVIX", "^VIX9D", "^VIX3M"]
+    comparative_data = fetch_all_symbols(
+        comparative_symbols,
+        start_date.strftime("%Y-%m-%d"),
+        end_date.strftime("%Y-%m-%d"),
+    )
+    normalized_df = normalize_prices(comparative_data)
+    return create_vix_comparative_chart(normalized_df)
+
+
+def run_credit_analysis(start_date, end_date):
+    """Run credit market canary analysis."""
+    logging.info("Running Credit Market Canary Analysis...")
+    credit_data = get_credit_market_data(
+        start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
+    )
+    if credit_data is None or credit_data.empty:
+        logging.error("Failed to retrieve credit market data")
+        return None, None
+    return create_credit_market_chart(credit_data), generate_credit_market_stats(
+        credit_data
+    )
+
+
+def fetch_tqqq_data(start_date, end_date):
+    """Fetch all required market data for TQQQ analysis."""
+    from datetime import timedelta
+
+    tqqq_start_date = (start_date - timedelta(days=300)).strftime("%Y-%m-%d")
+    all_symbols = ["SPY", "LQD", "IEF", "QQQ", "TQQQ", ALTERNATE_TICKER]
+    return fetch_all_symbols(
+        all_symbols, tqqq_start_date, end_date.strftime("%Y-%m-%d")
+    )
+
+
+def run_tqqq_bucket_analysis(all_market_data, start_date, use_alternate=True):
+    """Run TQQQ volatility bucket analysis."""
+    logging.info("Running TQQQ Volatility Bucket Analysis...")
+    tqqq_result = run_tqqq_analysis(all_market_data, use_alternate)
+
+    if tqqq_result is None:
+        logging.error("Failed to run TQQQ analysis")
+        return None, None, None
+
+    tqqq_results_df, use_alt = tqqq_result
+    tqqq_results_df = tqqq_results_df[tqqq_results_df.index >= start_date]
+
+    if tqqq_results_df.empty:
+        logging.error("No TQQQ data available for the requested date range")
+        return None, None, None
+
+    tqqq_fig = create_tqqq_chart(tqqq_results_df, use_alt)
+    tqqq_stats = generate_tqqq_stats(tqqq_results_df, use_alt)
+    alternate_label = ALTERNATE_TICKER if use_alt else "Cash"
+    return tqqq_fig, tqqq_stats, alternate_label
+
+
+def run_tqqq_regime_analysis(all_market_data, start_date):
+    """Run TQQQ volatility regime analysis."""
+    logging.info("Running TQQQ Volatility Regime Analysis...")
+    regime_results_df = run_regime_analysis(all_market_data)
+
+    if regime_results_df is None:
+        logging.error("Failed to run TQQQ regime analysis")
+        return None, None
+
+    regime_results_df = regime_results_df[regime_results_df.index >= start_date]
+
+    if regime_results_df.empty:
+        logging.error("No regime data available for the requested date range")
+        return None, None
+
+    return create_regime_chart(regime_results_df), generate_regime_stats(
+        regime_results_df
+    )
+
+
+def save_report(html_content, report_path):
+    """Save HTML report to file."""
+    if report_path == "daily_rebalance_report.html":
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".html", mode="w")
+        output_path = temp_file.name
+        with open(output_path, "w") as f:
+            f.write(html_content)
+        temp_file.close()
+        return output_path
+
+    with open(report_path, "w") as f:
+        f.write(html_content)
+    return report_path
+
+
 def parse_args():
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
@@ -1621,123 +1593,37 @@ def main(args):
     logging.info("Starting Daily Rebalance Report generation...")
 
     try:
-        # Parse dates
         start_date = pd.to_datetime(args.start_date)
         end_date = pd.to_datetime(args.end_date)
-
         logging.info(f"Analysis period: {start_date.date()} to {end_date.date()}")
 
-        # ========================================================================
-        # 1. VIX Signals Analysis
-        # ========================================================================
-        logging.info("Running VIX Signals Analysis...")
-        vix_symbols = ["^VIX9D", "^VIX", "SPY"]
-        vix_market_data = fetch_all_symbols(
-            vix_symbols, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
+        vix_signals_fig, vix_signals_stats = run_vix_signals_analysis(
+            start_date, end_date
+        )
+        vix_comparative_fig = run_vix_comparative_analysis(start_date, end_date)
+        credit_market_fig, credit_market_stats = run_credit_analysis(
+            start_date, end_date
         )
 
-        vix_df = calculate_ivts(vix_market_data)
-        vix_df = calculate_vix_signals(vix_df)
-        vix_signals_fig = create_vix_signals_chart(vix_df)
-        vix_signals_stats = generate_vix_signals_stats(vix_df)
+        if credit_market_fig is None:
+            return 1
 
-        # ========================================================================
-        # 2. VIX Comparative Analysis
-        # ========================================================================
-        logging.info("Running VIX Comparative Analysis...")
-        comparative_symbols = ["SPY", "^VIX", "^VVIX", "^VIX9D", "^VIX3M"]
-        comparative_data = fetch_all_symbols(
-            comparative_symbols,
-            start_date.strftime("%Y-%m-%d"),
-            end_date.strftime("%Y-%m-%d"),
+        all_market_data = fetch_tqqq_data(start_date, end_date)
+        tqqq_fig, tqqq_stats, alternate_label = run_tqqq_bucket_analysis(
+            all_market_data, start_date, use_alternate=True
         )
 
-        normalized_df = normalize_prices(comparative_data)
-        vix_comparative_fig = create_vix_comparative_chart(normalized_df)
-
-        # ========================================================================
-        # 3. Credit Market Canary & TQQQ Data Fetching
-        # ========================================================================
-        logging.info(
-            "Fetching market data for Credit Market Canary and TQQQ analysis..."
-        )
-        # For TQQQ analysis, we need at least 252 days of history for volatility calculations
-        # So fetch from an earlier date (add 300 days buffer for rolling median)
-        from datetime import timedelta
-
-        tqqq_start_date = (start_date - timedelta(days=300)).strftime("%Y-%m-%d")
-
-        # Fetch all required symbols in one place
-        all_symbols = ["SPY", "LQD", "IEF", "QQQ", "TQQQ", ALTERNATE_TICKER]
-        all_market_data = fetch_all_symbols(
-            all_symbols, tqqq_start_date, end_date.strftime("%Y-%m-%d")
-        )
-
-        # Credit Market Canary Analysis
-        logging.info("Running Credit Market Canary Analysis...")
-        credit_data = get_credit_market_data(
-            start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
-        )
-
-        if credit_data is None or credit_data.empty:
-            logging.error("Failed to retrieve credit market data")
+        if tqqq_fig is None:
             return 1
 
-        credit_market_fig = create_credit_market_chart(credit_data)
-        credit_market_stats = generate_credit_market_stats(credit_data)
+        regime_fig, regime_stats = run_tqqq_regime_analysis(all_market_data, start_date)
 
-        # ========================================================================
-        # 4. TQQQ Volatility Bucket Analysis
-        # ========================================================================
-        logging.info("Running TQQQ Volatility Bucket Analysis...")
-        tqqq_result = run_tqqq_analysis(all_market_data, use_alternate=True)
-
-        if tqqq_result is None:
-            logging.error("Failed to run TQQQ analysis")
+        if regime_fig is None:
             return 1
 
-        tqqq_results_df, use_alternate = tqqq_result
-
-        # Filter results to only show data from the requested start_date onwards
-        tqqq_results_df = tqqq_results_df[tqqq_results_df.index >= start_date]
-
-        if tqqq_results_df.empty:
-            logging.error("No TQQQ data available for the requested date range")
-            return 1
-
-        tqqq_fig = create_tqqq_chart(tqqq_results_df, use_alternate)
-        tqqq_stats = generate_tqqq_stats(tqqq_results_df, use_alternate)
-        alternate_label = ALTERNATE_TICKER if use_alternate else "Cash"
-
-        # ========================================================================
-        # 5. TQQQ Volatility Regime Analysis
-        # ========================================================================
-        logging.info("Running TQQQ Volatility Regime Analysis...")
-        regime_results_df = run_regime_analysis(all_market_data)
-
-        if regime_results_df is None:
-            logging.error("Failed to run TQQQ regime analysis")
-            return 1
-
-        # Filter results to only show data from the requested start_date onwards
-        regime_results_df = regime_results_df[regime_results_df.index >= start_date]
-
-        if regime_results_df.empty:
-            logging.error("No regime data available for the requested date range")
-            return 1
-
-        regime_fig = create_regime_chart(regime_results_df)
-        regime_stats = generate_regime_stats(regime_results_df)
-
-        # ========================================================================
-        # 6. Options Expected Move Analysis
-        # ========================================================================
         logging.info("Generating Options Expected Move Analysis...")
         options_expected_move_img = generate_options_expected_move("SPY")
 
-        # ========================================================================
-        # 7. Generate HTML Report
-        # ========================================================================
         logging.info("Generating HTML report...")
         html_content = generate_html_report(
             vix_signals_fig,
@@ -1755,27 +1641,10 @@ def main(args):
             end_date,
         )
 
-        # Determine report path
-        if args.report_path == "daily_rebalance_report.html":
-            # Create temporary file in the system temp directory
-            temp_file = tempfile.NamedTemporaryFile(
-                delete=False, suffix=".html", mode="w"
-            )
-            report_path = temp_file.name
-            # Write content to temporary file
-            with open(report_path, "w") as f:
-                f.write(html_content)
-            temp_file.close()
-        else:
-            # Use the provided path
-            with open(args.report_path, "w") as f:
-                f.write(html_content)
-            report_path = args.report_path
-
+        report_path = save_report(html_content, args.report_path)
         logging.info(f"Report saved to {report_path}")
         print(f"\n✅ Report successfully generated: {report_path}")
 
-        # Open report in browser if requested
         if args.open:
             logging.info("Opening report in browser...")
             webbrowser.open(f"file://{os.path.abspath(report_path)}")
