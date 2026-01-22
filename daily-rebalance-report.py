@@ -40,6 +40,7 @@ from typing import Dict, List
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import yfinance as yf
 from matplotlib.gridspec import GridSpec
@@ -48,6 +49,13 @@ from persistent_cache import PersistentCache
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from stockstats import wrap as stockstats_wrap
+
+# TQQQ Strategy Configuration
+EXPOSURE_LEVELS = [0.00, 0.25, 0.70]  # Available exposure buckets
+HYSTERESIS_DAYS = 10  # Days required to size up
+VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
+VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
+ALTERNATE_TICKER = "GLD"
 
 
 def setup_logging(verbosity):
@@ -512,6 +520,382 @@ def generate_credit_market_stats(data) -> str:
 
 
 # ============================================================================
+# TQQQ Volatility Buckets Analysis
+# ============================================================================
+
+
+def calculate_atr(df, period=20):
+    """Calculate Average True Range"""
+    # Handle MultiIndex columns from yfinance
+    if isinstance(df.columns, pd.MultiIndex):
+        high = df["High"].iloc[:, 0] if len(df["High"].shape) > 1 else df["High"]
+        low = df["Low"].iloc[:, 0] if len(df["Low"].shape) > 1 else df["Low"]
+        close = df["Close"].iloc[:, 0] if len(df["Close"].shape) > 1 else df["Close"]
+    else:
+        high = df["High"]
+        low = df["Low"]
+        close = df["Close"]
+
+    prev_close = close.shift(1)
+
+    tr1 = high - low
+    tr2 = abs(high - prev_close)
+    tr3 = abs(low - prev_close)
+
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+
+    return atr
+
+
+def calculate_vol_ratio(df):
+    """Calculate normalized volatility ratio"""
+    # Calculate ATR(20)
+    atr_20 = calculate_atr(df, period=20)
+
+    # Handle MultiIndex columns from yfinance
+    if isinstance(df.columns, pd.MultiIndex):
+        close = df["Close"].iloc[:, 0] if len(df["Close"].shape) > 1 else df["Close"]
+    else:
+        close = df["Close"]
+
+    # Normalize by close price
+    vol_raw = atr_20 / close
+
+    # Calculate 252-day rolling median and shift by 1 day (no lookahead)
+    vol_median = vol_raw.rolling(window=252, min_periods=252).median().shift(1)
+
+    # Calculate ratio
+    vol_ratio = vol_raw / vol_median
+
+    return vol_ratio
+
+
+def get_target_exposure(vol_ratio):
+    """Map vol_ratio to target exposure bucket"""
+    if pd.isna(vol_ratio):
+        return np.nan
+    elif vol_ratio < VOL_THRESHOLD_LOW:
+        return EXPOSURE_LEVELS[2]  # Max exposure
+    elif vol_ratio < VOL_THRESHOLD_HIGH:
+        return EXPOSURE_LEVELS[1]  # Medium exposure
+    else:
+        return EXPOSURE_LEVELS[0]  # No exposure
+
+
+def apply_hysteresis(target_exposures):
+    """
+    Apply hysteresis logic:
+    - Sizing DOWN: immediate
+    - Sizing UP: requires HYSTERESIS_DAYS consecutive days in lower-vol bucket
+    """
+    current_exposure = []
+    days_in_bucket = 0
+    prev_exposure = 0.0
+
+    for target in target_exposures:
+        if pd.isna(target):
+            current_exposure.append(np.nan)
+            continue
+
+        # First valid target
+        if prev_exposure == 0.0 and not pd.isna(target):
+            prev_exposure = target
+            current_exposure.append(target)
+            days_in_bucket = 1
+            continue
+
+        # Sizing DOWN - immediate
+        if target < prev_exposure:
+            prev_exposure = target
+            current_exposure.append(target)
+            days_in_bucket = 1
+        # Sizing UP - need HYSTERESIS_DAYS consecutive days
+        elif target > prev_exposure:
+            days_in_bucket += 1
+            if days_in_bucket >= HYSTERESIS_DAYS:
+                # Increase by ONE bucket at a time
+                current_idx = EXPOSURE_LEVELS.index(prev_exposure)
+                if current_idx < len(EXPOSURE_LEVELS) - 1:
+                    prev_exposure = EXPOSURE_LEVELS[current_idx + 1]
+                days_in_bucket = 1
+            current_exposure.append(prev_exposure)
+        else:
+            # No change
+            current_exposure.append(prev_exposure)
+            days_in_bucket += 1
+
+    return pd.Series(current_exposure, index=target_exposures.index)
+
+
+def run_tqqq_analysis(market_data: Dict[str, pd.DataFrame], use_alternate: bool = True):
+    """Run TQQQ volatility bucket analysis."""
+    logging.info("Running TQQQ Volatility Bucket Analysis...")
+
+    # Extract data from pre-fetched market data
+    qqq_data = market_data.get("QQQ", pd.DataFrame())
+    tqqq_data = market_data.get("TQQQ", pd.DataFrame())
+    alternate_data = (
+        market_data.get(ALTERNATE_TICKER, pd.DataFrame())
+        if use_alternate
+        else pd.DataFrame()
+    )
+
+    if qqq_data.empty or tqqq_data.empty or (use_alternate and alternate_data.empty):
+        logging.error("Failed to get TQQQ analysis data from market data")
+        return None
+
+    # Calculate volatility ratio
+    vol_ratio = calculate_vol_ratio(qqq_data)
+
+    # Determine target exposure
+    target_exposure = vol_ratio.apply(get_target_exposure)
+
+    # Apply hysteresis
+    actual_exposure = apply_hysteresis(target_exposure)
+
+    # Calculate returns
+    if isinstance(tqqq_data.columns, pd.MultiIndex):
+        tqqq_close = (
+            tqqq_data["Close"].iloc[:, 0]
+            if len(tqqq_data["Close"].shape) > 1
+            else tqqq_data["Close"]
+        )
+    else:
+        tqqq_close = tqqq_data["Close"]
+    tqqq_returns = tqqq_close.pct_change()
+
+    if use_alternate:
+        if isinstance(alternate_data.columns, pd.MultiIndex):
+            alternate_close = (
+                alternate_data["Close"].iloc[:, 0]
+                if len(alternate_data["Close"].shape) > 1
+                else alternate_data["Close"]
+            )
+        else:
+            alternate_close = alternate_data["Close"]
+        alternate_returns = alternate_close.pct_change()
+    else:
+        alternate_returns = pd.Series(dtype=float)
+
+    # Align indices
+    common_index = actual_exposure.dropna().index.intersection(
+        tqqq_returns.dropna().index
+    )
+    if use_alternate:
+        common_index = common_index.intersection(alternate_returns.dropna().index)
+
+    logging.info(f"Common index length: {len(common_index)}")
+    if len(common_index) == 0:
+        logging.error("No common dates found between datasets")
+        logging.error(f"Actual exposure dates: {len(actual_exposure.dropna())}")
+        logging.error(f"TQQQ returns dates: {len(tqqq_returns.dropna())}")
+        if use_alternate:
+            logging.error(f"Alternate returns dates: {len(alternate_returns.dropna())}")
+        return None
+
+    actual_exposure = actual_exposure.loc[common_index]
+    tqqq_returns = tqqq_returns.loc[common_index]
+
+    if use_alternate:
+        alternate_returns = alternate_returns.loc[common_index]
+    else:
+        alternate_returns = pd.Series(0.0, index=common_index)
+
+    # Strategy returns: TQQQ portion + Alternate portion
+    tqqq_portion = actual_exposure * tqqq_returns
+    alternate_portion = (1 - actual_exposure) * alternate_returns
+    strategy_returns = tqqq_portion + alternate_portion
+
+    # Build results dataframe
+    if isinstance(qqq_data.columns, pd.MultiIndex):
+        qqq_close = (
+            qqq_data["Close"].iloc[:, 0]
+            if len(qqq_data["Close"].shape) > 1
+            else qqq_data["Close"]
+        )
+    else:
+        qqq_close = qqq_data["Close"]
+
+    results_df = pd.DataFrame(
+        {
+            "qqq_close": qqq_close.loc[common_index],
+            "vol_ratio": vol_ratio.loc[common_index],
+            "target_exposure": target_exposure.loc[common_index],
+            "actual_exposure": actual_exposure,
+            "strategy_returns": strategy_returns,
+            "tqqq_returns": tqqq_returns,
+            "alternate_returns": alternate_returns,
+        }
+    )
+
+    if results_df.empty:
+        logging.error("Results dataframe is empty - no common index found")
+        return None
+
+    return results_df, use_alternate
+
+
+def create_tqqq_chart(results_df, use_alternate: bool = True):
+    """Create TQQQ volatility bucket strategy chart."""
+    logging.info("Creating TQQQ strategy chart...")
+
+    ALTERNATE_TICKER if use_alternate else "Cash"
+
+    # Calculate equity curves
+    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
+    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
+
+    # Create figure with subplots
+    fig, axes = plt.subplots(3, 1, figsize=(15, 12))
+
+    # Panel 1: Equity Curves
+    axes[0].plot(
+        strategy_equity.index,
+        strategy_equity.values,
+        label="Vol Bucket Strategy",
+        linewidth=2,
+    )
+    axes[0].plot(
+        tqqq_equity.index,
+        tqqq_equity.values,
+        label="TQQQ B&H",
+        linewidth=2,
+        alpha=0.7,
+    )
+    axes[0].set_yscale("log")
+    axes[0].set_title("Equity Curves Comparison", fontsize=14, fontweight="bold")
+    axes[0].set_ylabel("Equity (Log Scale)")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    # Panel 2: Exposure Over Time
+    exposure_changes = results_df["actual_exposure"].diff() != 0
+    size_up = (results_df["actual_exposure"].diff() > 0) & exposure_changes
+    size_down = (results_df["actual_exposure"].diff() < 0) & exposure_changes
+
+    axes[1].plot(
+        results_df.index,
+        results_df["actual_exposure"] * 100,
+        label="TQQQ Exposure",
+        color="navy",
+        linewidth=2,
+    )
+    axes[1].scatter(
+        results_df.index[size_up],
+        results_df["actual_exposure"][size_up] * 100,
+        color="green",
+        marker="^",
+        s=100,
+        label="Size Up",
+        zorder=5,
+    )
+    axes[1].scatter(
+        results_df.index[size_down],
+        results_df["actual_exposure"][size_down] * 100,
+        color="red",
+        marker="v",
+        s=100,
+        label="Size Down",
+        zorder=5,
+    )
+    axes[1].set_title("Position Sizing with Signals", fontsize=14, fontweight="bold")
+    axes[1].set_ylabel("TQQQ Exposure (%)")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+    axes[1].set_ylim([-5, 105])
+
+    # Panel 3: Volatility Regime
+    vol_ratio = results_df["vol_ratio"].dropna()
+    axes[2].plot(
+        vol_ratio.index,
+        vol_ratio.values,
+        label="Vol Ratio",
+        color="purple",
+        linewidth=1,
+    )
+    axes[2].axhline(
+        y=VOL_THRESHOLD_LOW, linestyle="--", color="green", label="Low Vol Threshold"
+    )
+    axes[2].axhline(
+        y=VOL_THRESHOLD_HIGH, linestyle="--", color="red", label="High Vol Threshold"
+    )
+    axes[2].set_title(
+        "Volatility Regime (QQQ ATR / Median)", fontsize=14, fontweight="bold"
+    )
+    axes[2].set_ylabel("Vol Ratio")
+    axes[2].set_xlabel("Date")
+    axes[2].grid(True, alpha=0.3)
+    axes[2].legend()
+
+    plt.tight_layout()
+    return fig
+
+
+def generate_tqqq_stats(results_df, use_alternate: bool = True) -> str:
+    """Generate statistics summary for TQQQ volatility bucket strategy."""
+    if results_df.empty:
+        logging.error("Cannot generate TQQQ stats - results dataframe is empty")
+        return "<h3>TQQQ Analysis Unavailable</h3><p>Insufficient data for analysis period.</p>"
+
+    latest = results_df.iloc[-1]
+
+    # Calculate performance metrics
+    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
+    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
+
+    total_years = len(results_df) / 252
+    strategy_cagr = (
+        (strategy_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
+    )
+    tqqq_cagr = (
+        (tqqq_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
+    )
+
+    strategy_vol = results_df["strategy_returns"].std() * np.sqrt(252)
+    tqqq_vol = results_df["tqqq_returns"].std() * np.sqrt(252)
+
+    strategy_sharpe = (
+        (results_df["strategy_returns"].mean() * 252) / strategy_vol
+        if strategy_vol > 0
+        else 0
+    )
+    tqqq_sharpe = (
+        (results_df["tqqq_returns"].mean() * 252) / tqqq_vol if tqqq_vol > 0 else 0
+    )
+
+    strategy_dd = (
+        (strategy_equity - strategy_equity.cummax()) / strategy_equity.cummax()
+    ).min()
+    tqqq_dd = ((tqqq_equity - tqqq_equity.cummax()) / tqqq_equity.cummax()).min()
+
+    alternate_label = ALTERNATE_TICKER if use_alternate else "Cash"
+
+    stats = f"""
+    <h3>TQQQ Volatility Bucket Strategy Statistics</h3>
+    <table>
+        <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
+        <tr><td>CAGR</td><td>{strategy_cagr:.2%}</td><td>{tqqq_cagr:.2%}</td></tr>
+        <tr><td>Volatility</td><td>{strategy_vol:.2%}</td><td>{tqqq_vol:.2%}</td></tr>
+        <tr><td>Sharpe Ratio</td><td>{strategy_sharpe:.2f}</td><td>{tqqq_sharpe:.2f}</td></tr>
+        <tr><td>Max Drawdown</td><td>{strategy_dd:.2%}</td><td>{tqqq_dd:.2%}</td></tr>
+        <tr><td>Final Equity</td><td>${strategy_equity.iloc[-1]:.2f}</td><td>${tqqq_equity.iloc[-1]:.2f}</td></tr>
+    </table>
+    <h3>Current Position</h3>
+    <table>
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td>Current Date</td><td>{results_df.index[-1].strftime('%Y-%m-%d')}</td></tr>
+        <tr><td>QQQ Close</td><td>${latest['qqq_close']:.2f}</td></tr>
+        <tr><td>Vol Ratio</td><td>{latest['vol_ratio']:.2f}x</td></tr>
+        <tr><td>Target Exposure</td><td>{latest['target_exposure']*100:.0f}%</td></tr>
+        <tr><td>Actual Exposure</td><td>{latest['actual_exposure']*100:.0f}%</td></tr>
+        <tr><td>{alternate_label} Allocation</td><td>{(1-latest['actual_exposure'])*100:.0f}%</td></tr>
+    </table>
+    """
+    return stats
+
+
+# ============================================================================
 # Options Expected Move Analysis
 # ============================================================================
 
@@ -596,6 +980,9 @@ def generate_html_report(
     vix_comparative_fig,
     credit_market_fig,
     credit_market_stats,
+    tqqq_fig,
+    tqqq_stats,
+    alternate_label,
     options_expected_move_img,
     start_date,
     end_date,
@@ -606,6 +993,7 @@ def generate_html_report(
     vix_signals_img = fig_to_base64(vix_signals_fig)
     vix_comparative_img = fig_to_base64(vix_comparative_fig)
     credit_market_img = fig_to_base64(credit_market_fig)
+    tqqq_img = fig_to_base64(tqqq_fig)
 
     html_content = f"""
     <!DOCTYPE html>
@@ -714,7 +1102,15 @@ def generate_html_report(
             </div>
 
             <div class="section">
-                <h2>4. Options Expected Move (Multi-DTE)</h2>
+                <h2>4. TQQQ Volatility Bucket Strategy</h2>
+                <p>Dynamic position sizing for TQQQ based on QQQ volatility regimes with hysteresis to avoid overtrading.</p>
+                <p><strong>Strategy:</strong> Adjusts TQQQ exposure based on ATR-normalized volatility. Uninvested portion allocated to {alternate_label}.</p>
+                {tqqq_stats}
+                <img src="data:image/png;base64,{tqqq_img}" alt="TQQQ Volatility Bucket Chart">
+            </div>
+
+            <div class="section">
+                <h2>5. Options Expected Move (Multi-DTE)</h2>
                 <p>Multi-DTE expected move analysis based on options implied volatility for SPY.</p>
                 <p>Shows projected price ranges at 7, 14, 21, and 30 days to expiration based on at-the-money options IV.</p>
                 {"<img src='data:image/png;base64," + options_expected_move_img + "' alt='Options Expected Move Chart'>" if options_expected_move_img else "<p style='color: #999; font-style: italic;'>Chart unavailable</p>"}
@@ -813,8 +1209,24 @@ def main(args):
         vix_comparative_fig = create_vix_comparative_chart(normalized_df)
 
         # ========================================================================
-        # 3. Credit Market Canary
+        # 3. Credit Market Canary & TQQQ Data Fetching
         # ========================================================================
+        logging.info(
+            "Fetching market data for Credit Market Canary and TQQQ analysis..."
+        )
+        # For TQQQ analysis, we need at least 252 days of history for volatility calculations
+        # So fetch from an earlier date (add 300 days buffer for rolling median)
+        from datetime import timedelta
+
+        tqqq_start_date = (start_date - timedelta(days=300)).strftime("%Y-%m-%d")
+
+        # Fetch all required symbols in one place
+        all_symbols = ["SPY", "LQD", "IEF", "QQQ", "TQQQ", ALTERNATE_TICKER]
+        all_market_data = fetch_all_symbols(
+            all_symbols, tqqq_start_date, end_date.strftime("%Y-%m-%d")
+        )
+
+        # Credit Market Canary Analysis
         logging.info("Running Credit Market Canary Analysis...")
         credit_data = get_credit_market_data(
             start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
@@ -828,13 +1240,36 @@ def main(args):
         credit_market_stats = generate_credit_market_stats(credit_data)
 
         # ========================================================================
-        # 4. Options Expected Move Analysis
+        # 4. TQQQ Volatility Bucket Analysis
+        # ========================================================================
+        logging.info("Running TQQQ Volatility Bucket Analysis...")
+        tqqq_result = run_tqqq_analysis(all_market_data, use_alternate=True)
+
+        if tqqq_result is None:
+            logging.error("Failed to run TQQQ analysis")
+            return 1
+
+        tqqq_results_df, use_alternate = tqqq_result
+
+        # Filter results to only show data from the requested start_date onwards
+        tqqq_results_df = tqqq_results_df[tqqq_results_df.index >= start_date]
+
+        if tqqq_results_df.empty:
+            logging.error("No TQQQ data available for the requested date range")
+            return 1
+
+        tqqq_fig = create_tqqq_chart(tqqq_results_df, use_alternate)
+        tqqq_stats = generate_tqqq_stats(tqqq_results_df, use_alternate)
+        alternate_label = ALTERNATE_TICKER if use_alternate else "Cash"
+
+        # ========================================================================
+        # 5. Options Expected Move Analysis
         # ========================================================================
         logging.info("Generating Options Expected Move Analysis...")
         options_expected_move_img = generate_options_expected_move("SPY")
 
         # ========================================================================
-        # 5. Generate HTML Report
+        # 6. Generate HTML Report
         # ========================================================================
         logging.info("Generating HTML report...")
         html_content = generate_html_report(
@@ -843,6 +1278,9 @@ def main(args):
             vix_comparative_fig,
             credit_market_fig,
             credit_market_stats,
+            tqqq_fig,
+            tqqq_stats,
+            alternate_label,
             options_expected_move_img,
             start_date,
             end_date,
