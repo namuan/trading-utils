@@ -34,6 +34,7 @@ import webbrowser
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from base64 import b64encode
 from datetime import datetime
+from enum import Enum
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, List
@@ -50,12 +51,88 @@ from persistent_cache import PersistentCache
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from stockstats import wrap as stockstats_wrap
 
-# TQQQ Strategy Configuration
+# TQQQ Volatility Buckets Strategy Configuration
 EXPOSURE_LEVELS = [0.00, 0.25, 0.70]  # Available exposure buckets
 HYSTERESIS_DAYS = 10  # Days required to size up
 VOL_THRESHOLD_LOW = 1.30  # vol_ratio threshold for max exposure
 VOL_THRESHOLD_HIGH = 1.60  # vol_ratio threshold for 25% exposure
 ALTERNATE_TICKER = "GLD"
+
+
+# TQQQ Volatility Regimes Strategy Configuration
+class Regime(Enum):
+    """Volatility regime states."""
+
+    CALM = "CALM"
+    NORMAL = "NORMAL"
+    STRESS = "STRESS"
+    PANIC = "PANIC"
+
+
+# Exposure allocation per regime
+REGIME_EXPOSURE = {
+    Regime.CALM: 1.00,
+    Regime.NORMAL: 0.75,
+    Regime.STRESS: 0.50,
+    Regime.PANIC: 0.00,
+}
+
+# Volatility ratio thresholds for regime transitions
+REGIME_VOL_THRESHOLDS = {
+    "CALM_ENTER": 0.80,
+    "NORMAL_ENTER": 1.00,
+    "STRESS_ENTER": 1.30,
+    "PANIC_ENTER": 1.60,
+}
+
+# Required consecutive days to confirm regime change
+REGIME_PERSISTENCE_DAYS = {
+    Regime.CALM: 20,
+    Regime.NORMAL: 15,
+    Regime.STRESS: 5,
+    Regime.PANIC: 2,
+}
+
+# Panic daily drop threshold
+PANIC_DAILY_DROP = -0.04
+
+
+# TQQQ Volatility Regimes Strategy Configuration
+class Regime(Enum):
+    """Volatility regime states."""
+
+    CALM = "CALM"
+    NORMAL = "NORMAL"
+    STRESS = "STRESS"
+    PANIC = "PANIC"
+
+
+# Exposure allocation per regime
+REGIME_EXPOSURE = {
+    Regime.CALM: 1.00,
+    Regime.NORMAL: 0.75,
+    Regime.STRESS: 0.50,
+    Regime.PANIC: 0.00,
+}
+
+# Volatility ratio thresholds for regime transitions
+REGIME_VOL_THRESHOLDS = {
+    "CALM_ENTER": 0.80,
+    "NORMAL_ENTER": 1.00,
+    "STRESS_ENTER": 1.30,
+    "PANIC_ENTER": 1.60,
+}
+
+# Required consecutive days to confirm regime change
+REGIME_PERSISTENCE_DAYS = {
+    Regime.CALM: 20,
+    Regime.NORMAL: 15,
+    Regime.STRESS: 5,
+    Regime.PANIC: 2,
+}
+
+# Panic daily drop threshold
+PANIC_DAILY_DROP = -0.04
 
 
 def setup_logging(verbosity):
@@ -896,6 +973,365 @@ def generate_tqqq_stats(results_df, use_alternate: bool = True) -> str:
 
 
 # ============================================================================
+# TQQQ Volatility Regimes Analysis
+# ============================================================================
+
+
+def run_regime_state_machine(df, vol_ratio):
+    """
+    Run the regime state machine day by day.
+    Returns a series with the regime for each day.
+    """
+    n = len(df)
+    regimes = [None] * n
+    current_state = Regime.NORMAL
+    days_condition_met = 0
+
+    for i in range(n):
+        current_vol = vol_ratio.iloc[i]
+
+        if pd.isna(current_vol):
+            regimes[i] = current_state
+            continue
+
+        # Check for PANIC override
+        if i > 0:
+            # Handle MultiIndex columns if present
+            if isinstance(df.columns, pd.MultiIndex):
+                current_close = df["Close"].iloc[i, 0]
+                prev_close = df["Close"].iloc[i - 1, 0]
+            else:
+                current_close = df["Close"].iloc[i]
+                prev_close = df["Close"].iloc[i - 1]
+
+            daily_return = current_close / prev_close - 1
+            if (
+                daily_return <= PANIC_DAILY_DROP
+                or current_vol >= REGIME_VOL_THRESHOLDS["PANIC_ENTER"]
+            ):
+                current_state = Regime.PANIC
+                days_condition_met = 0
+                regimes[i] = current_state
+                continue
+
+        # Determine target regime based on vol_ratio
+        if current_vol < REGIME_VOL_THRESHOLDS["CALM_ENTER"]:
+            target = Regime.CALM
+        elif current_vol < REGIME_VOL_THRESHOLDS["NORMAL_ENTER"]:
+            target = Regime.NORMAL
+        elif current_vol < REGIME_VOL_THRESHOLDS["STRESS_ENTER"]:
+            target = Regime.NORMAL
+        elif current_vol < REGIME_VOL_THRESHOLDS["PANIC_ENTER"]:
+            target = Regime.STRESS
+        else:
+            target = Regime.PANIC
+
+        # State machine logic
+        if target == current_state:
+            days_condition_met = 0
+            regimes[i] = current_state
+        else:
+            days_condition_met += 1
+            required_days = REGIME_PERSISTENCE_DAYS.get(target, 1)
+
+            if days_condition_met >= required_days:
+                current_state = target
+                days_condition_met = 0
+
+            regimes[i] = current_state
+
+    return pd.Series(regimes, index=df.index)
+
+
+def run_regime_analysis(market_data: Dict[str, pd.DataFrame]):
+    """Run TQQQ volatility regime analysis."""
+    logging.info("Running TQQQ Volatility Regime Analysis...")
+
+    # Extract data from pre-fetched market data
+    qqq_data = market_data.get("QQQ", pd.DataFrame())
+    tqqq_data = market_data.get("TQQQ", pd.DataFrame())
+
+    if qqq_data.empty or tqqq_data.empty:
+        logging.error("Failed to get regime analysis data from market data")
+        return None
+
+    # Calculate volatility ratio (reuse existing function)
+    vol_ratio = calculate_vol_ratio(qqq_data)
+
+    # Run regime state machine
+    regimes = run_regime_state_machine(qqq_data, vol_ratio)
+
+    # Calculate returns
+    if isinstance(tqqq_data.columns, pd.MultiIndex):
+        tqqq_close = (
+            tqqq_data["Close"].iloc[:, 0]
+            if len(tqqq_data["Close"].shape) > 1
+            else tqqq_data["Close"]
+        )
+    else:
+        tqqq_close = tqqq_data["Close"]
+
+    tqqq_returns = tqqq_close.pct_change()
+
+    # Map regimes to exposure
+    exposure = regimes.map(REGIME_EXPOSURE)
+
+    # Calculate strategy returns (exposure lagged by 1 day)
+    strategy_returns = exposure.shift(1) * tqqq_returns
+
+    # Align all data
+    common_index = regimes.dropna().index.intersection(tqqq_returns.dropna().index)
+
+    if len(common_index) == 0:
+        logging.error("No common dates for regime analysis")
+        return None
+
+    regimes = regimes.loc[common_index]
+    vol_ratio = vol_ratio.loc[common_index]
+    exposure = exposure.loc[common_index]
+    strategy_returns = strategy_returns.loc[common_index]
+    tqqq_returns = tqqq_returns.loc[common_index]
+
+    # Build results dataframe
+    if isinstance(qqq_data.columns, pd.MultiIndex):
+        qqq_close = (
+            qqq_data["Close"].iloc[:, 0]
+            if len(qqq_data["Close"].shape) > 1
+            else qqq_data["Close"]
+        )
+    else:
+        qqq_close = qqq_data["Close"]
+
+    results_df = pd.DataFrame(
+        {
+            "qqq_close": qqq_close.loc[common_index],
+            "vol_ratio": vol_ratio,
+            "regime": regimes,
+            "exposure": exposure,
+            "strategy_returns": strategy_returns,
+            "tqqq_returns": tqqq_returns,
+        }
+    )
+
+    if results_df.empty:
+        logging.error("Regime results dataframe is empty")
+        return None
+
+    return results_df
+
+
+def create_regime_chart(results_df):
+    """Create TQQQ volatility regime strategy chart."""
+    logging.info("Creating TQQQ regime strategy chart...")
+
+    # Calculate equity curves
+    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
+    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
+
+    # Create figure with subplots
+    fig, axes = plt.subplots(4, 1, figsize=(15, 16))
+
+    # Panel 1: Volatility Ratio with regime thresholds
+    axes[0].plot(
+        results_df.index,
+        results_df["vol_ratio"],
+        label="Vol Ratio",
+        color="black",
+        linewidth=1.5,
+    )
+    axes[0].axhline(
+        y=REGIME_VOL_THRESHOLDS["PANIC_ENTER"],
+        linestyle="--",
+        color="red",
+        label=f"Panic ({REGIME_VOL_THRESHOLDS['PANIC_ENTER']:.2f})",
+    )
+    axes[0].axhline(
+        y=REGIME_VOL_THRESHOLDS["STRESS_ENTER"],
+        linestyle="--",
+        color="orange",
+        label=f"Stress ({REGIME_VOL_THRESHOLDS['STRESS_ENTER']:.2f})",
+    )
+    axes[0].axhline(
+        y=REGIME_VOL_THRESHOLDS["NORMAL_ENTER"],
+        linestyle="--",
+        color="blue",
+        label=f"Normal ({REGIME_VOL_THRESHOLDS['NORMAL_ENTER']:.2f})",
+    )
+    axes[0].axhline(
+        y=REGIME_VOL_THRESHOLDS["CALM_ENTER"],
+        linestyle="--",
+        color="green",
+        label=f"Calm ({REGIME_VOL_THRESHOLDS['CALM_ENTER']:.2f})",
+    )
+    axes[0].set_title("QQQ Normalized Volatility Ratio", fontsize=14, fontweight="bold")
+    axes[0].set_ylabel("Vol Ratio")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend(loc="best", fontsize=9)
+
+    # Panel 2: Regime Over Time
+    regime_colors = {
+        Regime.CALM: "green",
+        Regime.NORMAL: "blue",
+        Regime.STRESS: "orange",
+        Regime.PANIC: "red",
+    }
+    regime_numeric = results_df["regime"].map(
+        {Regime.CALM: 3, Regime.NORMAL: 2, Regime.STRESS: 1, Regime.PANIC: 0}
+    )
+
+    for i in range(len(results_df) - 1):
+        regime = results_df["regime"].iloc[i]
+        axes[1].axhspan(
+            regime_numeric.iloc[i] - 0.4,
+            regime_numeric.iloc[i] + 0.4,
+            xmin=(results_df.index[i] - results_df.index[0]).days
+            / (results_df.index[-1] - results_df.index[0]).days,
+            xmax=(results_df.index[i + 1] - results_df.index[0]).days
+            / (results_df.index[-1] - results_df.index[0]).days,
+            color=regime_colors[regime],
+            alpha=0.6,
+        )
+
+    axes[1].set_title("Volatility Regime Over Time", fontsize=14, fontweight="bold")
+    axes[1].set_ylabel("Regime")
+    axes[1].set_yticks([0, 1, 2, 3])
+    axes[1].set_yticklabels(["PANIC", "STRESS", "NORMAL", "CALM"])
+    axes[1].grid(True, alpha=0.3)
+
+    # Panel 3: Exposure Over Time
+    exposure_changes = results_df["exposure"].diff() != 0
+    size_up = (results_df["exposure"].diff() > 0) & exposure_changes
+    size_down = (results_df["exposure"].diff() < 0) & exposure_changes
+
+    axes[2].plot(
+        results_df.index,
+        results_df["exposure"] * 100,
+        label="TQQQ Exposure",
+        color="navy",
+        linewidth=2,
+    )
+    axes[2].scatter(
+        results_df.index[size_up],
+        results_df["exposure"][size_up] * 100,
+        color="green",
+        marker="^",
+        s=100,
+        label="Size Up",
+        zorder=5,
+    )
+    axes[2].scatter(
+        results_df.index[size_down],
+        results_df["exposure"][size_down] * 100,
+        color="red",
+        marker="v",
+        s=100,
+        label="Size Down",
+        zorder=5,
+    )
+    axes[2].set_title("Strategy Exposure with Signals", fontsize=14, fontweight="bold")
+    axes[2].set_ylabel("TQQQ Exposure (%)")
+    axes[2].grid(True, alpha=0.3)
+    axes[2].legend()
+    axes[2].set_ylim([-5, 105])
+
+    # Panel 4: Equity Curves
+    axes[3].plot(
+        strategy_equity.index,
+        strategy_equity.values,
+        label="Regime Strategy",
+        linewidth=2,
+    )
+    axes[3].plot(
+        tqqq_equity.index,
+        tqqq_equity.values,
+        label="TQQQ B&H",
+        linewidth=2,
+        alpha=0.7,
+    )
+    axes[3].set_yscale("log")
+    axes[3].set_title("Equity Curves Comparison", fontsize=14, fontweight="bold")
+    axes[3].set_ylabel("Equity (Log Scale)")
+    axes[3].set_xlabel("Date")
+    axes[3].grid(True, alpha=0.3)
+    axes[3].legend()
+
+    plt.tight_layout()
+    return fig
+
+
+def generate_regime_stats(results_df) -> str:
+    """Generate statistics summary for TQQQ volatility regime strategy."""
+    if results_df.empty:
+        logging.error("Cannot generate regime stats - results dataframe is empty")
+        return "<h3>TQQQ Regime Analysis Unavailable</h3><p>Insufficient data for analysis period.</p>"
+
+    latest = results_df.iloc[-1]
+
+    # Calculate performance metrics
+    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
+    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
+
+    total_years = len(results_df) / 252
+    strategy_cagr = (
+        (strategy_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
+    )
+    tqqq_cagr = (
+        (tqqq_equity.iloc[-1] ** (1 / total_years)) - 1 if total_years > 0 else 0
+    )
+
+    strategy_vol = results_df["strategy_returns"].std() * np.sqrt(252)
+    tqqq_vol = results_df["tqqq_returns"].std() * np.sqrt(252)
+
+    strategy_sharpe = (
+        (results_df["strategy_returns"].mean() * 252) / strategy_vol
+        if strategy_vol > 0
+        else 0
+    )
+    tqqq_sharpe = (
+        (results_df["tqqq_returns"].mean() * 252) / tqqq_vol if tqqq_vol > 0 else 0
+    )
+
+    strategy_dd = (
+        (strategy_equity - strategy_equity.cummax()) / strategy_equity.cummax()
+    ).min()
+    tqqq_dd = ((tqqq_equity - tqqq_equity.cummax()) / tqqq_equity.cummax()).min()
+
+    # Regime statistics
+    regime_counts = results_df["regime"].value_counts()
+    total_days = len(results_df)
+
+    stats = f"""
+    <h3>TQQQ Volatility Regime Strategy Statistics</h3>
+    <table>
+        <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
+        <tr><td>CAGR</td><td>{strategy_cagr:.2%}</td><td>{tqqq_cagr:.2%}</td></tr>
+        <tr><td>Volatility</td><td>{strategy_vol:.2%}</td><td>{tqqq_vol:.2%}</td></tr>
+        <tr><td>Sharpe Ratio</td><td>{strategy_sharpe:.2f}</td><td>{tqqq_sharpe:.2f}</td></tr>
+        <tr><td>Max Drawdown</td><td>{strategy_dd:.2%}</td><td>{tqqq_dd:.2%}</td></tr>
+        <tr><td>Final Equity</td><td>${strategy_equity.iloc[-1]:.2f}</td><td>${tqqq_equity.iloc[-1]:.2f}</td></tr>
+    </table>
+    <h3>Current Regime Status</h3>
+    <table>
+        <tr><th>Metric</th><th>Value</th></tr>
+        <tr><td>Current Date</td><td>{results_df.index[-1].strftime('%Y-%m-%d')}</td></tr>
+        <tr><td>QQQ Close</td><td>${latest['qqq_close']:.2f}</td></tr>
+        <tr><td>Vol Ratio</td><td>{latest['vol_ratio']:.2f}x</td></tr>
+        <tr><td>Current Regime</td><td>{latest['regime'].value}</td></tr>
+        <tr><td>Exposure</td><td>{latest['exposure']*100:.0f}%</td></tr>
+    </table>
+    <h3>Regime Distribution</h3>
+    <table>
+        <tr><th>Regime</th><th>Days</th><th>Percentage</th></tr>
+        <tr><td>CALM</td><td>{regime_counts.get(Regime.CALM, 0)}</td><td>{regime_counts.get(Regime.CALM, 0)/total_days*100:.1f}%</td></tr>
+        <tr><td>NORMAL</td><td>{regime_counts.get(Regime.NORMAL, 0)}</td><td>{regime_counts.get(Regime.NORMAL, 0)/total_days*100:.1f}%</td></tr>
+        <tr><td>STRESS</td><td>{regime_counts.get(Regime.STRESS, 0)}</td><td>{regime_counts.get(Regime.STRESS, 0)/total_days*100:.1f}%</td></tr>
+        <tr><td>PANIC</td><td>{regime_counts.get(Regime.PANIC, 0)}</td><td>{regime_counts.get(Regime.PANIC, 0)/total_days*100:.1f}%</td></tr>
+    </table>
+    """
+    return stats
+
+
+# ============================================================================
 # Options Expected Move Analysis
 # ============================================================================
 
@@ -983,6 +1419,8 @@ def generate_html_report(
     tqqq_fig,
     tqqq_stats,
     alternate_label,
+    regime_fig,
+    regime_stats,
     options_expected_move_img,
     start_date,
     end_date,
@@ -994,6 +1432,7 @@ def generate_html_report(
     vix_comparative_img = fig_to_base64(vix_comparative_fig)
     credit_market_img = fig_to_base64(credit_market_fig)
     tqqq_img = fig_to_base64(tqqq_fig)
+    regime_img = fig_to_base64(regime_fig)
 
     html_content = f"""
     <!DOCTYPE html>
@@ -1110,7 +1549,15 @@ def generate_html_report(
             </div>
 
             <div class="section">
-                <h2>5. Options Expected Move (Multi-DTE)</h2>
+                <h2>5. TQQQ Volatility Regime Strategy</h2>
+                <p>State machine-based trading strategy for TQQQ using four volatility regimes: CALM, NORMAL, STRESS, and PANIC.</p>
+                <p><strong>Strategy:</strong> Uses ATR-based volatility normalization with persistence requirements to confirm regime changes.</p>
+                {regime_stats}
+                <img src="data:image/png;base64,{regime_img}" alt="TQQQ Volatility Regime Chart">
+            </div>
+
+            <div class="section">
+                <h2>6. Options Expected Move (Multi-DTE)</h2>
                 <p>Multi-DTE expected move analysis based on options implied volatility for SPY.</p>
                 <p>Shows projected price ranges at 7, 14, 21, and 30 days to expiration based on at-the-money options IV.</p>
                 {"<img src='data:image/png;base64," + options_expected_move_img + "' alt='Options Expected Move Chart'>" if options_expected_move_img else "<p style='color: #999; font-style: italic;'>Chart unavailable</p>"}
@@ -1263,13 +1710,33 @@ def main(args):
         alternate_label = ALTERNATE_TICKER if use_alternate else "Cash"
 
         # ========================================================================
-        # 5. Options Expected Move Analysis
+        # 5. TQQQ Volatility Regime Analysis
+        # ========================================================================
+        logging.info("Running TQQQ Volatility Regime Analysis...")
+        regime_results_df = run_regime_analysis(all_market_data)
+
+        if regime_results_df is None:
+            logging.error("Failed to run TQQQ regime analysis")
+            return 1
+
+        # Filter results to only show data from the requested start_date onwards
+        regime_results_df = regime_results_df[regime_results_df.index >= start_date]
+
+        if regime_results_df.empty:
+            logging.error("No regime data available for the requested date range")
+            return 1
+
+        regime_fig = create_regime_chart(regime_results_df)
+        regime_stats = generate_regime_stats(regime_results_df)
+
+        # ========================================================================
+        # 6. Options Expected Move Analysis
         # ========================================================================
         logging.info("Generating Options Expected Move Analysis...")
         options_expected_move_img = generate_options_expected_move("SPY")
 
         # ========================================================================
-        # 6. Generate HTML Report
+        # 7. Generate HTML Report
         # ========================================================================
         logging.info("Generating HTML report...")
         html_content = generate_html_report(
@@ -1281,6 +1748,8 @@ def main(args):
             tqqq_fig,
             tqqq_stats,
             alternate_label,
+            regime_fig,
+            regime_stats,
             options_expected_move_img,
             start_date,
             end_date,
