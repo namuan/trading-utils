@@ -736,90 +736,34 @@ def create_tqqq_chart(results_df, use_alternate: bool = True):
     ALTERNATE_TICKER if use_alternate else "Cash"
 
     # Calculate equity curves
-    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
-    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
+    (1 + results_df["strategy_returns"]).cumprod()
+    (1 + results_df["tqqq_returns"]).cumprod()
 
     # Create figure with subplots
-    fig, axes = plt.subplots(3, 1, figsize=(15, 12))
+    fig, axes = plt.subplots(1, 1, figsize=(15, 6))
 
-    # Panel 1: Equity Curves
-    axes[0].plot(
-        strategy_equity.index,
-        strategy_equity.values,
-        label="Vol Bucket Strategy",
-        linewidth=2,
-    )
-    axes[0].plot(
-        tqqq_equity.index,
-        tqqq_equity.values,
-        label="TQQQ B&H",
-        linewidth=2,
-        alpha=0.7,
-    )
-    axes[0].set_yscale("log")
-    axes[0].set_title("Equity Curves Comparison", fontsize=14, fontweight="bold")
-    axes[0].set_ylabel("Equity (Log Scale)")
-    axes[0].grid(True, alpha=0.3)
-    axes[0].legend()
-
-    # Panel 2: Exposure Over Time
-    exposure_changes = results_df["actual_exposure"].diff() != 0
-    size_up = (results_df["actual_exposure"].diff() > 0) & exposure_changes
-    size_down = (results_df["actual_exposure"].diff() < 0) & exposure_changes
-
-    axes[1].plot(
-        results_df.index,
-        results_df["actual_exposure"] * 100,
-        label="TQQQ Exposure",
-        color="navy",
-        linewidth=2,
-    )
-    axes[1].scatter(
-        results_df.index[size_up],
-        results_df["actual_exposure"][size_up] * 100,
-        color="green",
-        marker="^",
-        s=100,
-        label="Size Up",
-        zorder=5,
-    )
-    axes[1].scatter(
-        results_df.index[size_down],
-        results_df["actual_exposure"][size_down] * 100,
-        color="red",
-        marker="v",
-        s=100,
-        label="Size Down",
-        zorder=5,
-    )
-    axes[1].set_title("Position Sizing with Signals", fontsize=14, fontweight="bold")
-    axes[1].set_ylabel("TQQQ Exposure (%)")
-    axes[1].grid(True, alpha=0.3)
-    axes[1].legend()
-    axes[1].set_ylim([-5, 105])
-
-    # Panel 3: Volatility Regime
+    # Panel: Volatility Regime
     vol_ratio = results_df["vol_ratio"].dropna()
-    axes[2].plot(
+    axes.plot(
         vol_ratio.index,
         vol_ratio.values,
         label="Vol Ratio",
         color="purple",
         linewidth=1,
     )
-    axes[2].axhline(
+    axes.axhline(
         y=VOL_THRESHOLD_LOW, linestyle="--", color="green", label="Low Vol Threshold"
     )
-    axes[2].axhline(
+    axes.axhline(
         y=VOL_THRESHOLD_HIGH, linestyle="--", color="red", label="High Vol Threshold"
     )
-    axes[2].set_title(
+    axes.set_title(
         "Volatility Regime (QQQ ATR / Median)", fontsize=14, fontweight="bold"
     )
-    axes[2].set_ylabel("Vol Ratio")
-    axes[2].set_xlabel("Date")
-    axes[2].grid(True, alpha=0.3)
-    axes[2].legend()
+    axes.set_ylabel("Vol Ratio")
+    axes.set_xlabel("Date")
+    axes.grid(True, alpha=0.3)
+    axes.legend()
 
     plt.tight_layout()
     return fig
@@ -1021,136 +965,46 @@ def create_regime_chart(results_df):
     """Create TQQQ volatility regime strategy chart."""
     logging.info("Creating TQQQ regime strategy chart...")
 
-    # Calculate equity curves
-    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
-    tqqq_equity = (1 + results_df["tqqq_returns"]).cumprod()
-
     # Create figure with subplots
-    fig, axes = plt.subplots(4, 1, figsize=(15, 16))
+    fig, axes = plt.subplots(1, 1, figsize=(15, 6))
 
-    # Panel 1: Volatility Ratio with regime thresholds
-    axes[0].plot(
+    # Panel: Volatility Ratio with regime thresholds
+    axes.plot(
         results_df.index,
         results_df["vol_ratio"],
         label="Vol Ratio",
         color="black",
         linewidth=1.5,
     )
-    axes[0].axhline(
+    axes.axhline(
         y=REGIME_VOL_THRESHOLDS["PANIC_ENTER"],
         linestyle="--",
         color="red",
         label=f"Panic ({REGIME_VOL_THRESHOLDS['PANIC_ENTER']:.2f})",
     )
-    axes[0].axhline(
+    axes.axhline(
         y=REGIME_VOL_THRESHOLDS["STRESS_ENTER"],
         linestyle="--",
         color="orange",
         label=f"Stress ({REGIME_VOL_THRESHOLDS['STRESS_ENTER']:.2f})",
     )
-    axes[0].axhline(
+    axes.axhline(
         y=REGIME_VOL_THRESHOLDS["NORMAL_ENTER"],
         linestyle="--",
         color="blue",
         label=f"Normal ({REGIME_VOL_THRESHOLDS['NORMAL_ENTER']:.2f})",
     )
-    axes[0].axhline(
+    axes.axhline(
         y=REGIME_VOL_THRESHOLDS["CALM_ENTER"],
         linestyle="--",
         color="green",
         label=f"Calm ({REGIME_VOL_THRESHOLDS['CALM_ENTER']:.2f})",
     )
-    axes[0].set_title("QQQ Normalized Volatility Ratio", fontsize=14, fontweight="bold")
-    axes[0].set_ylabel("Vol Ratio")
-    axes[0].grid(True, alpha=0.3)
-    axes[0].legend(loc="best", fontsize=9)
-
-    # Panel 2: Regime Over Time
-    regime_colors = {
-        Regime.CALM: "green",
-        Regime.NORMAL: "blue",
-        Regime.STRESS: "orange",
-        Regime.PANIC: "red",
-    }
-    regime_numeric = results_df["regime"].map(
-        {Regime.CALM: 3, Regime.NORMAL: 2, Regime.STRESS: 1, Regime.PANIC: 0}
-    )
-
-    for i in range(len(results_df) - 1):
-        regime = results_df["regime"].iloc[i]
-        axes[1].axhspan(
-            regime_numeric.iloc[i] - 0.4,
-            regime_numeric.iloc[i] + 0.4,
-            xmin=(results_df.index[i] - results_df.index[0]).days
-            / (results_df.index[-1] - results_df.index[0]).days,
-            xmax=(results_df.index[i + 1] - results_df.index[0]).days
-            / (results_df.index[-1] - results_df.index[0]).days,
-            color=regime_colors[regime],
-            alpha=0.6,
-        )
-
-    axes[1].set_title("Volatility Regime Over Time", fontsize=14, fontweight="bold")
-    axes[1].set_ylabel("Regime")
-    axes[1].set_yticks([0, 1, 2, 3])
-    axes[1].set_yticklabels(["PANIC", "STRESS", "NORMAL", "CALM"])
-    axes[1].grid(True, alpha=0.3)
-
-    # Panel 3: Exposure Over Time
-    exposure_changes = results_df["exposure"].diff() != 0
-    size_up = (results_df["exposure"].diff() > 0) & exposure_changes
-    size_down = (results_df["exposure"].diff() < 0) & exposure_changes
-
-    axes[2].plot(
-        results_df.index,
-        results_df["exposure"] * 100,
-        label="TQQQ Exposure",
-        color="navy",
-        linewidth=2,
-    )
-    axes[2].scatter(
-        results_df.index[size_up],
-        results_df["exposure"][size_up] * 100,
-        color="green",
-        marker="^",
-        s=100,
-        label="Size Up",
-        zorder=5,
-    )
-    axes[2].scatter(
-        results_df.index[size_down],
-        results_df["exposure"][size_down] * 100,
-        color="red",
-        marker="v",
-        s=100,
-        label="Size Down",
-        zorder=5,
-    )
-    axes[2].set_title("Strategy Exposure with Signals", fontsize=14, fontweight="bold")
-    axes[2].set_ylabel("TQQQ Exposure (%)")
-    axes[2].grid(True, alpha=0.3)
-    axes[2].legend()
-    axes[2].set_ylim([-5, 105])
-
-    # Panel 4: Equity Curves
-    axes[3].plot(
-        strategy_equity.index,
-        strategy_equity.values,
-        label="Regime Strategy",
-        linewidth=2,
-    )
-    axes[3].plot(
-        tqqq_equity.index,
-        tqqq_equity.values,
-        label="TQQQ B&H",
-        linewidth=2,
-        alpha=0.7,
-    )
-    axes[3].set_yscale("log")
-    axes[3].set_title("Equity Curves Comparison", fontsize=14, fontweight="bold")
-    axes[3].set_ylabel("Equity (Log Scale)")
-    axes[3].set_xlabel("Date")
-    axes[3].grid(True, alpha=0.3)
-    axes[3].legend()
+    axes.set_title("QQQ Normalized Volatility Ratio", fontsize=14, fontweight="bold")
+    axes.set_ylabel("Vol Ratio")
+    axes.set_xlabel("Date")
+    axes.grid(True, alpha=0.3)
+    axes.legend(loc="best", fontsize=9)
 
     plt.tight_layout()
     return fig
