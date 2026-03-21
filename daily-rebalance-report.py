@@ -2,12 +2,11 @@
 # /// script
 # dependencies = [
 #   "pandas",
-#   "matplotlib",
-#   "seaborn",
 #   "numpy",
 #   "yfinance",
 #   "stockstats",
-#   "persistent-cache@git+https://github.com/namuan/persistent-cache"
+#   "persistent-cache@git+https://github.com/namuan/persistent-cache",
+#   "plotly"
 # ]
 # ///
 """
@@ -35,17 +34,15 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from base64 import b64encode
 from datetime import datetime
 from enum import Enum
-from io import BytesIO
 from pathlib import Path
 from typing import Dict, List
 
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import yfinance as yf
-from matplotlib.gridspec import GridSpec
 from persistent_cache import PersistentCache
+from plotly.subplots import make_subplots
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -157,71 +154,132 @@ def calculate_vix_signals(
 
 
 def create_vix_signals_chart(df: pd.DataFrame, window1: int = 3, window2: int = 5):
-    """Create VIX signals chart with 5 panels."""
-    fig = plt.figure(figsize=(15, 20))
-    gs = fig.add_gridspec(5, 1, height_ratios=[1, 1, 1, 1, 1], hspace=0.4)
-
-    # SPY Price
-    ax1 = fig.add_subplot(gs[0])
-    ax1.plot(df.index, df["SPY"], label="SPY", color="blue")
-    ax1.set_title("SPY Price", fontsize=14, fontweight="bold")
-    ax1.set_ylabel("Price ($)")
-    ax1.grid(True, alpha=0.3)
-    ax1.legend()
-
-    # IVTS with median filters
-    ax2 = fig.add_subplot(gs[1])
-    ax2.plot(df.index, df["IVTS"], label="IVTS", color="green", alpha=0.5)
-    ax2.plot(
-        df.index, df[f"IVTS_Med{window1}"], label=f"IVTS Med-{window1}", color="blue"
+    """Create VIX signals chart with 5 panels using Plotly."""
+    fig = make_subplots(
+        rows=5,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.04,
+        subplot_titles=(
+            "SPY Price",
+            "IVTS with Median Filters",
+            "Trading Signals (Raw IVTS)",
+            f"Trading Signals (Median-{window1})",
+            f"Trading Signals (Median-{window2})",
+        ),
     )
-    ax2.plot(
-        df.index, df[f"IVTS_Med{window2}"], label=f"IVTS Med-{window2}", color="red"
-    )
-    ax2.axhline(y=1, color="black", linestyle="--", label="Signal Threshold")
-    ax2.set_title(
-        "IVTS with Median Filters (LONG when < 1, SHORT when > 1)",
-        fontsize=14,
-        fontweight="bold",
-    )
-    ax2.set_ylabel("IVTS Ratio")
-    ax2.grid(True, alpha=0.3)
-    ax2.legend()
 
-    def plot_signal_panel(ax, signal_col: str, title: str) -> None:
+    # Row 1: SPY Price
+    fig.add_trace(
+        go.Scatter(
+            x=df.index, y=df["SPY"], name="SPY", line=dict(color="blue", width=2)
+        ),
+        row=1,
+        col=1,
+    )
+    fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+
+    # Row 2: IVTS with median filters
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df["IVTS"],
+            name="IVTS",
+            line=dict(color="green", width=1),
+            opacity=0.5,
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df[f"IVTS_Med{window1}"],
+            name=f"IVTS Med-{window1}",
+            line=dict(color="blue", width=1.5),
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df[f"IVTS_Med{window2}"],
+            name=f"IVTS Med-{window2}",
+            line=dict(color="red", width=1.5),
+        ),
+        row=2,
+        col=1,
+    )
+    # Add horizontal line at y=1
+    fig.add_hline(
+        y=1,
+        line_dash="dash",
+        line_color="black",
+        opacity=0.8,
+        row=2,
+        col=1,
+        annotation_text="Signal Threshold",
+    )
+    fig.update_yaxes(title_text="IVTS Ratio", row=2, col=1)
+
+    # Helper function for signal panels
+    def add_signal_trace(row_idx, signal_col, title):
         signals = df[signal_col]
-        ax.step(df.index, signals, where="post", color="blue", label="Signal", zorder=2)
-
+        fig.add_trace(
+            go.Scatter(
+                x=df.index,
+                y=signals,
+                name="Signal",
+                line=dict(color="blue", width=2),
+                mode="lines",
+                stackgroup=None,
+                line_shape="hv",
+            ),
+            row=row_idx,
+            col=1,
+        )
+        # Add colored background bands where signal is long/short
         for i in range(len(df.index) - 1):
-            color = "green" if signals.iloc[i] == 1 else "red"
-            ax.axvspan(df.index[i], df.index[i + 1], alpha=0.2, color=color, zorder=1)
+            color = (
+                "rgba(0, 255, 0, 0.2)"
+                if signals.iloc[i] == 1
+                else "rgba(255, 0, 0, 0.2)"
+            )
+            fig.add_vrect(
+                x0=df.index[i],
+                x1=df.index[i + 1],
+                fillcolor=color,
+                line_width=0,
+                opacity=0.3,
+                row=row_idx,
+                col=1,
+            )
 
-        ax.axhline(y=1, color="green", linestyle="--", alpha=0.5, label="Long")
-        ax.axhline(y=-1, color="red", linestyle="--", alpha=0.5, label="Short")
-        ax.set_title(title, fontsize=14, fontweight="bold")
-        ax.set_ylabel("Signal")
-        ax.grid(True, alpha=0.3)
-        ax.legend()
-        ax.set_ylim(-1.5, 1.5)
+        fig.add_hline(
+            y=1, line_dash="dash", line_color="green", opacity=0.5, row=row_idx, col=1
+        )
+        fig.add_hline(
+            y=-1, line_dash="dash", line_color="red", opacity=0.5, row=row_idx, col=1
+        )
+        fig.update_yaxes(title_text="Signal", range=[-1.5, 1.5], row=row_idx, col=1)
 
-    # Plot raw IVTS signal
-    plot_signal_panel(
-        fig.add_subplot(gs[2]), "Signal_Raw", "Trading Signals (Raw IVTS)"
+    # Row 3: Raw signal
+    add_signal_trace(3, "Signal_Raw", "Trading Signals (Raw IVTS)")
+
+    # Row 4: Median window 1 signal
+    add_signal_trace(4, f"Signal_Med{window1}", f"Trading Signals (Median-{window1})")
+
+    # Row 5: Median window 2 signal
+    add_signal_trace(5, f"Signal_Med{window2}", f"Trading Signals (Median-{window2})")
+
+    fig.update_layout(
+        title="VIX Signals Analysis",
+        height=1200,
+        showlegend=True,
+        hovermode="x unified",
     )
 
-    # Plot median-based signals
-    plot_signal_panel(
-        fig.add_subplot(gs[3]),
-        f"Signal_Med{window1}",
-        f"Trading Signals (Median-{window1})",
-    )
-    plot_signal_panel(
-        fig.add_subplot(gs[4]),
-        f"Signal_Med{window2}",
-        f"Trading Signals (Median-{window2})",
-    )
-
-    plt.tight_layout()
     return fig
 
 
@@ -233,15 +291,15 @@ def generate_vix_signals_stats(
     <h3>VIX Signals Statistics</h3>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>
-        <tr><td>Current SPY</td><td>${df['SPY'].iloc[-1]:.2f}</td></tr>
-        <tr><td>Current IVTS</td><td>{df['IVTS'].iloc[-1]:.3f}</td></tr>
-        <tr><td>IVTS Med-{window1}</td><td>{df[f'IVTS_Med{window1}'].iloc[-1]:.3f}</td></tr>
-        <tr><td>IVTS Med-{window2}</td><td>{df[f'IVTS_Med{window2}'].iloc[-1]:.3f}</td></tr>
-        <tr><td>Raw Signal</td><td>{'LONG' if df['Signal_Raw'].iloc[-1] == 1 else 'SHORT'}</td></tr>
-        <tr><td>Med-{window1} Signal</td><td>{'LONG' if df[f'Signal_Med{window1}'].iloc[-1] == 1 else 'SHORT'}</td></tr>
-        <tr><td>Med-{window2} Signal</td><td>{'LONG' if df[f'Signal_Med{window2}'].iloc[-1] == 1 else 'SHORT'}</td></tr>
-        <tr><td>Short Term VIX (9D)</td><td>{df['Short_Term_VIX'].iloc[-1]:.2f}</td></tr>
-        <tr><td>Long Term VIX</td><td>{df['Long_Term_VIX'].iloc[-1]:.2f}</td></tr>
+        <tr><td>Current SPY</td><td>${df["SPY"].iloc[-1]:.2f}</td></tr>
+        <tr><td>Current IVTS</td><td>{df["IVTS"].iloc[-1]:.3f}</td></tr>
+        <tr><td>IVTS Med-{window1}</td><td>{df[f"IVTS_Med{window1}"].iloc[-1]:.3f}</td></tr>
+        <tr><td>IVTS Med-{window2}</td><td>{df[f"IVTS_Med{window2}"].iloc[-1]:.3f}</td></tr>
+        <tr><td>Raw Signal</td><td>{"LONG" if df["Signal_Raw"].iloc[-1] == 1 else "SHORT"}</td></tr>
+        <tr><td>Med-{window1} Signal</td><td>{"LONG" if df[f"Signal_Med{window1}"].iloc[-1] == 1 else "SHORT"}</td></tr>
+        <tr><td>Med-{window2} Signal</td><td>{"LONG" if df[f"Signal_Med{window2}"].iloc[-1] == 1 else "SHORT"}</td></tr>
+        <tr><td>Short Term VIX (9D)</td><td>{df["Short_Term_VIX"].iloc[-1]:.2f}</td></tr>
+        <tr><td>Long Term VIX</td><td>{df["Long_Term_VIX"].iloc[-1]:.2f}</td></tr>
     </table>
     """
     return stats
@@ -275,18 +333,19 @@ def normalize_prices(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def create_vix_comparative_chart(normalized_df: pd.DataFrame):
-    """Create comparative price chart with SPY and VIX indices."""
-    fig, ax = plt.subplots(figsize=(14, 8))
+    """Create comparative price chart with SPY and VIX indices using Plotly."""
+    fig = go.Figure()
 
     # Plot SPY with higher line width
     if "SPY" in normalized_df.columns:
-        ax.plot(
-            normalized_df.index,
-            normalized_df["SPY"],
-            label="SPY",
-            linewidth=2.5,
-            color="blue",
-            alpha=0.8,
+        fig.add_trace(
+            go.Scatter(
+                x=normalized_df.index,
+                y=normalized_df["SPY"],
+                name="SPY",
+                line=dict(color="blue", width=2.5),
+                opacity=0.8,
+            )
         )
 
     # Define colors for VIX symbols
@@ -300,33 +359,31 @@ def create_vix_comparative_chart(normalized_df: pd.DataFrame):
     # Plot VIX-related symbols
     for symbol in ["^VIX", "^VVIX", "^VIX9D", "^VIX3M"]:
         if symbol in normalized_df.columns:
-            ax.plot(
-                normalized_df.index,
-                normalized_df[symbol],
-                label=symbol,
-                linewidth=1.5,
-                color=vix_colors.get(symbol, "gray"),
-                alpha=0.7,
+            fig.add_trace(
+                go.Scatter(
+                    x=normalized_df.index,
+                    y=normalized_df[symbol],
+                    name=symbol,
+                    line=dict(color=vix_colors.get(symbol, "gray"), width=1.5),
+                    opacity=0.7,
+                )
             )
 
     # Add horizontal line at 100 (starting point)
-    ax.axhline(y=100, color="black", linestyle="--", linewidth=0.5, alpha=0.5)
-
-    # Formatting
-    ax.set_title(
-        "Comparative Price Chart: SPY vs VIX Indices",
-        fontsize=14,
-        fontweight="bold",
-        pad=20,
+    fig.add_hline(
+        y=100, line_dash="dash", line_color="black", opacity=0.5, line_width=1
     )
-    ax.set_xlabel("Date", fontsize=12)
-    ax.set_ylabel("Normalized Price (Starting at 100)", fontsize=12)
-    ax.legend(loc="best", framealpha=0.9, fontsize=10)
-    ax.grid(True, alpha=0.3, linestyle=":")
 
-    # Rotate x-axis labels
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
+    fig.update_layout(
+        title="Comparative Price Chart: SPY vs VIX Indices",
+        xaxis_title="Date",
+        yaxis_title="Normalized Price (Starting at 100)",
+        height=600,
+        hovermode="x unified",
+    )
+
+    fig.update_xaxes(tickangle=45)
+    fig.update_yaxes(gridcolor="rgba(0,0,0,0.1)")
 
     return fig
 
@@ -399,135 +456,168 @@ def get_credit_market_data(start_date, end_date):
 
 
 def create_credit_market_chart(data):
-    """Create the four-panel credit market canary chart with PPO indicators"""
+    """Create the four-panel credit market canary chart with PPO indicators using Plotly"""
     logging.info("Creating credit market canary chart...")
 
-    plt.style.use("seaborn-v0_8-darkgrid")
-    fig = plt.figure(figsize=(16, 16))
-    gs = GridSpec(4, 1, height_ratios=[2, 2, 1, 1], hspace=0.30)
-
-    # Top panel: SPX
-    ax1 = fig.add_subplot(gs[0])
-    ax1.plot(
-        data.index, data["SPX"], color="black", linewidth=2, label="SPY (SPX Proxy)"
+    fig = make_subplots(
+        rows=4,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.08,
+        subplot_titles=(
+            "Credit Market Canary - LQD:IEF Ratio Analysis",
+            "LQD:IEF Ratio - Current: {:.3f}".format(data["LQD_IEF_Ratio"].iloc[-1]),
+            "PPO(1,100,0) - Very Long-Term Momentum",
+            "PPO(8,21,0) - Medium-Term Momentum",
+        ),
+        row_heights=[2, 2, 1, 1],
     )
-    ax1.set_title(
-        "Credit Market Canary - LQD:IEF Ratio Analysis",
-        fontsize=18,
-        fontweight="bold",
-        pad=20,
-    )
-    ax1.set_ylabel("SPY Price ($)", fontsize=12, labelpad=10)
-    ax1.grid(True, alpha=0.3)
-    ax1.tick_params(axis="both", which="major", labelsize=10)
 
-    # Add vertical line for recent signal
     recent_signal_date = (
         data[data["Risk_Off_Signal"]].index[-1]
         if data["Risk_Off_Signal"].any()
         else None
     )
+
+    # Row 1: SPX
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["SPX"],
+            name="SPY (SPX Proxy)",
+            line=dict(color="black", width=2),
+        ),
+        row=1,
+        col=1,
+    )
+
     if recent_signal_date:
-        ax1.axvline(
+        fig.add_vline(
             x=recent_signal_date,
-            color="red",
-            linestyle="--",
-            alpha=0.7,
-            linewidth=2,
-            label="Risk-Off Signal",
+            line_dash="dash",
+            line_color="red",
+            opacity=0.7,
+            line_width=2,
+            row=2,
+            col=1,
         )
 
-    ax1.legend(loc="upper left", fontsize=10, framealpha=0.8)
+    fig.update_yaxes(title_text="SPY Price ($)", row=1, col=1)
 
-    # Middle panel: LQD:IEF Ratio with moving averages
-    ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    ax2.plot(
-        data.index,
-        data["LQD_IEF_Ratio"],
-        color="black",
-        linewidth=2,
-        label="LQD:IEF Ratio",
+    # Row 2: LQD:IEF Ratio with moving averages
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["LQD_IEF_Ratio"],
+            name="LQD:IEF Ratio",
+            line=dict(color="black", width=2),
+        ),
+        row=2,
+        col=1,
     )
-    ax2.plot(
-        data.index, data["Ratio_EMA20"], color="green", linewidth=1.5, label="EMA(20)"
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["Ratio_EMA20"],
+            name="EMA(20)",
+            line=dict(color="green", width=1.5),
+        ),
+        row=2,
+        col=1,
     )
-    ax2.plot(
-        data.index, data["Ratio_EMA50"], color="red", linewidth=1.5, label="EMA(50)"
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["Ratio_EMA50"],
+            name="EMA(50)",
+            line=dict(color="red", width=1.5),
+        ),
+        row=2,
+        col=1,
     )
-    ax2.plot(
-        data.index,
-        data["Ratio_SMA200"],
-        color="darkred",
-        linestyle="--",
-        linewidth=1.5,
-        label="SMA(200)",
+    fig.add_trace(
+        go.Scatter(
+            x=data.index,
+            y=data["Ratio_SMA200"],
+            name="SMA(200)",
+            line=dict(color="darkred", width=1.5, dash="dash"),
+        ),
+        row=2,
+        col=1,
     )
-
-    current_ratio = data["LQD_IEF_Ratio"].iloc[-1]
-    ax2.set_title(f"LQD:IEF Ratio - Current: {current_ratio:.3f}", fontsize=14, pad=15)
-    ax2.set_ylabel("Ratio", fontsize=12, labelpad=10)
-    ax2.grid(True, alpha=0.3)
-    ax2.tick_params(axis="both", which="major", labelsize=10)
-    ax2.legend(loc="upper left", fontsize=10, framealpha=0.8)
 
     if recent_signal_date:
-        ax2.axvline(
-            x=recent_signal_date, color="red", linestyle="--", alpha=0.7, linewidth=2
+        fig.add_vline(
+            x=recent_signal_date,
+            line_dash="dash",
+            line_color="red",
+            opacity=0.7,
+            line_width=2,
+            row=2,
+            col=1,
         )
 
-    # Third panel: PPO(1,100,0)
-    ax3 = fig.add_subplot(gs[2], sharex=ax1)
+    fig.update_yaxes(title_text="Ratio", row=2, col=1)
+
+    # Row 3: PPO(1,100,0) histogram
     colors_1_100 = ["red" if x < 0 else "green" for x in data["PPO_1_100_0_Hist"]]
-    ax3.bar(
-        data.index,
-        data["PPO_1_100_0_Hist"],
-        color=colors_1_100,
-        alpha=0.7,
-        label="PPO(1,100,0)",
-        width=0.8,
+    fig.add_trace(
+        go.Bar(
+            x=data.index,
+            y=data["PPO_1_100_0_Hist"],
+            name="PPO(1,100,0)",
+            marker_color=colors_1_100,
+            opacity=0.7,
+        ),
+        row=3,
+        col=1,
     )
-    ax3.set_title("PPO(1,100,0) - Very Long-Term Momentum", fontsize=14, pad=15)
-    ax3.set_ylabel("PPO(1,100,0)", fontsize=10, labelpad=5)
-    ax3.grid(True, alpha=0.3)
-    ax3.tick_params(axis="both", which="major", labelsize=9)
-    ax3.legend(loc="upper left", fontsize=9, framealpha=0.8)
-    ax3.axhline(y=0, color="black", linestyle="-", alpha=0.5)
-
+    fig.add_hline(y=0, line_color="black", line_width=1, opacity=0.5, row=3, col=1)
     if recent_signal_date:
-        ax3.axvline(
-            x=recent_signal_date, color="red", linestyle="--", alpha=0.7, linewidth=2
+        fig.add_vline(
+            x=recent_signal_date,
+            line_dash="dash",
+            line_color="red",
+            opacity=0.7,
+            line_width=2,
+            row=3,
+            col=1,
         )
+    fig.update_yaxes(title_text="PPO(1,100,0)", row=3, col=1)
 
-    # Fourth panel: PPO(8,21,0)
-    ax4 = fig.add_subplot(gs[3], sharex=ax1)
+    # Row 4: PPO(8,21,0) histogram
     colors_8_21 = ["red" if x < 0 else "green" for x in data["PPO_8_21_0_Hist"]]
-    ax4.bar(
-        data.index,
-        data["PPO_8_21_0_Hist"],
-        color=colors_8_21,
-        alpha=0.7,
-        label="PPO(8,21,0)",
-        width=0.8,
+    fig.add_trace(
+        go.Bar(
+            x=data.index,
+            y=data["PPO_8_21_0_Hist"],
+            name="PPO(8,21,0)",
+            marker_color=colors_8_21,
+            opacity=0.7,
+        ),
+        row=4,
+        col=1,
     )
-    ax4.set_title("PPO(8,21,0) - Medium-Term Momentum", fontsize=14, pad=15)
-    ax4.set_ylabel("PPO(8,21,0)", fontsize=10, labelpad=5)
-    ax4.grid(True, alpha=0.3)
-    ax4.tick_params(axis="both", which="major", labelsize=9)
-    ax4.legend(loc="upper left", fontsize=9, framealpha=0.8)
-    ax4.axhline(y=0, color="black", linestyle="-", alpha=0.5)
-
+    fig.add_hline(y=0, line_color="black", line_width=1, opacity=0.5, row=4, col=1)
     if recent_signal_date:
-        ax4.axvline(
-            x=recent_signal_date, color="red", linestyle="--", alpha=0.7, linewidth=2
+        fig.add_vline(
+            x=recent_signal_date,
+            line_dash="dash",
+            line_color="red",
+            opacity=0.7,
+            line_width=2,
+            row=4,
+            col=1,
         )
+    fig.update_yaxes(title_text="PPO(8,21,0)", row=4, col=1)
+    fig.update_xaxes(title_text="Date", row=4, col=1)
 
-    # Format x-axis
-    ax4.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax4.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-    plt.setp(ax4.xaxis.get_majorticklabels(), rotation=45, fontsize=9)
-    ax4.set_xlabel("Date", fontsize=10, labelpad=10)
-
-    plt.subplots_adjust(top=0.93, bottom=0.08, left=0.08, right=0.92, hspace=0.30)
+    fig.update_layout(
+        title="Credit Market Canary - LQD:IEF Ratio Analysis",
+        height=900,
+        showlegend=True,
+        hovermode="x unified",
+    )
 
     return fig
 
@@ -540,14 +630,14 @@ def generate_credit_market_stats(data) -> str:
     <h3>Credit Market Canary Statistics</h3>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>
-        <tr><td>LQD:IEF Ratio</td><td>{latest['LQD_IEF_Ratio']:.3f}</td></tr>
-        <tr><td>Ratio vs SMA(200)</td><td>{'Above' if latest['LQD_IEF_Ratio'] > latest['Ratio_SMA200'] else 'Below'}</td></tr>
-        <tr><td>Current Signal</td><td>{'RISK-OFF' if latest['Risk_Off_Signal'] else 'RISK-ON' if latest['Risk_On_Signal'] else 'NEUTRAL'}</td></tr>
-        <tr><td>EMA(20)</td><td>{latest['Ratio_EMA20']:.3f}</td></tr>
-        <tr><td>EMA(50)</td><td>{latest['Ratio_EMA50']:.3f}</td></tr>
-        <tr><td>SMA(200)</td><td>{latest['Ratio_SMA200']:.3f}</td></tr>
-        <tr><td>PPO(1,100,0)</td><td>{latest['PPO_1_100_0']:.3f}</td></tr>
-        <tr><td>PPO(8,21,0)</td><td>{latest['PPO_8_21_0']:.3f}</td></tr>
+        <tr><td>LQD:IEF Ratio</td><td>{latest["LQD_IEF_Ratio"]:.3f}</td></tr>
+        <tr><td>Ratio vs SMA(200)</td><td>{"Above" if latest["LQD_IEF_Ratio"] > latest["Ratio_SMA200"] else "Below"}</td></tr>
+        <tr><td>Current Signal</td><td>{"RISK-OFF" if latest["Risk_Off_Signal"] else "RISK-ON" if latest["Risk_On_Signal"] else "NEUTRAL"}</td></tr>
+        <tr><td>EMA(20)</td><td>{latest["Ratio_EMA20"]:.3f}</td></tr>
+        <tr><td>EMA(50)</td><td>{latest["Ratio_EMA50"]:.3f}</td></tr>
+        <tr><td>SMA(200)</td><td>{latest["Ratio_SMA200"]:.3f}</td></tr>
+        <tr><td>PPO(1,100,0)</td><td>{latest["PPO_1_100_0"]:.3f}</td></tr>
+        <tr><td>PPO(8,21,0)</td><td>{latest["PPO_8_21_0"]:.3f}</td></tr>
     </table>
     """
     return stats
@@ -730,42 +820,46 @@ def run_tqqq_analysis(market_data: Dict[str, pd.DataFrame], use_alternate: bool 
 
 
 def create_tqqq_chart(results_df, use_alternate: bool = True):
-    """Create TQQQ volatility bucket strategy chart."""
+    """Create TQQQ volatility bucket strategy chart using Plotly."""
     logging.info("Creating TQQQ strategy chart...")
 
-    ALTERNATE_TICKER if use_alternate else "Cash"
+    fig = go.Figure()
 
-    # Calculate equity curves
-    (1 + results_df["strategy_returns"]).cumprod()
-    (1 + results_df["tqqq_returns"]).cumprod()
-
-    # Create figure with subplots
-    fig, axes = plt.subplots(1, 1, figsize=(15, 6))
-
-    # Panel: Volatility Regime
     vol_ratio = results_df["vol_ratio"].dropna()
-    axes.plot(
-        vol_ratio.index,
-        vol_ratio.values,
-        label="Vol Ratio",
-        color="purple",
-        linewidth=1,
-    )
-    axes.axhline(
-        y=VOL_THRESHOLD_LOW, linestyle="--", color="green", label="Low Vol Threshold"
-    )
-    axes.axhline(
-        y=VOL_THRESHOLD_HIGH, linestyle="--", color="red", label="High Vol Threshold"
-    )
-    axes.set_title(
-        "Volatility Regime (QQQ ATR / Median)", fontsize=14, fontweight="bold"
-    )
-    axes.set_ylabel("Vol Ratio")
-    axes.set_xlabel("Date")
-    axes.grid(True, alpha=0.3)
-    axes.legend()
 
-    plt.tight_layout()
+    fig.add_trace(
+        go.Scatter(
+            x=vol_ratio.index,
+            y=vol_ratio.values,
+            name="Vol Ratio",
+            line=dict(color="purple", width=1),
+        )
+    )
+
+    # Add threshold lines
+    fig.add_hline(
+        y=VOL_THRESHOLD_LOW,
+        line_dash="dash",
+        line_color="green",
+        annotation_text=f"Low Vol ({VOL_THRESHOLD_LOW:.2f})",
+        annotation_position="right",
+    )
+    fig.add_hline(
+        y=VOL_THRESHOLD_HIGH,
+        line_dash="dash",
+        line_color="red",
+        annotation_text=f"High Vol ({VOL_THRESHOLD_HIGH:.2f})",
+        annotation_position="right",
+    )
+
+    fig.update_layout(
+        title="Volatility Regime (QQQ ATR / Median)",
+        xaxis_title="Date",
+        yaxis_title="Vol Ratio",
+        height=500,
+        hovermode="x unified",
+    )
+
     return fig
 
 
@@ -823,21 +917,21 @@ def generate_tqqq_stats(results_df, use_alternate: bool = True) -> str:
     <h3>TQQQ Volatility Bucket Strategy Statistics</h3>
     <table>
         <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
-        <tr><td>CAGR</td><td>{metrics['strategy_cagr']:.2%}</td><td>{metrics['benchmark_cagr']:.2%}</td></tr>
-        <tr><td>Volatility</td><td>{metrics['strategy_vol']:.2%}</td><td>{metrics['benchmark_vol']:.2%}</td></tr>
-        <tr><td>Sharpe Ratio</td><td>{metrics['strategy_sharpe']:.2f}</td><td>{metrics['benchmark_sharpe']:.2f}</td></tr>
-        <tr><td>Max Drawdown</td><td>{metrics['strategy_dd']:.2%}</td><td>{metrics['benchmark_dd']:.2%}</td></tr>
-        <tr><td>Final Equity</td><td>${metrics['strategy_equity'].iloc[-1]:.2f}</td><td>${metrics['benchmark_equity'].iloc[-1]:.2f}</td></tr>
+        <tr><td>CAGR</td><td>{metrics["strategy_cagr"]:.2%}</td><td>{metrics["benchmark_cagr"]:.2%}</td></tr>
+        <tr><td>Volatility</td><td>{metrics["strategy_vol"]:.2%}</td><td>{metrics["benchmark_vol"]:.2%}</td></tr>
+        <tr><td>Sharpe Ratio</td><td>{metrics["strategy_sharpe"]:.2f}</td><td>{metrics["benchmark_sharpe"]:.2f}</td></tr>
+        <tr><td>Max Drawdown</td><td>{metrics["strategy_dd"]:.2%}</td><td>{metrics["benchmark_dd"]:.2%}</td></tr>
+        <tr><td>Final Equity</td><td>${metrics["strategy_equity"].iloc[-1]:.2f}</td><td>${metrics["benchmark_equity"].iloc[-1]:.2f}</td></tr>
     </table>
     <h3>Current Position</h3>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>
-        <tr><td>Current Date</td><td>{results_df.index[-1].strftime('%Y-%m-%d')}</td></tr>
-        <tr><td>QQQ Close</td><td>${latest['qqq_close']:.2f}</td></tr>
-        <tr><td>Vol Ratio</td><td>{latest['vol_ratio']:.2f}x</td></tr>
-        <tr><td>Target Exposure</td><td>{latest['target_exposure']*100:.0f}%</td></tr>
-        <tr><td>Actual Exposure</td><td>{latest['actual_exposure']*100:.0f}%</td></tr>
-        <tr><td>{alternate_label} Allocation</td><td>{(1-latest['actual_exposure'])*100:.0f}%</td></tr>
+        <tr><td>Current Date</td><td>{results_df.index[-1].strftime("%Y-%m-%d")}</td></tr>
+        <tr><td>QQQ Close</td><td>${latest["qqq_close"]:.2f}</td></tr>
+        <tr><td>Vol Ratio</td><td>{latest["vol_ratio"]:.2f}x</td></tr>
+        <tr><td>Target Exposure</td><td>{latest["target_exposure"] * 100:.0f}%</td></tr>
+        <tr><td>Actual Exposure</td><td>{latest["actual_exposure"] * 100:.0f}%</td></tr>
+        <tr><td>{alternate_label} Allocation</td><td>{(1 - latest["actual_exposure"]) * 100:.0f}%</td></tr>
     </table>
     """
     return stats
@@ -962,51 +1056,45 @@ def run_regime_analysis(market_data: Dict[str, pd.DataFrame]):
 
 
 def create_regime_chart(results_df):
-    """Create TQQQ volatility regime strategy chart."""
+    """Create TQQQ volatility regime strategy chart using Plotly."""
     logging.info("Creating TQQQ regime strategy chart...")
 
-    # Create figure with subplots
-    fig, axes = plt.subplots(1, 1, figsize=(15, 6))
+    fig = go.Figure()
 
-    # Panel: Volatility Ratio with regime thresholds
-    axes.plot(
-        results_df.index,
-        results_df["vol_ratio"],
-        label="Vol Ratio",
-        color="black",
-        linewidth=1.5,
+    fig.add_trace(
+        go.Scatter(
+            x=results_df.index,
+            y=results_df["vol_ratio"],
+            name="Vol Ratio",
+            line=dict(color="black", width=1.5),
+        )
     )
-    axes.axhline(
-        y=REGIME_VOL_THRESHOLDS["PANIC_ENTER"],
-        linestyle="--",
-        color="red",
-        label=f"Panic ({REGIME_VOL_THRESHOLDS['PANIC_ENTER']:.2f})",
-    )
-    axes.axhline(
-        y=REGIME_VOL_THRESHOLDS["STRESS_ENTER"],
-        linestyle="--",
-        color="orange",
-        label=f"Stress ({REGIME_VOL_THRESHOLDS['STRESS_ENTER']:.2f})",
-    )
-    axes.axhline(
-        y=REGIME_VOL_THRESHOLDS["NORMAL_ENTER"],
-        linestyle="--",
-        color="blue",
-        label=f"Normal ({REGIME_VOL_THRESHOLDS['NORMAL_ENTER']:.2f})",
-    )
-    axes.axhline(
-        y=REGIME_VOL_THRESHOLDS["CALM_ENTER"],
-        linestyle="--",
-        color="green",
-        label=f"Calm ({REGIME_VOL_THRESHOLDS['CALM_ENTER']:.2f})",
-    )
-    axes.set_title("QQQ Normalized Volatility Ratio", fontsize=14, fontweight="bold")
-    axes.set_ylabel("Vol Ratio")
-    axes.set_xlabel("Date")
-    axes.grid(True, alpha=0.3)
-    axes.legend(loc="best", fontsize=9)
 
-    plt.tight_layout()
+    # Add threshold lines for each regime
+    thresholds = [
+        ("PANIC", REGIME_VOL_THRESHOLDS["PANIC_ENTER"], "red"),
+        ("STRESS", REGIME_VOL_THRESHOLDS["STRESS_ENTER"], "orange"),
+        ("NORMAL", REGIME_VOL_THRESHOLDS["NORMAL_ENTER"], "blue"),
+        ("CALM", REGIME_VOL_THRESHOLDS["CALM_ENTER"], "green"),
+    ]
+
+    for regime_name, value, color in thresholds:
+        fig.add_hline(
+            y=value,
+            line_dash="dash",
+            line_color=color,
+            annotation_text=f"{regime_name} ({value:.2f})",
+            annotation_position="right",
+        )
+
+    fig.update_layout(
+        title="QQQ Normalized Volatility Ratio",
+        xaxis_title="Date",
+        yaxis_title="Vol Ratio",
+        height=500,
+        hovermode="x unified",
+    )
+
     return fig
 
 
@@ -1025,28 +1113,28 @@ def generate_regime_stats(results_df) -> str:
     <h3>TQQQ Volatility Regime Strategy Statistics</h3>
     <table>
         <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
-        <tr><td>CAGR</td><td>{metrics['strategy_cagr']:.2%}</td><td>{metrics['benchmark_cagr']:.2%}</td></tr>
-        <tr><td>Volatility</td><td>{metrics['strategy_vol']:.2%}</td><td>{metrics['benchmark_vol']:.2%}</td></tr>
-        <tr><td>Sharpe Ratio</td><td>{metrics['strategy_sharpe']:.2f}</td><td>{metrics['benchmark_sharpe']:.2f}</td></tr>
-        <tr><td>Max Drawdown</td><td>{metrics['strategy_dd']:.2%}</td><td>{metrics['benchmark_dd']:.2%}</td></tr>
-        <tr><td>Final Equity</td><td>${metrics['strategy_equity'].iloc[-1]:.2f}</td><td>${metrics['benchmark_equity'].iloc[-1]:.2f}</td></tr>
+        <tr><td>CAGR</td><td>{metrics["strategy_cagr"]:.2%}</td><td>{metrics["benchmark_cagr"]:.2%}</td></tr>
+        <tr><td>Volatility</td><td>{metrics["strategy_vol"]:.2%}</td><td>{metrics["benchmark_vol"]:.2%}</td></tr>
+        <tr><td>Sharpe Ratio</td><td>{metrics["strategy_sharpe"]:.2f}</td><td>{metrics["benchmark_sharpe"]:.2f}</td></tr>
+        <tr><td>Max Drawdown</td><td>{metrics["strategy_dd"]:.2%}</td><td>{metrics["benchmark_dd"]:.2%}</td></tr>
+        <tr><td>Final Equity</td><td>${metrics["strategy_equity"].iloc[-1]:.2f}</td><td>${metrics["benchmark_equity"].iloc[-1]:.2f}</td></tr>
     </table>
     <h3>Current Regime Status</h3>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>
-        <tr><td>Current Date</td><td>{results_df.index[-1].strftime('%Y-%m-%d')}</td></tr>
-        <tr><td>QQQ Close</td><td>${latest['qqq_close']:.2f}</td></tr>
-        <tr><td>Vol Ratio</td><td>{latest['vol_ratio']:.2f}x</td></tr>
-        <tr><td>Current Regime</td><td>{latest['regime'].value}</td></tr>
-        <tr><td>Exposure</td><td>{latest['exposure']*100:.0f}%</td></tr>
+        <tr><td>Current Date</td><td>{results_df.index[-1].strftime("%Y-%m-%d")}</td></tr>
+        <tr><td>QQQ Close</td><td>${latest["qqq_close"]:.2f}</td></tr>
+        <tr><td>Vol Ratio</td><td>{latest["vol_ratio"]:.2f}x</td></tr>
+        <tr><td>Current Regime</td><td>{latest["regime"].value}</td></tr>
+        <tr><td>Exposure</td><td>{latest["exposure"] * 100:.0f}%</td></tr>
     </table>
     <h3>Regime Distribution</h3>
     <table>
         <tr><th>Regime</th><th>Days</th><th>Percentage</th></tr>
-        <tr><td>CALM</td><td>{regime_counts.get(Regime.CALM, 0)}</td><td>{regime_counts.get(Regime.CALM, 0)/total_days*100:.1f}%</td></tr>
-        <tr><td>NORMAL</td><td>{regime_counts.get(Regime.NORMAL, 0)}</td><td>{regime_counts.get(Regime.NORMAL, 0)/total_days*100:.1f}%</td></tr>
-        <tr><td>STRESS</td><td>{regime_counts.get(Regime.STRESS, 0)}</td><td>{regime_counts.get(Regime.STRESS, 0)/total_days*100:.1f}%</td></tr>
-        <tr><td>PANIC</td><td>{regime_counts.get(Regime.PANIC, 0)}</td><td>{regime_counts.get(Regime.PANIC, 0)/total_days*100:.1f}%</td></tr>
+        <tr><td>CALM</td><td>{regime_counts.get(Regime.CALM, 0)}</td><td>{regime_counts.get(Regime.CALM, 0) / total_days * 100:.1f}%</td></tr>
+        <tr><td>NORMAL</td><td>{regime_counts.get(Regime.NORMAL, 0)}</td><td>{regime_counts.get(Regime.NORMAL, 0) / total_days * 100:.1f}%</td></tr>
+        <tr><td>STRESS</td><td>{regime_counts.get(Regime.STRESS, 0)}</td><td>{regime_counts.get(Regime.STRESS, 0) / total_days * 100:.1f}%</td></tr>
+        <tr><td>PANIC</td><td>{regime_counts.get(Regime.PANIC, 0)}</td><td>{regime_counts.get(Regime.PANIC, 0) / total_days * 100:.1f}%</td></tr>
     </table>
     """
     return stats
@@ -1119,14 +1207,15 @@ def generate_options_expected_move(symbol: str = "SPY") -> str:
 # ============================================================================
 
 
-def fig_to_base64(fig):
-    """Convert matplotlib figure to base64 encoded string."""
-    buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
-    buf.seek(0)
-    img_base64 = b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
-    return img_base64
+def fig_to_html(fig):
+    """Convert Plotly figure to HTML div string."""
+    # Include Plotly.js from CDN for interactivity
+    html = fig.to_html(
+        full_html=False,
+        include_plotlyjs="cdn",
+        config={"displayModeBar": True, "displaylogo": False},
+    )
+    return html
 
 
 def generate_html_report(
@@ -1146,18 +1235,19 @@ def generate_html_report(
 ):
     """Generate HTML report with all plots and statistics."""
 
-    # Convert figures to base64
-    vix_signals_img = fig_to_base64(vix_signals_fig)
-    vix_comparative_img = fig_to_base64(vix_comparative_fig)
-    credit_market_img = fig_to_base64(credit_market_fig)
-    tqqq_img = fig_to_base64(tqqq_fig)
-    regime_img = fig_to_base64(regime_fig)
+    # Convert figures to HTML
+    vix_signals_html = fig_to_html(vix_signals_fig)
+    vix_comparative_html = fig_to_html(vix_comparative_fig)
+    credit_market_html = fig_to_html(credit_market_fig)
+    tqqq_html = fig_to_html(tqqq_fig)
+    regime_html = fig_to_html(regime_fig)
 
     html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Daily Rebalance Report - {end_date.strftime('%Y-%m-%d')}</title>
+        <title>Daily Rebalance Report - {end_date.strftime("%Y-%m-%d")}</title>
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <style>
             body {{
                 font-family: Arial, sans-serif;
@@ -1195,9 +1285,8 @@ def generate_html_report(
             .section {{
                 margin-bottom: 50px;
             }}
-            img {{
+            .plotly-chart {{
                 max-width: 100%;
-                height: auto;
                 margin: 20px 0;
                 border: 1px solid #ddd;
                 border-radius: 5px;
@@ -1234,8 +1323,8 @@ def generate_html_report(
             <h1>Daily Rebalance Report</h1>
 
             <div class="metadata">
-                <p><strong>Report Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-                <p><strong>Analysis Period:</strong> {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}</p>
+                <p><strong>Report Generated:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                <p><strong>Analysis Period:</strong> {start_date.strftime("%Y-%m-%d")} to {end_date.strftime("%Y-%m-%d")}</p>
             </div>
 
             <div class="section">
@@ -1243,20 +1332,20 @@ def generate_html_report(
                 <p>Analysis of VIX term structure signals using IVTS (Implied Volatility Term Structure) ratio.</p>
                 <p><strong>Trading Rules:</strong> Go LONG when IVTS < 1 (backwardation), Go SHORT when IVTS > 1 (contango)</p>
                 {vix_signals_stats}
-                <img src="data:image/png;base64,{vix_signals_img}" alt="VIX Signals Chart">
+                <div class="plotly-chart">{vix_signals_html}</div>
             </div>
 
             <div class="section">
                 <h2>2. VIX Comparative Analysis</h2>
                 <p>Comparative price performance of SPY vs various VIX indices (normalized to 100 at start date).</p>
-                <img src="data:image/png;base64,{vix_comparative_img}" alt="VIX Comparative Chart">
+                <div class="plotly-chart">{vix_comparative_html}</div>
             </div>
 
             <div class="section">
                 <h2>3. Credit Market Canary</h2>
                 <p>LQD:IEF ratio analysis as an early warning indicator for equity risk.</p>
                 {credit_market_stats}
-                <img src="data:image/png;base64,{credit_market_img}" alt="Credit Market Canary Chart">
+                <div class="plotly-chart">{credit_market_html}</div>
             </div>
 
             <div class="section">
@@ -1264,7 +1353,7 @@ def generate_html_report(
                 <p>Dynamic position sizing for TQQQ based on QQQ volatility regimes with hysteresis to avoid overtrading.</p>
                 <p><strong>Strategy:</strong> Adjusts TQQQ exposure based on ATR-normalized volatility. Uninvested portion allocated to {alternate_label}.</p>
                 {tqqq_stats}
-                <img src="data:image/png;base64,{tqqq_img}" alt="TQQQ Volatility Bucket Chart">
+                <div class="plotly-chart">{tqqq_html}</div>
             </div>
 
             <div class="section">
@@ -1272,14 +1361,14 @@ def generate_html_report(
                 <p>State machine-based trading strategy for TQQQ using four volatility regimes: CALM, NORMAL, STRESS, and PANIC.</p>
                 <p><strong>Strategy:</strong> Uses ATR-based volatility normalization with persistence requirements to confirm regime changes.</p>
                 {regime_stats}
-                <img src="data:image/png;base64,{regime_img}" alt="TQQQ Volatility Regime Chart">
+                <div class="plotly-chart">{regime_html}</div>
             </div>
 
             <div class="section">
                 <h2>6. Options Expected Move (Multi-DTE)</h2>
                 <p>Multi-DTE expected move analysis based on options implied volatility for SPY.</p>
                 <p>Shows projected price ranges at 7, 14, 21, and 30 days to expiration based on at-the-money options IV.</p>
-                {"<img src='data:image/png;base64," + options_expected_move_img + "' alt='Options Expected Move Chart'>" if options_expected_move_img else "<p style='color: #999; font-style: italic;'>Chart unavailable</p>"}
+                {"<div class='plotly-chart'><img src='data:image/png;base64," + options_expected_move_img + "' alt='Options Expected Move Chart'></div>" if options_expected_move_img else "<p style='color: #999; font-style: italic;'>Chart unavailable</p>"}
             </div>
 
             <div class="footer">
@@ -1341,7 +1430,9 @@ def fetch_tqqq_data(start_date, end_date):
     """Fetch all required market data for TQQQ analysis."""
     from datetime import timedelta
 
-    tqqq_start_date = (start_date - timedelta(days=300)).strftime("%Y-%m-%d")
+    # Need at least 252 trading days for vol_ratio + buffer for ATR warmup
+    # Use 800 calendar days to be safe across different periods
+    tqqq_start_date = (start_date - timedelta(days=800)).strftime("%Y-%m-%d")
     all_symbols = ["SPY", "LQD", "IEF", "QQQ", "TQQQ", ALTERNATE_TICKER]
     return fetch_all_symbols(
         all_symbols, tqqq_start_date, end_date.strftime("%Y-%m-%d")
