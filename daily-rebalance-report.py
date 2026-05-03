@@ -9,7 +9,8 @@
 #   "plotly",
 #   "playwright",
 #   "requests",
-#   "python-dotenv"
+#   "python-dotenv",
+#   "schedule"
 # ]
 # ///
 """
@@ -27,12 +28,15 @@ Usage:
 ./daily-rebalance-report.py --start-date 2024-01-01 --pdf --send-telegram
 ./daily-rebalance-report.py --start-date 2024-01-01 -v # INFO logging
 ./daily-rebalance-report.py --start-date 2024-01-01 -vv # DEBUG logging
+./daily-rebalance-report.py -b  # Run as bot (scheduled at 9:00 AM on weekdays)
+./daily-rebalance-report.py --once  # Generate & send report via Telegram once and exit
 """
 
 import logging
 import os
 import sys
 import tempfile
+import time
 import webbrowser
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
@@ -42,6 +46,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import schedule
 import yfinance as yf
 from persistent_cache import PersistentCache
 from plotly.subplots import make_subplots
@@ -1427,7 +1432,135 @@ def parse_args():
         action="store_true",
         help="Send the generated report to Telegram",
     )
+    parser.add_argument(
+        "-b",
+        "--run-as-bot",
+        action="store_true",
+        default=False,
+        help="Run as bot (scheduled at 9:00 AM on weekdays)",
+    )
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        default=False,
+        help="Send Telegram alert once and exit (alias for --send-telegram)",
+    )
     return parser.parse_args()
+
+
+def is_weekday():
+    return datetime.now().weekday() < 5
+
+
+def run_bot(use_alternate=True, start_date="2010-02-10", use_pdf=False):
+    """Run the daily report and send to Telegram."""
+    if not is_weekday():
+        logging.info("Not a weekday, skipping...")
+        return
+
+    logging.info(f"Running bot at {datetime.now()}")
+
+    end_date = datetime.now()
+
+    try:
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+
+        vix_signals_fig, vix_signals_stats = run_vix_signals_analysis(start_dt, end_dt)
+        credit_market_fig, credit_market_stats = run_credit_analysis(start_dt, end_dt)
+
+        if credit_market_fig is None:
+            logging.error("Credit analysis failed, skipping Telegram update")
+            return
+
+        all_market_data = fetch_tqqq_data(start_dt, end_dt)
+        tqqq_fig, tqqq_stats, alternate_label = run_tqqq_bucket_analysis(
+            all_market_data, start_dt, use_alternate=use_alternate
+        )
+
+        if tqqq_fig is None:
+            logging.error("TQQQ analysis failed, skipping Telegram update")
+            return
+
+        regime_fig, regime_stats = run_tqqq_regime_analysis(all_market_data, start_dt)
+
+        if regime_fig is None:
+            logging.error("Regime analysis failed, skipping Telegram update")
+            return
+
+        if use_pdf:
+            logging.info("Generating PDF report...")
+            html_content = generate_html_report(
+                vix_signals_fig,
+                vix_signals_stats,
+                credit_market_fig,
+                credit_market_stats,
+                tqqq_fig,
+                tqqq_stats,
+                alternate_label,
+                regime_fig,
+                regime_stats,
+                start_dt,
+                end_dt,
+            )
+            report_path = generate_pdf_report(
+                html_content, "daily_rebalance_report.html"
+            )
+        else:
+            logging.info("Generating HTML report...")
+            html_content = generate_html_report(
+                vix_signals_fig,
+                vix_signals_stats,
+                credit_market_fig,
+                credit_market_stats,
+                tqqq_fig,
+                tqqq_stats,
+                alternate_label,
+                regime_fig,
+                regime_stats,
+                start_dt,
+                end_dt,
+            )
+            report_path = save_report(html_content, "daily_rebalance_report.html")
+        logging.info(f"Report saved to {report_path}")
+
+        send_file_to_telegram(
+            f"Daily Rebalance Report ({start_dt.date()} to {end_dt.date()})",
+            report_path,
+        )
+        logging.info("Telegram message sent successfully")
+
+    except Exception as e:
+        logging.error(f"Error in run_bot: {e}", exc_info=True)
+
+
+def schedule_bot(start_date="2010-02-10", use_pdf=False):
+    """Schedule the bot to run at 9:00 AM on weekdays."""
+    logging.info("Starting Daily Rebalance Report Bot...")
+    logging.info("Scheduled to run at 9:00 AM on weekdays")
+
+    schedule.every().monday.at("09:00").do(
+        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
+    )
+    schedule.every().tuesday.at("09:00").do(
+        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
+    )
+    schedule.every().wednesday.at("09:00").do(
+        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
+    )
+    schedule.every().thursday.at("09:00").do(
+        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
+    )
+    schedule.every().friday.at("09:00").do(
+        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
+    )
+
+    logging.info("Running initial check...")
+    run_bot(start_date=start_date, use_pdf=use_pdf)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
 
 
 def main(args):
@@ -1505,4 +1638,11 @@ def main(args):
 if __name__ == "__main__":
     args = parse_args()
     setup_logging(args.verbose)
-    sys.exit(main(args))
+
+    if args.once:
+        args.send_telegram = True
+
+    if args.run_as_bot:
+        schedule_bot(start_date=args.start_date, use_pdf=args.pdf)
+    else:
+        sys.exit(main(args))
