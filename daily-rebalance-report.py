@@ -7,7 +7,9 @@
 #   "stockstats",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
 #   "plotly",
-#   "playwright"
+#   "playwright",
+#   "requests",
+#   "python-dotenv"
 # ]
 # ///
 """
@@ -22,6 +24,7 @@ Usage:
 ./daily-rebalance-report.py --start-date 2024-01-01 --end-date 2024-12-31
 ./daily-rebalance-report.py --start-date 2024-01-01 --report-path report.html --open
 ./daily-rebalance-report.py --start-date 2024-01-01 --pdf --open
+./daily-rebalance-report.py --start-date 2024-01-01 --pdf --send-telegram
 ./daily-rebalance-report.py --start-date 2024-01-01 -v # INFO logging
 ./daily-rebalance-report.py --start-date 2024-01-01 -vv # DEBUG logging
 """
@@ -46,6 +49,8 @@ from plotly.subplots import make_subplots
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from stockstats import wrap as stockstats_wrap
+
+from common.tele_notifier import send_file_to_telegram
 
 # TQQQ Volatility Buckets Strategy Configuration
 EXPOSURE_LEVELS = [0.00, 0.25, 0.70]  # Available exposure buckets
@@ -1417,6 +1422,11 @@ def parse_args():
         action="store_true",
         help="Generate a PDF report instead of HTML (requires Playwright)",
     )
+    parser.add_argument(
+        "--send-telegram",
+        action="store_true",
+        help="Send the generated report to Telegram",
+    )
     return parser.parse_args()
 
 
@@ -1473,6 +1483,13 @@ def main(args):
 
         logging.info(f"Report saved to {report_path}")
         print(f"\n✅ Report successfully generated: {report_path}")
+
+        if args.send_telegram:
+            send_file_to_telegram(
+                f"Daily Rebalance Report ({start_date.date()} to {end_date.date()})",
+                report_path,
+            )
+            print(f"📨 Report sent to Telegram")
 
         if args.open:
             logging.info("Opening report...")
