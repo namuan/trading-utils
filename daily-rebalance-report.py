@@ -1383,6 +1383,18 @@ def generate_pdf_report(html_content, report_path):
             logging.warning(f"Failed to delete temporary HTML file {html_path}: {e}")
 
 
+def prepare_pdf_for_telegram(pdf_path):
+    """Copy PDF to a temp file with current date for Telegram sending."""
+    import shutil
+
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    temp_dir = tempfile.gettempdir()
+    dated_path = os.path.join(temp_dir, f"daily_rebalance_report_{date_str}.pdf")
+    shutil.copy2(pdf_path, dated_path)
+    logging.info(f"Prepared PDF for Telegram: {dated_path}")
+    return dated_path
+
+
 def parse_args():
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
@@ -1520,6 +1532,9 @@ def run_bot(use_alternate=True, start_date="2010-02-10", use_pdf=False):
             report_path = save_report(html_content, "daily_rebalance_report.html")
         logging.info(f"Report saved to {report_path}")
 
+        if report_path.endswith(".pdf"):
+            report_path = prepare_pdf_for_telegram(report_path)
+
         send_file_to_telegram(
             f"Daily Rebalance Report ({start_dt.date()} to {end_dt.date()})",
             report_path,
@@ -1614,6 +1629,8 @@ def main(args):
         print(f"\n✅ Report successfully generated: {report_path}")
 
         if args.send_telegram:
+            if report_path.endswith(".pdf"):
+                report_path = prepare_pdf_for_telegram(report_path)
             send_file_to_telegram(
                 f"Daily Rebalance Report ({start_date.date()} to {end_date.date()})",
                 report_path,
