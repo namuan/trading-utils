@@ -678,8 +678,6 @@ def get_common_index(series_list):
 
 def run_tqqq_analysis(market_data: Dict[str, pd.DataFrame], use_alternate: bool = True):
     """Run TQQQ volatility bucket analysis."""
-    logging.info("Running TQQQ Volatility Bucket Analysis...")
-
     qqq_data = market_data.get("QQQ", pd.DataFrame())
     tqqq_data = market_data.get("TQQQ", pd.DataFrame())
     alternate_data = (
@@ -936,8 +934,6 @@ def run_regime_state_machine(df, vol_ratio):
 
 def run_regime_analysis(market_data: Dict[str, pd.DataFrame]):
     """Run TQQQ volatility regime analysis."""
-    logging.info("Running TQQQ Volatility Regime Analysis...")
-
     qqq_data = market_data.get("QQQ", pd.DataFrame())
     tqqq_data = market_data.get("TQQQ", pd.DataFrame())
 
