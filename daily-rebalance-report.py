@@ -6,7 +6,8 @@
 #   "yfinance",
 #   "stockstats",
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
-#   "plotly"
+#   "plotly",
+#   "playwright"
 # ]
 # ///
 """
@@ -20,6 +21,7 @@ Usage:
 ./daily-rebalance-report.py --start-date 2024-01-01
 ./daily-rebalance-report.py --start-date 2024-01-01 --end-date 2024-12-31
 ./daily-rebalance-report.py --start-date 2024-01-01 --report-path report.html --open
+./daily-rebalance-report.py --start-date 2024-01-01 --pdf --open
 ./daily-rebalance-report.py --start-date 2024-01-01 -v # INFO logging
 ./daily-rebalance-report.py --start-date 2024-01-01 -vv # DEBUG logging
 """
@@ -1496,6 +1498,62 @@ def save_report(html_content, report_path):
     return report_path
 
 
+def generate_pdf_report(html_content, report_path):
+    """Generate PDF from HTML content using Playwright."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as e:
+        raise ImportError(
+            "PDF generation requires Playwright. "
+            "Install it with: uv add playwright\n"
+            "Then install browsers: uv run playwright install chromium"
+        ) from e
+
+    # Determine output path
+    if report_path == "daily_rebalance_report.html":
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        tmp.close()
+        pdf_path = tmp.name
+    elif report_path.lower().endswith(".html"):
+        pdf_path = report_path[:-5] + ".pdf"
+    else:
+        pdf_path = report_path + ".pdf"
+
+    # Write HTML to a temp file so Playwright can render it
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".html", delete=False
+    ) as tmp_html:
+        tmp_html.write(html_content)
+        html_path = tmp_html.name
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto(f"file://{os.path.abspath(html_path)}")
+            page.wait_for_timeout(3000)  # Wait for Plotly charts to render
+            page.pdf(
+                path=pdf_path,
+                format="A4",
+                landscape=True,
+                print_background=True,
+                margin={
+                    "top": "20px",
+                    "right": "20px",
+                    "bottom": "20px",
+                    "left": "20px",
+                },
+            )
+            browser.close()
+        logging.info(f"PDF report saved to {pdf_path}")
+        return pdf_path
+    finally:
+        try:
+            os.unlink(html_path)
+        except Exception as e:
+            logging.warning(f"Failed to delete temporary HTML file {html_path}: {e}")
+
+
 def parse_args():
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
@@ -1529,7 +1587,12 @@ def parse_args():
     parser.add_argument(
         "--open",
         action="store_true",
-        help="Open the HTML report in browser after generation",
+        help="Open the report in browser after generation",
+    )
+    parser.add_argument(
+        "--pdf",
+        action="store_true",
+        help="Generate a PDF report instead of HTML (requires Playwright)",
     )
     return parser.parse_args()
 
@@ -1586,12 +1649,16 @@ def main(args):
             end_date,
         )
 
-        report_path = save_report(html_content, args.report_path)
+        if args.pdf:
+            report_path = generate_pdf_report(html_content, args.report_path)
+        else:
+            report_path = save_report(html_content, args.report_path)
+
         logging.info(f"Report saved to {report_path}")
         print(f"\n✅ Report successfully generated: {report_path}")
 
         if args.open:
-            logging.info("Opening report in browser...")
+            logging.info("Opening report...")
             webbrowser.open(f"file://{os.path.abspath(report_path)}")
 
         return 0
