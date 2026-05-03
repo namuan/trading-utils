@@ -1410,8 +1410,8 @@ def parse_args():
     parser.add_argument(
         "--start-date",
         type=str,
-        required=True,
-        help="Start date for analysis (YYYY-MM-DD format)",
+        default="2010-02-10",
+        help="Start date for analysis (YYYY-MM-DD format, default: 2010-02-10)",
     )
     parser.add_argument(
         "--end-date",
@@ -1460,7 +1460,85 @@ def is_weekday():
     return datetime.now().weekday() < 5
 
 
-def run_bot(use_alternate=True, start_date="2010-02-10", use_pdf=False):
+def generate_report(
+    start_date,
+    end_date=None,
+    use_pdf=False,
+    report_path="daily_rebalance_report.html",
+    send_telegram=False,
+    open_report=False,
+    use_alternate=True,
+):
+    """Shared pipeline: fetch data, analyze, generate report, optionally send/open."""
+    if end_date is None:
+        end_date = datetime.now()
+
+    start_dt = pd.to_datetime(start_date)
+    end_dt = pd.to_datetime(end_date)
+    logging.info(f"Analysis period: {start_dt.date()} to {end_dt.date()}")
+
+    vix_signals_fig, vix_signals_stats = run_vix_signals_analysis(start_dt, end_dt)
+    credit_market_fig, credit_market_stats = run_credit_analysis(start_dt, end_dt)
+
+    if credit_market_fig is None:
+        logging.error("Credit analysis failed")
+        return None
+
+    all_market_data = fetch_tqqq_data(start_dt, end_dt)
+    tqqq_fig, tqqq_stats, alternate_label = run_tqqq_bucket_analysis(
+        all_market_data, start_dt, use_alternate=use_alternate
+    )
+
+    if tqqq_fig is None:
+        logging.error("TQQQ analysis failed")
+        return None
+
+    regime_fig, regime_stats = run_tqqq_regime_analysis(all_market_data, start_dt)
+
+    if regime_fig is None:
+        logging.error("Regime analysis failed")
+        return None
+
+    html_content = generate_html_report(
+        vix_signals_fig,
+        vix_signals_stats,
+        credit_market_fig,
+        credit_market_stats,
+        tqqq_fig,
+        tqqq_stats,
+        alternate_label,
+        regime_fig,
+        regime_stats,
+        start_dt,
+        end_dt,
+    )
+
+    if use_pdf:
+        logging.info("Generating PDF report...")
+        result_path = generate_pdf_report(html_content, report_path)
+    else:
+        logging.info("Generating HTML report...")
+        result_path = save_report(html_content, report_path)
+
+    logging.info(f"Report saved to {result_path}")
+
+    if send_telegram:
+        if result_path.endswith(".pdf"):
+            result_path = prepare_pdf_for_telegram(result_path)
+        send_file_to_telegram(
+            f"Daily Rebalance Report ({start_dt.date()} to {end_dt.date()})",
+            result_path,
+        )
+        logging.info("Telegram message sent successfully")
+
+    if open_report:
+        logging.info("Opening report...")
+        webbrowser.open(f"file://{os.path.abspath(result_path)}")
+
+    return result_path
+
+
+def run_bot(start_date, use_alternate=True, use_pdf=False):
     """Run the daily report and send to Telegram."""
     if not is_weekday():
         logging.info("Not a weekday, skipping...")
@@ -1468,103 +1546,26 @@ def run_bot(use_alternate=True, start_date="2010-02-10", use_pdf=False):
 
     logging.info(f"Running bot at {datetime.now()}")
 
-    end_date = datetime.now()
-
     try:
-        start_dt = pd.to_datetime(start_date)
-        end_dt = pd.to_datetime(end_date)
-
-        vix_signals_fig, vix_signals_stats = run_vix_signals_analysis(start_dt, end_dt)
-        credit_market_fig, credit_market_stats = run_credit_analysis(start_dt, end_dt)
-
-        if credit_market_fig is None:
-            logging.error("Credit analysis failed, skipping Telegram update")
-            return
-
-        all_market_data = fetch_tqqq_data(start_dt, end_dt)
-        tqqq_fig, tqqq_stats, alternate_label = run_tqqq_bucket_analysis(
-            all_market_data, start_dt, use_alternate=use_alternate
+        generate_report(
+            start_date=start_date,
+            use_pdf=use_pdf,
+            send_telegram=True,
+            use_alternate=use_alternate,
         )
-
-        if tqqq_fig is None:
-            logging.error("TQQQ analysis failed, skipping Telegram update")
-            return
-
-        regime_fig, regime_stats = run_tqqq_regime_analysis(all_market_data, start_dt)
-
-        if regime_fig is None:
-            logging.error("Regime analysis failed, skipping Telegram update")
-            return
-
-        if use_pdf:
-            logging.info("Generating PDF report...")
-            html_content = generate_html_report(
-                vix_signals_fig,
-                vix_signals_stats,
-                credit_market_fig,
-                credit_market_stats,
-                tqqq_fig,
-                tqqq_stats,
-                alternate_label,
-                regime_fig,
-                regime_stats,
-                start_dt,
-                end_dt,
-            )
-            report_path = generate_pdf_report(
-                html_content, "daily_rebalance_report.html"
-            )
-        else:
-            logging.info("Generating HTML report...")
-            html_content = generate_html_report(
-                vix_signals_fig,
-                vix_signals_stats,
-                credit_market_fig,
-                credit_market_stats,
-                tqqq_fig,
-                tqqq_stats,
-                alternate_label,
-                regime_fig,
-                regime_stats,
-                start_dt,
-                end_dt,
-            )
-            report_path = save_report(html_content, "daily_rebalance_report.html")
-        logging.info(f"Report saved to {report_path}")
-
-        if report_path.endswith(".pdf"):
-            report_path = prepare_pdf_for_telegram(report_path)
-
-        send_file_to_telegram(
-            f"Daily Rebalance Report ({start_dt.date()} to {end_dt.date()})",
-            report_path,
-        )
-        logging.info("Telegram message sent successfully")
-
     except Exception as e:
         logging.error(f"Error in run_bot: {e}", exc_info=True)
 
 
-def schedule_bot(start_date="2010-02-10", use_pdf=False):
+def schedule_bot(start_date, use_pdf=False):
     """Schedule the bot to run at 9:00 AM on weekdays."""
     logging.info("Starting Daily Rebalance Report Bot...")
     logging.info("Scheduled to run at 9:00 AM on weekdays")
 
-    schedule.every().monday.at("09:00").do(
-        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
-    )
-    schedule.every().tuesday.at("09:00").do(
-        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
-    )
-    schedule.every().wednesday.at("09:00").do(
-        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
-    )
-    schedule.every().thursday.at("09:00").do(
-        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
-    )
-    schedule.every().friday.at("09:00").do(
-        lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
-    )
+    for day in ("monday", "tuesday", "wednesday", "thursday", "friday"):
+        getattr(schedule.every(), day).at("09:00").do(
+            lambda: run_bot(start_date=start_date, use_pdf=use_pdf)
+        )
 
     logging.info("Running initial check...")
     run_bot(start_date=start_date, use_pdf=use_pdf)
@@ -1578,68 +1579,22 @@ def main(args):
     logging.info("Starting Daily Rebalance Report generation...")
 
     try:
-        start_date = pd.to_datetime(args.start_date)
-        end_date = pd.to_datetime(args.end_date)
-        logging.info(f"Analysis period: {start_date.date()} to {end_date.date()}")
-
-        vix_signals_fig, vix_signals_stats = run_vix_signals_analysis(
-            start_date, end_date
-        )
-        credit_market_fig, credit_market_stats = run_credit_analysis(
-            start_date, end_date
+        result = generate_report(
+            start_date=args.start_date,
+            end_date=args.end_date,
+            use_pdf=args.pdf,
+            report_path=args.report_path,
+            send_telegram=args.send_telegram,
+            open_report=args.open,
         )
 
-        if credit_market_fig is None:
+        if result is None:
             return 1
 
-        all_market_data = fetch_tqqq_data(start_date, end_date)
-        tqqq_fig, tqqq_stats, alternate_label = run_tqqq_bucket_analysis(
-            all_market_data, start_date, use_alternate=True
-        )
-
-        if tqqq_fig is None:
-            return 1
-
-        regime_fig, regime_stats = run_tqqq_regime_analysis(all_market_data, start_date)
-
-        if regime_fig is None:
-            return 1
-
-        logging.info("Generating HTML report...")
-        html_content = generate_html_report(
-            vix_signals_fig,
-            vix_signals_stats,
-            credit_market_fig,
-            credit_market_stats,
-            tqqq_fig,
-            tqqq_stats,
-            alternate_label,
-            regime_fig,
-            regime_stats,
-            start_date,
-            end_date,
-        )
-
-        if args.pdf:
-            report_path = generate_pdf_report(html_content, args.report_path)
-        else:
-            report_path = save_report(html_content, args.report_path)
-
-        logging.info(f"Report saved to {report_path}")
-        print(f"\n✅ Report successfully generated: {report_path}")
+        print(f"\n✅ Report successfully generated: {result}")
 
         if args.send_telegram:
-            if report_path.endswith(".pdf"):
-                report_path = prepare_pdf_for_telegram(report_path)
-            send_file_to_telegram(
-                f"Daily Rebalance Report ({start_date.date()} to {end_date.date()})",
-                report_path,
-            )
-            print(f"📨 Report sent to Telegram")
-
-        if args.open:
-            logging.info("Opening report...")
-            webbrowser.open(f"file://{os.path.abspath(report_path)}")
+            print("📨 Report sent to Telegram")
 
         return 0
 
