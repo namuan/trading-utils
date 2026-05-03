@@ -13,7 +13,7 @@
 """
 Daily Rebalance Report - Combined Market Analysis
 
-Combines VIX signals, VIX comparative analysis, and credit market canary analysis
+Combines VIX signals and credit market canary analysis
 into a single HTML report with all plots.
 
 Usage:
@@ -28,15 +28,12 @@ Usage:
 
 import logging
 import os
-import subprocess
 import sys
 import tempfile
 import webbrowser
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
-from base64 import b64encode
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
@@ -305,89 +302,6 @@ def generate_vix_signals_stats(
     </table>
     """
     return stats
-
-
-# ============================================================================
-# VIX Comparative Analysis
-# ============================================================================
-
-
-def normalize_prices(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
-    """Normalize all prices to start at 100 for comparison."""
-    normalized_data = {}
-
-    for symbol, df in data.items():
-        if df.empty:
-            logging.warning(f"No data for {symbol}")
-            continue
-
-        # Use Close price
-        if isinstance(df.columns, pd.MultiIndex):
-            prices = df["Close"].iloc[:, 0] if df["Close"].shape[1] > 0 else df["Close"]
-        else:
-            prices = df["Close"]
-
-        # Normalize to start at 100
-        normalized = (prices / prices.iloc[0]) * 100
-        normalized_data[symbol] = normalized
-
-    return pd.DataFrame(normalized_data)
-
-
-def create_vix_comparative_chart(normalized_df: pd.DataFrame):
-    """Create comparative price chart with SPY and VIX indices using Plotly."""
-    fig = go.Figure()
-
-    # Plot SPY with higher line width
-    if "SPY" in normalized_df.columns:
-        fig.add_trace(
-            go.Scatter(
-                x=normalized_df.index,
-                y=normalized_df["SPY"],
-                name="SPY",
-                line=dict(color="blue", width=2.5),
-                opacity=0.8,
-            )
-        )
-
-    # Define colors for VIX symbols
-    vix_colors = {
-        "^VIX": "red",
-        "^VVIX": "orange",
-        "^VIX9D": "green",
-        "^VIX3M": "purple",
-    }
-
-    # Plot VIX-related symbols
-    for symbol in ["^VIX", "^VVIX", "^VIX9D", "^VIX3M"]:
-        if symbol in normalized_df.columns:
-            fig.add_trace(
-                go.Scatter(
-                    x=normalized_df.index,
-                    y=normalized_df[symbol],
-                    name=symbol,
-                    line=dict(color=vix_colors.get(symbol, "gray"), width=1.5),
-                    opacity=0.7,
-                )
-            )
-
-    # Add horizontal line at 100 (starting point)
-    fig.add_hline(
-        y=100, line_dash="dash", line_color="black", opacity=0.5, line_width=1
-    )
-
-    fig.update_layout(
-        title="Comparative Price Chart: SPY vs VIX Indices",
-        xaxis_title="Date",
-        yaxis_title="Normalized Price (Starting at 100)",
-        height=600,
-        hovermode="x unified",
-    )
-
-    fig.update_xaxes(tickangle=45)
-    fig.update_yaxes(gridcolor="rgba(0,0,0,0.1)")
-
-    return fig
 
 
 # ============================================================================
@@ -1143,68 +1057,6 @@ def generate_regime_stats(results_df) -> str:
 
 
 # ============================================================================
-# Options Expected Move Analysis
-# ============================================================================
-
-
-def run_options_script(symbol, output_path):
-    """Run options expected move script."""
-    script_dir = Path(__file__).parent
-    options_script = script_dir / "options-expected-move.py"
-    cmd = [
-        str(options_script),
-        "-s",
-        symbol,
-        "--multi-dte",
-        "--no-show",
-        "--output-file",
-        output_path,
-    ]
-    logging.info(f"Running command: {' '.join(cmd)}")
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-
-
-def encode_png_to_base64(file_path):
-    """Encode PNG file to base64 string."""
-    with open(file_path, "rb") as f:
-        return b64encode(f.read()).decode("utf-8")
-
-
-def generate_options_expected_move(symbol: str = "SPY") -> str:
-    """Generate options expected move chart and return base64 encoded PNG."""
-    logging.info(f"Generating options expected move chart for {symbol}...")
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".png", delete=False) as tmp_file:
-        output_path = tmp_file.name
-
-    try:
-        result = run_options_script(symbol, output_path)
-
-        if result.returncode != 0:
-            logging.error(
-                f"Failed to generate options expected move chart: {result.stderr}"
-            )
-            return None
-
-        img_base64 = encode_png_to_base64(output_path)
-        logging.info("Successfully generated options expected move chart")
-        return img_base64
-
-    except subprocess.TimeoutExpired:
-        logging.error("Options expected move generation timed out")
-        return None
-    except Exception as e:
-        logging.error(f"Error generating options expected move: {e}", exc_info=True)
-        return None
-    finally:
-        if os.path.exists(output_path):
-            try:
-                os.unlink(output_path)
-            except Exception as e:
-                logging.warning(f"Failed to delete temporary file {output_path}: {e}")
-
-
-# ============================================================================
 # HTML Report Generation
 # ============================================================================
 
@@ -1223,7 +1075,6 @@ def fig_to_html(fig):
 def generate_html_report(
     vix_signals_fig,
     vix_signals_stats,
-    vix_comparative_fig,
     credit_market_fig,
     credit_market_stats,
     tqqq_fig,
@@ -1231,7 +1082,6 @@ def generate_html_report(
     alternate_label,
     regime_fig,
     regime_stats,
-    options_expected_move_img,
     start_date,
     end_date,
 ):
@@ -1239,7 +1089,6 @@ def generate_html_report(
 
     # Convert figures to HTML
     vix_signals_html = fig_to_html(vix_signals_fig)
-    vix_comparative_html = fig_to_html(vix_comparative_fig)
     credit_market_html = fig_to_html(credit_market_fig)
     tqqq_html = fig_to_html(tqqq_fig)
     regime_html = fig_to_html(regime_fig)
@@ -1338,20 +1187,14 @@ def generate_html_report(
             </div>
 
             <div class="section">
-                <h2>2. VIX Comparative Analysis</h2>
-                <p>Comparative price performance of SPY vs various VIX indices (normalized to 100 at start date).</p>
-                <div class="plotly-chart">{vix_comparative_html}</div>
-            </div>
-
-            <div class="section">
-                <h2>3. Credit Market Canary</h2>
+                <h2>2. Credit Market Canary</h2>
                 <p>LQD:IEF ratio analysis as an early warning indicator for equity risk.</p>
                 {credit_market_stats}
                 <div class="plotly-chart">{credit_market_html}</div>
             </div>
 
             <div class="section">
-                <h2>4. TQQQ Volatility Bucket Strategy</h2>
+                <h2>3. TQQQ Volatility Bucket Strategy</h2>
                 <p>Dynamic position sizing for TQQQ based on QQQ volatility regimes with hysteresis to avoid overtrading.</p>
                 <p><strong>Strategy:</strong> Adjusts TQQQ exposure based on ATR-normalized volatility. Uninvested portion allocated to {alternate_label}.</p>
                 {tqqq_stats}
@@ -1359,18 +1202,11 @@ def generate_html_report(
             </div>
 
             <div class="section">
-                <h2>5. TQQQ Volatility Regime Strategy</h2>
+                <h2>4. TQQQ Volatility Regime Strategy</h2>
                 <p>State machine-based trading strategy for TQQQ using four volatility regimes: CALM, NORMAL, STRESS, and PANIC.</p>
                 <p><strong>Strategy:</strong> Uses ATR-based volatility normalization with persistence requirements to confirm regime changes.</p>
                 {regime_stats}
                 <div class="plotly-chart">{regime_html}</div>
-            </div>
-
-            <div class="section">
-                <h2>6. Options Expected Move (Multi-DTE)</h2>
-                <p>Multi-DTE expected move analysis based on options implied volatility for SPY.</p>
-                <p>Shows projected price ranges at 7, 14, 21, and 30 days to expiration based on at-the-money options IV.</p>
-                {"<div class='plotly-chart'><img src='data:image/png;base64," + options_expected_move_img + "' alt='Options Expected Move Chart'></div>" if options_expected_move_img else "<p style='color: #999; font-style: italic;'>Chart unavailable</p>"}
             </div>
 
             <div class="footer">
@@ -1399,19 +1235,6 @@ def run_vix_signals_analysis(start_date, end_date):
     vix_df = calculate_ivts(vix_market_data)
     vix_df = calculate_vix_signals(vix_df)
     return create_vix_signals_chart(vix_df), generate_vix_signals_stats(vix_df)
-
-
-def run_vix_comparative_analysis(start_date, end_date):
-    """Run VIX comparative analysis."""
-    logging.info("Running VIX Comparative Analysis...")
-    comparative_symbols = ["SPY", "^VIX", "^VVIX", "^VIX9D", "^VIX3M"]
-    comparative_data = fetch_all_symbols(
-        comparative_symbols,
-        start_date.strftime("%Y-%m-%d"),
-        end_date.strftime("%Y-%m-%d"),
-    )
-    normalized_df = normalize_prices(comparative_data)
-    return create_vix_comparative_chart(normalized_df)
 
 
 def run_credit_analysis(start_date, end_date):
@@ -1608,7 +1431,6 @@ def main(args):
         vix_signals_fig, vix_signals_stats = run_vix_signals_analysis(
             start_date, end_date
         )
-        vix_comparative_fig = run_vix_comparative_analysis(start_date, end_date)
         credit_market_fig, credit_market_stats = run_credit_analysis(
             start_date, end_date
         )
@@ -1629,14 +1451,10 @@ def main(args):
         if regime_fig is None:
             return 1
 
-        logging.info("Generating Options Expected Move Analysis...")
-        options_expected_move_img = generate_options_expected_move("SPY")
-
         logging.info("Generating HTML report...")
         html_content = generate_html_report(
             vix_signals_fig,
             vix_signals_stats,
-            vix_comparative_fig,
             credit_market_fig,
             credit_market_stats,
             tqqq_fig,
@@ -1644,7 +1462,6 @@ def main(args):
             alternate_label,
             regime_fig,
             regime_stats,
-            options_expected_move_img,
             start_date,
             end_date,
         )
