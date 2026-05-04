@@ -155,11 +155,22 @@ class DataFetcher(QObject):
     def __init__(self):
         super().__init__()
         self.signals = DataSignals()
+        self._stopped = False
+
+    def stop(self):
+        self._stopped = True
 
     def run(self):
         self._do_fetch()
-        while True:
-            QThread.sleep(POLL_INTERVAL)
+        elapsed = 0
+        while not self._stopped:
+            QThread.sleep(1)
+            elapsed += 1
+            if self._stopped:
+                break
+            if elapsed < POLL_INTERVAL:
+                continue
+            elapsed = 0
             if not is_market_open():
                 continue
             self._do_fetch()
@@ -440,8 +451,9 @@ class MainWindow(QMainWindow):
         self.vix_chart.fig.tight_layout()
 
     def closeEvent(self, event):
+        self.fetcher.stop()
         self.thread.quit()
-        self.thread.wait(2000)
+        self.thread.wait(3000)
         event.accept()
 
 
