@@ -224,6 +224,8 @@ class CandlestickCanvas(FigureCanvasQTAgg):
         for spine in self.ax.spines.values():
             spine.set_color("#2a2e39")
             spine.set_linewidth(0.5)
+        self.ax.yaxis.tick_right()
+        self.ax.yaxis.set_label_position("right")
         self.ax.tick_params(colors="#787b86", labelsize=9)
         self.ax.set_title(self.chart_title, color="#787b86", fontsize=11, pad=6)
         self.ax.set_xlabel("")
@@ -283,24 +285,21 @@ class CandlestickCanvas(FigureCanvasQTAgg):
 class StatsCard(QFrame):
     def __init__(self, label, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(80)
+        self.setFixedHeight(92)
         self.setStyleSheet(
             """
             StatsCard {
                 background: #131722;
                 border: 1px solid #2a2e39;
                 border-radius: 8px;
-                padding: 10px 14px;
             }
         """
         )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(2)
+        layout.setContentsMargins(14, 8, 14, 8)
+        layout.setSpacing(1)
         title = QLabel(label)
-        title.setStyleSheet(
-            "color: #787b86; font-size: 10px; text-transform: uppercase;"
-        )
+        title.setStyleSheet("color: #787b86; font-size: 10px;")
         title_font = QFont()
         title_font.setPointSize(9)
         title_font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 120)
