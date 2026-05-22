@@ -1063,6 +1063,177 @@ def generate_regime_stats(results_df) -> str:
 
 
 # ============================================================================
+# Treasury Yield Analysis
+# ============================================================================
+
+YIELD_TICKERS = {
+    "^IRX": "13-Week T-Bill",
+    "^FVX": "5-Year Treasury",
+    "^TNX": "10-Year Treasury",
+    "^TYX": "30-Year Treasury",
+}
+
+SPREAD_DEFS = [
+    ("^TNX", "^FVX", "10y-5y"),
+    ("^TNX", "^IRX", "10y-3mo"),
+    ("^TYX", "^TNX", "30y-10y"),
+]
+
+YIELD_COLORS = {
+    "^IRX": "#1f77b4",
+    "^FVX": "#ff7f0e",
+    "^TNX": "#2ca02c",
+    "^TYX": "#d62728",
+    "SPY": "#000000",
+    "10y-5y": "#9467bd",
+    "10y-3mo": "#8c564b",
+    "30y-10y": "#e377c2",
+}
+
+
+def fetch_treasury_data(start_date, end_date):
+    data = {}
+    for ticker in YIELD_TICKERS:
+        df = fetch_market_data(ticker, start_date, end_date)
+        if not df.empty:
+            close = df["Close"]
+            data[ticker] = (
+                close.iloc[:, 0] if isinstance(close, pd.DataFrame) else close
+            ).rename(ticker)
+    return data
+
+
+def build_treasury_frame(data):
+    if not data:
+        return pd.DataFrame()
+    frame = pd.concat(data.values(), axis=1, join="inner")
+    for t1, t2, name in SPREAD_DEFS:
+        if t1 in frame.columns and t2 in frame.columns:
+            frame[name] = frame[t1] - frame[t2]
+    return frame
+
+
+def create_treasury_chart(frame, spy):
+    tickers = list(YIELD_TICKERS)
+    n_rows = 1 + len(tickers) + 1 + 1
+    tenors = ["3mo", "5yr", "10yr", "30yr"]
+
+    fig = make_subplots(
+        rows=n_rows,
+        cols=1,
+        shared_xaxes=False,
+        vertical_spacing=0.03,
+        subplot_titles=["SPY"]
+        + [YIELD_TICKERS[t] for t in tickers]
+        + ["Spreads", "Yield Curve"],
+    )
+
+    for r in range(1, n_rows + 1):
+        fig.update_yaxes(
+            title_text="Yield (%)" if r >= 2 else "Price ($)", row=r, col=1
+        )
+
+    if not spy.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=spy.index,
+                y=spy.values,
+                mode="lines",
+                showlegend=False,
+                line=dict(color="#000", width=1.5),
+            ),
+            row=1,
+            col=1,
+        )
+
+    for idx, t in enumerate(tickers):
+        if t in frame.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=frame.index,
+                    y=frame[t],
+                    mode="lines",
+                    showlegend=False,
+                    line=dict(color=YIELD_COLORS.get(t, "#333"), width=1.5),
+                ),
+                row=2 + idx,
+                col=1,
+            )
+
+    r = 2 + len(tickers)
+    for _, _, name in SPREAD_DEFS:
+        if name in frame.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=frame.index,
+                    y=frame[name],
+                    mode="lines",
+                    showlegend=False,
+                    line=dict(color=YIELD_COLORS.get(name, "#999"), width=1.5),
+                ),
+                row=r,
+                col=1,
+            )
+    fig.add_hline(
+        y=0, line_dash="dash", line_color="black", line_width=0.8, row=r, col=1
+    )
+
+    r = 3 + len(tickers)
+    latest = frame.dropna().iloc[-1]
+    vals = [latest[t] for t in tickers if t in latest.index]
+    if vals:
+        fig.add_trace(
+            go.Scatter(
+                x=tenors,
+                y=vals,
+                mode="lines+markers+text",
+                showlegend=False,
+                text=[f"{v:.2f}%" for v in vals],
+                textposition="top center",
+                line=dict(color="#2ca02c", width=2),
+                marker=dict(size=8),
+            ),
+            row=r,
+            col=1,
+        )
+    fig.update_xaxes(title_text="Tenor", row=r, col=1)
+
+    for r in range(1, n_rows):
+        fig.update_xaxes(matches="x", row=r, col=1)
+
+    return fig.update_layout(
+        title="Treasury Yield Analysis", height=300 * n_rows, hovermode="x unified"
+    )
+
+
+def generate_treasury_stats(frame) -> str:
+    latest = frame.dropna().iloc[-1]
+    ticks = [t for t in YIELD_TICKERS if t in latest.index]
+
+    rows = "".join(
+        f"<tr><td>{YIELD_TICKERS[t]}</td><td>{latest[t]:.2f}%</td></tr>" for t in ticks
+    )
+    spreads = "".join(
+        f"<tr><td>{n}</td><td>{latest[n]:.2f}%{' (INVERTED)' if latest[n] < 0 else ''}</td></tr>"
+        for _, _, n in SPREAD_DEFS
+        if n in latest.index
+    )
+    summary = "".join(
+        f"<tr><td>{YIELD_TICKERS[t]}</td>"
+        f"<td>{frame[t].min():.2f}%</td><td>{frame[t].max():.2f}%</td>"
+        f"<td>{frame[t].mean():.2f}%</td><td>{latest[t]:.2f}%</td></tr>"
+        for t in ticks
+    )
+
+    return f"""
+    <h3>Treasury Yield Statistics</h3>
+    <table><tr><th>Tenor</th><th>Yield</th></tr>{rows}</table>
+    <table><tr><th>Spread</th><th>Value</th></tr>{spreads}</table>
+    <table><tr><th>Tenor</th><th>Min</th><th>Max</th><th>Avg</th><th>Current</th></tr>{summary}</table>
+    """
+
+
+# ============================================================================
 # HTML Report Generation
 # ============================================================================
 
@@ -1088,6 +1259,8 @@ def generate_html_report(
     alternate_label,
     regime_fig,
     regime_stats,
+    treasury_fig,
+    treasury_stats,
     start_date,
     end_date,
 ):
@@ -1098,6 +1271,7 @@ def generate_html_report(
     credit_market_html = fig_to_html(credit_market_fig)
     tqqq_html = fig_to_html(tqqq_fig)
     regime_html = fig_to_html(regime_fig)
+    treasury_html = fig_to_html(treasury_fig)
 
     html_content = f"""
     <!DOCTYPE html>
@@ -1215,6 +1389,13 @@ def generate_html_report(
                 <div class="plotly-chart">{regime_html}</div>
             </div>
 
+            <div class="section">
+                <h2>5. Treasury Yield Analysis</h2>
+                <p>US Treasury yields across the curve: 3-month T-Bill, 5-year, 10-year, and 30-year bonds.</p>
+                {treasury_stats}
+                <div class="plotly-chart">{treasury_html}</div>
+            </div>
+
             <div class="footer">
                 <p>Generated by Daily Rebalance Report Script</p>
             </div>
@@ -1310,6 +1491,20 @@ def run_tqqq_regime_analysis(all_market_data, start_date):
     return create_regime_chart(regime_results_df), generate_regime_stats(
         regime_results_df
     )
+
+
+def run_treasury_analysis(start_date, end_date):
+    sd = start_date.strftime("%Y-%m-%d")
+    ed = end_date.strftime("%Y-%m-%d")
+    data = fetch_treasury_data(sd, ed)
+    frame = build_treasury_frame(data)
+    if frame.empty:
+        return None, None
+    spy_close = fetch_market_data("SPY", sd, ed)["Close"]
+    spy = (
+        spy_close.iloc[:, 0] if isinstance(spy_close, pd.DataFrame) else spy_close
+    ).rename("SPY")
+    return create_treasury_chart(frame, spy), generate_treasury_stats(frame)
 
 
 def save_report(html_content, report_path):
@@ -1499,6 +1694,8 @@ def generate_report(
         logging.error("Regime analysis failed")
         return None
 
+    treasury_fig, treasury_stats = run_treasury_analysis(start_dt, end_dt)
+
     html_content = generate_html_report(
         vix_signals_fig,
         vix_signals_stats,
@@ -1509,6 +1706,8 @@ def generate_report(
         alternate_label,
         regime_fig,
         regime_stats,
+        treasury_fig,
+        treasury_stats,
         start_dt,
         end_dt,
     )
