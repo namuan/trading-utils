@@ -17,7 +17,7 @@ a multi-panel interactive Plotly report covering:
 
    1. Headline numbers: last close, multi-horizon returns, max drawdown, vol regime
    2. Price + 50/200-day moving averages + volume + OVX overlay (secondary axis)
-   3. Return distribution histogram (1d, 5d, 21d) with bucket bands
+   3. Return distribution histogram (1d, 5d, 30d) with bucket bands
    4. Rolling annualised volatility with regime bands
       (calm < 25%, normal 25-45%, elevated 45-70%, crisis > 70%)
    5. OVX level vs CL=F 21d realised vol (implied vs realised) with OVX regime
@@ -223,7 +223,7 @@ def add_features(df, ovx=None):
 
     # Multi-period price returns (raw close-to-close)
     out["ret_5d"] = out["Close"].pct_change(5)
-    out["ret_21d"] = out["Close"].pct_change(21)
+    out["ret_30d"] = out["Close"].pct_change(30)
 
     # Moving averages
     out["ma_50"] = out["Close"].rolling(50).mean()
@@ -465,7 +465,7 @@ def add_vol_overlay(fig, df, row):
 def add_return_histogram(fig, df, row):
     r1 = df["ret_1d"].dropna() * 100
     r5 = df["ret_5d"].dropna() * 100
-    r21 = df["ret_21d"].dropna() * 100
+    r30 = df["ret_30d"].dropna() * 100
     bins = dict(start=-15, end=15, size=0.5)
 
     fig.add_trace(
@@ -494,8 +494,8 @@ def add_return_histogram(fig, df, row):
     )
     fig.add_trace(
         go.Histogram(
-            x=r21,
-            name="21-day",
+            x=r30,
+            name="30-day",
             xbins=bins,
             marker_color="#2ca02c",
             opacity=0.35,
@@ -504,13 +504,13 @@ def add_return_histogram(fig, df, row):
         row=row,
         col=1,
     )
-    # Bucket reference lines. Keep the bucket counts in one compact annotation
+    # Bucket reference lines. Keep the 30-day bucket counts in one compact annotation
     # instead of labeling every vertical line; individual labels overlap badly
     # on the probability chart, especially around ±0.5%, ±1%, and ±2%.
-    total = len(r1)
+    total = len(r30)
     bucket_labels = []
     for b in RETURN_BUCKETS:
-        inside = (r1.abs() <= b).sum()
+        inside = (r30.abs() <= b).sum()
         pct = inside / total * 100 if total else 0
         bucket_labels.append(f"±{b}%: {pct:.0f}%")
         fig.add_vline(
@@ -524,7 +524,7 @@ def add_return_histogram(fig, df, row):
         y=0.98,
         xref="x domain",
         yref="y domain",
-        text="1d abs-return coverage: "
+        text="30d abs-return coverage: "
         + " · ".join(bucket_labels[:4])
         + "<br>"
         + " · ".join(bucket_labels[4:]),
@@ -768,7 +768,7 @@ def add_cl_ovx_correlation(fig, df, row):
 def build_combined_figure(df):
     # Row 1: price + 50/200 MAs (+ OVX overlay on secondary y, if present)
     # Row 2: volume bars + 21d vol overlay (secondary y, with regime bands)
-    # Row 3: return distribution histogram (1d/5d/21d, with bucket lines)
+    # Row 3: return distribution histogram (1d/5d/30d, with bucket lines)
     # Row 4: rolling 21d annualised vol with regime bands
     # Row 5: OVX level vs CL realised vol (placeholder if OVX missing)
     # Row 6: rolling CL-OVX return correlation (placeholder if OVX missing)
@@ -783,7 +783,7 @@ def build_combined_figure(df):
         row_titles=[
             "Price &<br>50/200 MAs",
             "Volume & 21d<br>Ann. Vol",
-            "Return Dist.<br>1d/5d/21d",
+            "Return Dist.<br>1d/5d/30d",
             "Rolling Vol<br>Regimes",
             "OVX vs<br>Realised Vol",
             "CL-OVX<br>Correlation",
