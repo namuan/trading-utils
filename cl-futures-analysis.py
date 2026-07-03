@@ -504,28 +504,41 @@ def add_return_histogram(fig, df, row):
         row=row,
         col=1,
     )
-    # Bucket reference lines + counts
+    # Bucket reference lines. Keep the bucket counts in one compact annotation
+    # instead of labeling every vertical line; individual labels overlap badly
+    # on the probability chart, especially around ±0.5%, ±1%, and ±2%.
     total = len(r1)
+    bucket_labels = []
     for b in RETURN_BUCKETS:
         inside = (r1.abs() <= b).sum()
         pct = inside / total * 100 if total else 0
+        bucket_labels.append(f"±{b}%: {pct:.0f}%")
         fig.add_vline(
             x=b, line_dash="dot", line_color="grey", line_width=0.6, row=row, col=1
         )
         fig.add_vline(
             x=-b, line_dash="dot", line_color="grey", line_width=0.6, row=row, col=1
         )
-        fig.add_annotation(
-            x=b,
-            y=0.92,
-            yref=f"y{row} domain",
-            text=f"±{b}%: {pct:.0f}% of days",
-            showarrow=False,
-            yanchor="bottom",
-            font=dict(size=9, color="grey"),
-            row=row,
-            col=1,
-        )
+    fig.add_annotation(
+        x=0.01,
+        y=0.98,
+        xref="x domain",
+        yref="y domain",
+        text="1d abs-return coverage: "
+        + " · ".join(bucket_labels[:4])
+        + "<br>"
+        + " · ".join(bucket_labels[4:]),
+        showarrow=False,
+        xanchor="left",
+        yanchor="top",
+        align="left",
+        bgcolor="rgba(255,255,255,0.75)",
+        bordercolor="rgba(128,128,128,0.25)",
+        borderwidth=1,
+        font=dict(size=10, color="#555"),
+        row=row,
+        col=1,
+    )
     fig.update_yaxes(title_text="Probability", row=row, col=1)
     fig.update_xaxes(title_text="Return (%)", row=row, col=1)
     fig.update_layout(barmode="overlay")
