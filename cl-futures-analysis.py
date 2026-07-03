@@ -15,19 +15,17 @@ Pulls daily history for the front-month WTI crude oil continuous contract (CL=F)
 and the CBOE Crude Oil Volatility Index (^OVX) from Yahoo Finance, and produces
 a multi-panel interactive Plotly report covering:
 
-  1. Headline numbers: last close, multi-horizon returns, max drawdown, vol regime
-  2. Price + 50/200-day moving averages + volume + OVX overlay (secondary axis)
-  3. Return distribution histogram (1d, 5d, 21d) with bucket bands
-  4. Weekday seasonality (mean/median returns and intraday range by weekday)
-  5. Rolling annualised volatility with regime bands
-     (calm < 25%, normal 25-45%, elevated 45-70%, crisis > 70%)
-  6. Underwater (drawdown) plot and top-N drawdowns
-  7. OVX level vs CL=F 21d realised vol (implied vs realised) with OVX regime
-     bands (low < 30, normal 30-45, high 45-60, panic >= 60)
-  8. Rolling 30d/60d correlation between CL=F and OVX daily returns
+   1. Headline numbers: last close, multi-horizon returns, max drawdown, vol regime
+   2. Price + 50/200-day moving averages + volume + OVX overlay (secondary axis)
+   3. Return distribution histogram (1d, 5d, 21d) with bucket bands
+   4. Rolling annualised volatility with regime bands
+      (calm < 25%, normal 25-45%, elevated 45-70%, crisis > 70%)
+   5. OVX level vs CL=F 21d realised vol (implied vs realised) with OVX regime
+      bands (low < 30, normal 30-45, high 45-60, panic >= 60)
+   6. Rolling 30d/60d correlation between CL=F and OVX daily returns
 
 OVX integration is graceful: if Yahoo returns no ^OVX data (only ~5y of history
-is available, and the call itself can fail), rows 7 and 8 render a "data
+is available, and the call itself can fail), rows 5 and 6 render a "data
 unavailable" placeholder and row 1 omits the OVX overlay — the rest of the
 report is unaffected.
 
@@ -98,17 +96,6 @@ MA200_COLOR = "#ff7f0e"
 VOL_COLOR = "#9467bd"
 OVX_COLOR = "#8c564b"  # brown, distinct from the purple realised-vol line
 OVX_CORR_COLOR = "#17becf"
-DRAWDOWN_COLOR = "#d62728"
-WEEKDAY_COLORS = {
-    "Monday": "#1f77b4",
-    "Tuesday": "#ff7f0e",
-    "Wednesday": "#2ca02c",
-    "Thursday": "#d62728",
-    "Friday": "#9467bd",
-}
-
-WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-
 
 # ---- Boilerplate (logging + args) --------------------------------------------
 
@@ -220,7 +207,7 @@ def fetch_ovx(start_date, end_date):
 
 
 def add_features(df, ovx=None):
-    """Add returns, moving averages, rolling vol, drawdown, weekday columns.
+    """Add returns, moving averages, rolling vol, drawdown columns.
 
     If `ovx` is provided (DataFrame with 'Close' for ^OVX), also merge in:
       - ovx_close       : OVX level aligned to CL trading days
@@ -248,10 +235,6 @@ def add_features(df, ovx=None):
     # Drawdown from running all-time-high
     running_max = out["Close"].cummax()
     out["drawdown"] = out["Close"] / running_max - 1.0
-
-    # Calendar features
-    out["weekday"] = out.index.day_name()
-    out["year"] = out.index.year
 
     # Optional OVX merge
     if ovx is not None and not ovx.empty:
@@ -333,97 +316,6 @@ def print_headline(df):
     dd = df["drawdown"]
     print(f"    current  : {dd.iloc[-1] * 100:.2f}%")
     print(f"    max DD   : {dd.min() * 100:.2f}%")
-    print()
-
-
-def print_weekday_summary(df):
-    print("  Weekday seasonality (close-to-close %):")
-    rows = []
-    grouped = df.dropna(subset=["ret_1d"]).groupby("weekday")["ret_1d"]
-    for day in WEEKDAY_NAMES:
-        if day in grouped.groups:
-            s = grouped.get_group(day)
-            rows.append(
-                (
-                    day,
-                    len(s),
-                    s.mean() * 100,
-                    s.median() * 100,
-                    s.std() * 100,
-                    (s > 0).mean() * 100,
-                )
-            )
-    if not rows:
-        print("    (insufficient data)")
-        return
-    print(
-        f"    {'weekday':<10} {'days':>5} {'mean':>8} {'median':>8} "
-        f"{'std':>8} {'%up':>7}"
-    )
-    for day, n, m, med, sd, pup in rows:
-        print(
-            f"    {day:<10} {n:>5d} {m:>+7.3f}% {med:>+7.3f}% {sd:>7.3f}% {pup:>6.1f}%"
-        )
-    print()
-    print("  Weekday intraday range (High-Low, $):")
-    df2 = df.copy()
-    df2["range"] = df2["High"] - df2["Low"]
-    rg = df2.groupby("weekday")["range"]
-    for day in WEEKDAY_NAMES:
-        if day in rg.groups:
-            s = rg.get_group(day)
-            print(
-                f"    {day:<10} mean={s.mean():5.2f}  "
-                f"median={s.median():5.2f}  max={s.max():5.2f}"
-            )
-    print()
-
-
-def print_top_drawdowns(df, n=5):
-    """Walk through the drawdown series and report the top N drawdowns."""
-    dd = df["drawdown"].fillna(0)
-    in_dd = False
-    start = None
-    trough_val = 0
-    trough_date = None
-    events = []
-    for dt, val in dd.items():
-        if val < 0 and not in_dd:
-            in_dd = True
-            start = dt
-            trough_val = val
-            trough_date = dt
-        elif val < 0 and in_dd:
-            if val < trough_val:
-                trough_val = val
-                trough_date = dt
-        else:  # val == 0
-            if in_dd:
-                events.append((start, trough_date, trough_val))
-                in_dd = False
-    if in_dd:
-        events.append((start, trough_date, trough_val))
-
-    # The peak before the trough is approximated as the date the drawdown began;
-    # for accuracy, locate the running-high date at trough_date.
-    detailed = []
-    for start, trough, val in events:
-        peak_idx = df["Close"].loc[:start].idxmax()
-        recovery = df["Close"].loc[trough:]
-        rec_date = recovery[recovery >= df["Close"].loc[peak_idx]].first_valid_index()
-        detailed.append(
-            (
-                peak_idx.date(),
-                trough.date(),
-                rec_date.date() if rec_date is not None else None,
-                val * 100,
-            )
-        )
-    detailed.sort(key=lambda r: r[3])  # worst first
-    print(f"  Top {min(n, len(detailed))} drawdowns:")
-    print(f"    {'peak':<12} {'trough':<12} {'recovered':<12} {'drawdown':>10}")
-    for peak, trough, rec, val in detailed[:n]:
-        print(f"    {str(peak):<12} {str(trough):<12} {str(rec):<12} {val:>+9.2f}%")
     print()
 
 
@@ -639,37 +531,6 @@ def add_return_histogram(fig, df, row):
     fig.update_layout(barmode="overlay")
 
 
-def add_weekday_box(fig, df, row):
-    df2 = df.dropna(subset=["ret_1d"]).copy()
-    df2["ret_pct"] = df2["ret_1d"] * 100
-    for day in WEEKDAY_NAMES:
-        sub = df2[df2["weekday"] == day]
-        if sub.empty:
-            continue
-        fig.add_trace(
-            go.Box(
-                y=sub["ret_pct"],
-                name=day,
-                marker_color=WEEKDAY_COLORS[day],
-                boxmean="sd",
-                boxpoints="outliers",
-                jitter=0.4,
-                pointpos=0,
-            ),
-            row=row,
-            col=1,
-        )
-    fig.update_yaxes(
-        title_text="Daily return (%)",
-        row=row,
-        col=1,
-        zeroline=True,
-        zerolinecolor="black",
-        zerolinewidth=0.8,
-    )
-    fig.update_xaxes(title_text="Weekday", row=row, col=1)
-
-
 def add_vol_regimes(fig, df, row):
     fig.add_trace(
         go.Scatter(
@@ -704,32 +565,6 @@ def add_vol_regimes(fig, df, row):
             col=1,
         )
     fig.update_yaxes(title_text="Ann. vol (%)", row=row, col=1)
-    fig.update_xaxes(title_text="Date", row=row, col=1)
-
-
-def add_drawdown(fig, df, row):
-    fig.add_trace(
-        go.Scatter(
-            x=df.index,
-            y=df["drawdown"] * 100,
-            mode="lines",
-            name="Drawdown",
-            line=dict(color=DRAWDOWN_COLOR, width=1.4),
-            fill="tozeroy",
-            fillcolor="rgba(214,39,40,0.18)",
-            showlegend=False,
-        ),
-        row=row,
-        col=1,
-    )
-    fig.update_yaxes(
-        title_text="Drawdown (%)",
-        row=row,
-        col=1,
-        zeroline=True,
-        zerolinecolor="black",
-        zerolinewidth=0.8,
-    )
     fig.update_xaxes(title_text="Date", row=row, col=1)
 
 
@@ -921,16 +756,14 @@ def build_combined_figure(df):
     # Row 1: price + 50/200 MAs (+ OVX overlay on secondary y, if present)
     # Row 2: volume bars + 21d vol overlay (secondary y, with regime bands)
     # Row 3: return distribution histogram (1d/5d/21d, with bucket lines)
-    # Row 4: weekday box plots
-    # Row 5: rolling 21d annualised vol with regime bands
-    # Row 6: drawdown (underwater) plot
-    # Row 7: OVX level vs CL realised vol (placeholder if OVX missing)
-    # Row 8: rolling CL-OVX return correlation (placeholder if OVX missing)
+    # Row 4: rolling 21d annualised vol with regime bands
+    # Row 5: OVX level vs CL realised vol (placeholder if OVX missing)
+    # Row 6: rolling CL-OVX return correlation (placeholder if OVX missing)
 
     has_ovx = "ovx_close" in df.columns and not df["ovx_close"].dropna().empty
 
     fig = make_subplots(
-        rows=8,
+        rows=6,
         cols=1,
         shared_xaxes=False,
         vertical_spacing=0.04,
@@ -938,17 +771,13 @@ def build_combined_figure(df):
             "Price &<br>50/200 MAs",
             "Volume & 21d<br>Ann. Vol",
             "Return Dist.<br>1d/5d/21d",
-            "Weekday<br>Seasonality",
             "Rolling Vol<br>Regimes",
-            "Drawdown<br>(Underwater)",
             "OVX vs<br>Realised Vol",
             "CL-OVX<br>Correlation",
         ],
         specs=[
             [{"secondary_y": has_ovx}],
             [{"secondary_y": True}],
-            [{"secondary_y": False}],
-            [{"secondary_y": False}],
             [{"secondary_y": False}],
             [{"secondary_y": False}],
             [{"secondary_y": False}],
@@ -962,18 +791,16 @@ def build_combined_figure(df):
     add_volume_bars(fig, df, row=2)
     add_vol_overlay(fig, df, row=2)
     add_return_histogram(fig, df, row=3)
-    add_weekday_box(fig, df, row=4)
-    add_vol_regimes(fig, df, row=5)
-    add_drawdown(fig, df, row=6)
-    add_ovx_vs_realised_vol(fig, df, row=7)
-    add_cl_ovx_correlation(fig, df, row=8)
+    add_vol_regimes(fig, df, row=4)
+    add_ovx_vs_realised_vol(fig, df, row=5)
+    add_cl_ovx_correlation(fig, df, row=6)
 
     # Match x-axes across time-series rows for clean zoom/pan.
-    # Always include rows 7 and 8: even when OVX is missing we still want
+    # Always include rows 5 and 6: even when OVX is missing we still want
     # the placeholder rows to share the master xaxis, otherwise the date
     # axis auto-ranges to a 64-year span (1970-today) instead of the
     # actual data range.
-    for r in (1, 2, 5, 6, 7, 8):
+    for r in (1, 2, 4, 5, 6):
         fig.update_xaxes(matches="x", row=r, col=1)
 
     # Plotly places the per-row title annotations at paper x=0.94, rotated
@@ -994,7 +821,7 @@ def build_combined_figure(df):
             xanchor="left",
         ),
         template="plotly_white",
-        height=280 * 8,
+        height=280 * 6,
         hovermode="x unified",
         barmode="overlay",
         # Horizontal legend docked under the figure title. Keep items compact
@@ -1035,8 +862,6 @@ def main(args):
 
     print_headline(df)
     print_ovx_summary(df)
-    print_weekday_summary(df)
-    print_top_drawdowns(df, n=5)
 
     fig = build_combined_figure(df)
 
