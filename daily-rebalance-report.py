@@ -787,46 +787,6 @@ def create_tqqq_chart(results_df, use_alternate: bool = True):
     return fig
 
 
-def calculate_cagr(equity, years):
-    """Calculate annualized return."""
-    return (equity ** (1 / years)) - 1 if years > 0 else 0
-
-
-def calculate_sharpe(returns, volatility):
-    """Calculate Sharpe ratio."""
-    return (returns.mean() * 252) / volatility if volatility > 0 else 0
-
-
-def calculate_max_drawdown(equity):
-    """Calculate maximum drawdown."""
-    return ((equity - equity.cummax()) / equity.cummax()).min()
-
-
-def calculate_performance_metrics(results_df):
-    """Calculate all performance metrics."""
-    strategy_equity = (1 + results_df["strategy_returns"]).cumprod()
-    benchmark_equity = (1 + results_df["tqqq_returns"]).cumprod()
-    total_years = len(results_df) / 252
-
-    return {
-        "strategy_equity": strategy_equity,
-        "benchmark_equity": benchmark_equity,
-        "strategy_cagr": calculate_cagr(strategy_equity.iloc[-1], total_years),
-        "benchmark_cagr": calculate_cagr(benchmark_equity.iloc[-1], total_years),
-        "strategy_vol": results_df["strategy_returns"].std() * np.sqrt(252),
-        "benchmark_vol": results_df["tqqq_returns"].std() * np.sqrt(252),
-        "strategy_sharpe": calculate_sharpe(
-            results_df["strategy_returns"],
-            results_df["strategy_returns"].std() * np.sqrt(252),
-        ),
-        "benchmark_sharpe": calculate_sharpe(
-            results_df["tqqq_returns"], results_df["tqqq_returns"].std() * np.sqrt(252)
-        ),
-        "strategy_dd": calculate_max_drawdown(strategy_equity),
-        "benchmark_dd": calculate_max_drawdown(benchmark_equity),
-    }
-
-
 def generate_tqqq_stats(results_df, use_alternate: bool = True) -> str:
     """Generate statistics summary for TQQQ volatility bucket strategy."""
     if results_df.empty:
@@ -834,19 +794,10 @@ def generate_tqqq_stats(results_df, use_alternate: bool = True) -> str:
         return "<h3>TQQQ Analysis Unavailable</h3><p>Insufficient data for analysis period.</p>"
 
     latest = results_df.iloc[-1]
-    metrics = calculate_performance_metrics(results_df)
     alternate_label = ALTERNATE_TICKER if use_alternate else "Cash"
 
     stats = f"""
     <h3>TQQQ Volatility Bucket Strategy Statistics</h3>
-    <table>
-        <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
-        <tr><td>CAGR</td><td>{metrics["strategy_cagr"]:.2%}</td><td>{metrics["benchmark_cagr"]:.2%}</td></tr>
-        <tr><td>Volatility</td><td>{metrics["strategy_vol"]:.2%}</td><td>{metrics["benchmark_vol"]:.2%}</td></tr>
-        <tr><td>Sharpe Ratio</td><td>{metrics["strategy_sharpe"]:.2f}</td><td>{metrics["benchmark_sharpe"]:.2f}</td></tr>
-        <tr><td>Max Drawdown</td><td>{metrics["strategy_dd"]:.2%}</td><td>{metrics["benchmark_dd"]:.2%}</td></tr>
-        <tr><td>Final Equity</td><td>${metrics["strategy_equity"].iloc[-1]:.2f}</td><td>${metrics["benchmark_equity"].iloc[-1]:.2f}</td></tr>
-    </table>
     <h3>Current Position</h3>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>
@@ -1027,20 +978,11 @@ def generate_regime_stats(results_df) -> str:
         return "<h3>TQQQ Regime Analysis Unavailable</h3><p>Insufficient data for analysis period.</p>"
 
     latest = results_df.iloc[-1]
-    metrics = calculate_performance_metrics(results_df)
     regime_counts = results_df["regime"].value_counts()
     total_days = len(results_df)
 
     stats = f"""
     <h3>TQQQ Volatility Regime Strategy Statistics</h3>
-    <table>
-        <tr><th>Metric</th><th>Strategy</th><th>TQQQ B&H</th></tr>
-        <tr><td>CAGR</td><td>{metrics["strategy_cagr"]:.2%}</td><td>{metrics["benchmark_cagr"]:.2%}</td></tr>
-        <tr><td>Volatility</td><td>{metrics["strategy_vol"]:.2%}</td><td>{metrics["benchmark_vol"]:.2%}</td></tr>
-        <tr><td>Sharpe Ratio</td><td>{metrics["strategy_sharpe"]:.2f}</td><td>{metrics["benchmark_sharpe"]:.2f}</td></tr>
-        <tr><td>Max Drawdown</td><td>{metrics["strategy_dd"]:.2%}</td><td>{metrics["benchmark_dd"]:.2%}</td></tr>
-        <tr><td>Final Equity</td><td>${metrics["strategy_equity"].iloc[-1]:.2f}</td><td>${metrics["benchmark_equity"].iloc[-1]:.2f}</td></tr>
-    </table>
     <h3>Current Regime Status</h3>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>
