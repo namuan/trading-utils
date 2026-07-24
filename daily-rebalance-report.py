@@ -1021,6 +1021,12 @@ SPREAD_DEFS = [
     ("^TYX", "^TNX", "30y-10y"),
 ]
 
+# Treasury curve regime configuration. Yield tickers are quoted in percentage
+# points, so a one-point difference equals 100 basis points.
+TREASURY_REGIME_LOOKBACK_DAYS = 20
+TREASURY_REGIME_DEADBAND_BPS = 10
+TREASURY_REGIME_PERSISTENCE_DAYS = 3
+
 YIELD_COLORS = {
     "^IRX": "#1f77b4",
     "^FVX": "#ff7f0e",
@@ -1052,6 +1058,76 @@ def build_treasury_frame(data):
     for t1, t2, name in SPREAD_DEFS:
         if t1 in frame.columns and t2 in frame.columns:
             frame[name] = frame[t1] - frame[t2]
+    return calculate_treasury_regimes(frame)
+
+
+def apply_treasury_regime_persistence(candidates, persistence_days):
+    """Confirm a Treasury regime only after consecutive matching candidates."""
+    confirmed = []
+    current_regime = None
+    pending_regime = None
+    pending_days = 0
+
+    for candidate in candidates:
+        if pd.isna(candidate):
+            confirmed.append(np.nan)
+            continue
+
+        if current_regime is None:
+            current_regime = candidate
+            pending_regime = None
+            pending_days = 0
+        elif candidate == current_regime:
+            pending_regime = None
+            pending_days = 0
+        elif candidate == pending_regime:
+            pending_days += 1
+            if pending_days >= persistence_days:
+                current_regime = candidate
+                pending_regime = None
+                pending_days = 0
+        else:
+            pending_regime = candidate
+            pending_days = 1
+
+        confirmed.append(current_regime)
+
+    return pd.Series(confirmed, index=candidates.index, dtype=object)
+
+
+def calculate_treasury_regimes(frame):
+    """Classify curve direction and shape with a short confirmation period."""
+    required_columns = {"^TNX", "10y-3mo"}
+    if not required_columns.issubset(frame.columns):
+        logging.warning("Treasury regime analysis requires ^TNX and 10y-3mo data")
+        return frame
+
+    frame = frame.copy()
+    yield_change = frame["^TNX"].diff(TREASURY_REGIME_LOOKBACK_DAYS) * 100
+    spread_change = frame["10y-3mo"].diff(TREASURY_REGIME_LOOKBACK_DAYS) * 100
+    frame["10Y_Change_20D_Bps"] = yield_change
+    frame["10Y_3M_Change_20D_Bps"] = spread_change
+    frame["Curve_Status"] = np.where(frame["10y-3mo"] < 0, "INVERTED", "NORMAL")
+
+    candidates = pd.Series(np.nan, index=frame.index, dtype=object)
+    valid = yield_change.notna() & spread_change.notna()
+    rising_yields = yield_change > TREASURY_REGIME_DEADBAND_BPS
+    falling_yields = yield_change < -TREASURY_REGIME_DEADBAND_BPS
+    steepening = spread_change > TREASURY_REGIME_DEADBAND_BPS
+    flattening = spread_change < -TREASURY_REGIME_DEADBAND_BPS
+
+    candidates.loc[valid & rising_yields & steepening] = "BEAR_STEEPENING"
+    candidates.loc[valid & falling_yields & steepening] = "BULL_STEEPENING"
+    candidates.loc[valid & rising_yields & flattening] = "BEAR_FLATTENING"
+    candidates.loc[valid & falling_yields & flattening] = "BULL_FLATTENING"
+    candidates.loc[valid & candidates.isna()] = "RANGE_BOUND"
+    candidates.loc[valid & (frame["Curve_Status"] == "INVERTED")] = (
+        "INVERTED: " + candidates.loc[valid & (frame["Curve_Status"] == "INVERTED")]
+    )
+
+    frame["Treasury_Regime"] = apply_treasury_regime_persistence(
+        candidates, TREASURY_REGIME_PERSISTENCE_DAYS
+    )
     return frame
 
 
@@ -1121,7 +1197,8 @@ def create_treasury_chart(frame, spy):
     )
 
     r = 3 + len(tickers)
-    latest = frame.dropna().iloc[-1]
+    available_tickers = [ticker for ticker in tickers if ticker in frame.columns]
+    latest = frame.dropna(subset=available_tickers).iloc[-1]
     vals = [latest[t] for t in tickers if t in latest.index]
     if vals:
         fig.add_trace(
@@ -1140,6 +1217,35 @@ def create_treasury_chart(frame, spy):
         )
     fig.update_xaxes(title_text="Tenor", row=r, col=1)
 
+    spread_row = 2 + len(tickers)
+    if {"Treasury_Regime", "10y-3mo"}.issubset(frame.columns):
+        regimes = frame["Treasury_Regime"].dropna()
+        transitions = regimes[regimes.ne(regimes.shift())].tail(12)
+        if not transitions.empty:
+            fig.add_trace(
+                go.Scatter(
+                    x=transitions.index,
+                    y=frame.loc[transitions.index, "10y-3mo"],
+                    mode="markers",
+                    name="Regime transition",
+                    marker=dict(color="#7f7f7f", size=8, symbol="diamond"),
+                    text=transitions.values,
+                    hovertemplate="%{x|%Y-%m-%d}<br>%{text}<extra></extra>",
+                ),
+                row=spread_row,
+                col=1,
+            )
+            for transition_date in transitions.index:
+                fig.add_vline(
+                    x=transition_date,
+                    line_dash="dot",
+                    line_color="#7f7f7f",
+                    opacity=0.35,
+                    line_width=1,
+                    row=spread_row,
+                    col=1,
+                )
+
     for r in range(1, n_rows):
         fig.update_xaxes(matches="x", row=r, col=1)
 
@@ -1149,8 +1255,8 @@ def create_treasury_chart(frame, spy):
 
 
 def generate_treasury_stats(frame) -> str:
-    latest = frame.dropna().iloc[-1]
-    ticks = [t for t in YIELD_TICKERS if t in latest.index]
+    ticks = [ticker for ticker in YIELD_TICKERS if ticker in frame.columns]
+    latest = frame.dropna(subset=ticks).iloc[-1]
 
     rows = "".join(
         f"<tr><td>{YIELD_TICKERS[t]}</td><td>{latest[t]:.2f}%</td></tr>" for t in ticks
@@ -1167,10 +1273,27 @@ def generate_treasury_stats(frame) -> str:
         for t in ticks
     )
 
+    regime_stats = ""
+    if "Treasury_Regime" in frame.columns and pd.notna(latest["Treasury_Regime"]):
+        regimes = frame["Treasury_Regime"].dropna()
+        current_regime = latest["Treasury_Regime"]
+        regime_start = regimes[regimes.ne(regimes.shift())].index[-1]
+        regime_stats = f"""
+        <table>
+            <tr><th>Regime metric</th><th>Value</th></tr>
+            <tr><td>Current Treasury Regime</td><td>{current_regime}</td></tr>
+            <tr><td>Curve Status</td><td>{latest["Curve_Status"]}</td></tr>
+            <tr><td>Regime Since</td><td>{regime_start.strftime("%Y-%m-%d")}</td></tr>
+            <tr><td>20-Day 10-Year Yield Change</td><td>{latest["10Y_Change_20D_Bps"]:.0f} bps</td></tr>
+            <tr><td>20-Day 10y–3mo Spread Change</td><td>{latest["10Y_3M_Change_20D_Bps"]:.0f} bps</td></tr>
+        </table>
+        """
+
     return f"""
     <h3>Treasury Yield Statistics</h3>
     <table><tr><th>Tenor</th><th>Yield</th></tr>{rows}</table>
     <table><tr><th>Spread</th><th>Value</th></tr>{spreads}</table>
+    {regime_stats}
     <table><tr><th>Tenor</th><th>Min</th><th>Max</th><th>Avg</th><th>Current</th></tr>{summary}</table>
     """
 
@@ -1334,6 +1457,7 @@ def generate_html_report(
             <div class="section">
                 <h2>5. Treasury Yield Analysis</h2>
                 <p>US Treasury yields across the curve: 3-month T-Bill, 5-year, 10-year, and 30-year bonds.</p>
+                <p><strong>Treasury regime:</strong> Classifies 20-day changes in the 10-year yield and the 10y–3mo spread as bull/bear steepening or flattening. Regime changes require {TREASURY_REGIME_PERSISTENCE_DAYS} consecutive trading days; an inverted curve is labelled separately.</p>
                 {treasury_stats}
                 <div class="plotly-chart">{treasury_html}</div>
             </div>
