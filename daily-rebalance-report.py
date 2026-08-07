@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # dependencies = [
-#   "pandas",
+#   "pandas<3",
 #   "numpy",
 #   "yfinance",
 #   "stockstats",
@@ -139,7 +139,16 @@ def fetch_all_symbols(
 
 def calculate_ivts(market_data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Calculate IVTS (Implied Volatility Term Structure) ratio."""
-    df = pd.DataFrame()
+    # Build the frame on the union of all ticker indexes explicitly.
+    # pandas >= 3.0 no longer unions the index on column assignment, so if the
+    # first column assigned (^VIX9D) has missing/stale data, the whole frame
+    # (including SPY) would silently be truncated to its index.
+    idx = (
+        market_data["^VIX9D"]
+        .index.union(market_data["^VIX"].index)
+        .union(market_data["SPY"].index)
+    )
+    df = pd.DataFrame(index=idx)
     df["Short_Term_VIX"] = market_data["^VIX9D"]["Close"]
     df["Long_Term_VIX"] = market_data["^VIX"]["Close"]
     df["IVTS"] = df["Short_Term_VIX"] / df["Long_Term_VIX"]
