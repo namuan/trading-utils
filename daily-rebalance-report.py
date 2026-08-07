@@ -41,11 +41,13 @@ import webbrowser
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 from enum import Enum
+from io import StringIO
 from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import requests
 import schedule
 import yfinance as yf
 from persistent_cache import PersistentCache
@@ -102,6 +104,13 @@ REGIME_PERSISTENCE_DAYS = {
 # Panic daily drop threshold
 PANIC_DAILY_DROP = -0.04
 
+# Official Cboe daily VIX9D history. Yahoo Finance can have gaps in this
+# series, so Cboe is used as the authoritative source for the short-term leg
+# of the IVTS calculation.
+CBOE_VIX9D_HISTORY_URL = (
+    "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX9D_History.csv"
+)
+
 
 def setup_logging(verbosity):
     levels = {0: logging.WARNING, 1: logging.INFO}
@@ -130,6 +139,82 @@ def fetch_all_symbols(
     return {
         symbol: fetch_market_data(symbol, start_date, end_date) for symbol in symbols
     }
+
+
+def extract_close_series(data: pd.DataFrame) -> pd.Series:
+    """Extract a Close series from single- or multi-level market data."""
+    close = data["Close"]
+    if isinstance(close, pd.DataFrame):
+        close = close.iloc[:, 0]
+    return close.rename("Close")
+
+
+def fetch_cboe_vix9d_data(start_date: str, end_date: str) -> pd.DataFrame:
+    """Fetch official daily VIX9D history from Cboe."""
+    logging.info("Fetching VIX9D data from Cboe")
+    response = requests.get(
+        CBOE_VIX9D_HISTORY_URL,
+        headers={"User-Agent": "daily-rebalance-report/1.0"},
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    data = pd.read_csv(StringIO(response.text))
+    data.columns = [str(column).strip().upper() for column in data.columns]
+    required_columns = {"DATE", "CLOSE"}
+    if not required_columns.issubset(data.columns):
+        raise ValueError(
+            f"Cboe VIX9D response is missing columns: "
+            f"{sorted(required_columns - set(data.columns))}"
+        )
+
+    data["DATE"] = pd.to_datetime(data["DATE"], errors="coerce").dt.normalize()
+    data["CLOSE"] = pd.to_numeric(data["CLOSE"], errors="coerce")
+    close = (
+        data.dropna(subset=["DATE", "CLOSE"]).set_index("DATE")["CLOSE"].sort_index()
+    )
+    close = close[~close.index.duplicated(keep="last")].rename("Close")
+
+    start = pd.Timestamp(start_date).normalize()
+    end = pd.Timestamp(end_date).normalize()
+    close = close[(close.index >= start) & (close.index < end)]
+    if close.empty:
+        raise ValueError(
+            f"Cboe returned no VIX9D data between {start_date} and {end_date}"
+        )
+
+    logging.info(
+        "Cboe VIX9D data covers %s to %s (%d rows)",
+        close.index.min().date(),
+        close.index.max().date(),
+        len(close),
+    )
+    return pd.DataFrame({"Close": close})
+
+
+def fetch_vix9d_data(start_date: str, end_date: str) -> pd.DataFrame:
+    """Fetch VIX9D from Cboe, supplementing it with Yahoo if necessary."""
+    try:
+        cboe_data = fetch_cboe_vix9d_data(start_date, end_date)
+        cboe_close = extract_close_series(cboe_data)
+    except Exception as error:
+        logging.warning(
+            "Unable to fetch VIX9D from Cboe; falling back to Yahoo Finance: %s",
+            error,
+        )
+        return fetch_market_data("^VIX9D", start_date, end_date)
+
+    # Keep any Yahoo dates that Cboe does not yet publish, while preferring
+    # Cboe on overlapping dates because it is the index publisher.
+    try:
+        yahoo_close = extract_close_series(
+            fetch_market_data("^VIX9D", start_date, end_date)
+        )
+        close = cboe_close.combine_first(yahoo_close).sort_index()
+        return pd.DataFrame({"Close": close})
+    except Exception as error:
+        logging.warning("Unable to supplement Cboe VIX9D data with Yahoo: %s", error)
+        return cboe_data
 
 
 # ============================================================================
@@ -1490,10 +1575,10 @@ def generate_html_report(
 def run_vix_signals_analysis(start_date, end_date):
     """Run VIX signals analysis."""
     logging.info("Running VIX Signals Analysis...")
-    vix_symbols = ["^VIX9D", "^VIX", "SPY"]
-    vix_market_data = fetch_all_symbols(
-        vix_symbols, start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
-    )
+    start = start_date.strftime("%Y-%m-%d")
+    end = end_date.strftime("%Y-%m-%d")
+    vix_market_data = fetch_all_symbols(["^VIX", "SPY"], start, end)
+    vix_market_data["^VIX9D"] = fetch_vix9d_data(start, end)
     vix_df = calculate_ivts(vix_market_data)
     vix_df = calculate_vix_signals(vix_df)
     return create_vix_signals_chart(vix_df), generate_vix_signals_stats(vix_df)
