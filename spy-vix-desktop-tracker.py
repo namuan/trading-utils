@@ -95,10 +95,13 @@ def fetch_ohlcv(ticker):
             rows.append(
                 {
                     "time": int(ts.timestamp()),
-                    "open": round(float(row["Open"]), 2),
-                    "high": round(float(row["High"]), 2),
-                    "low": round(float(row["Low"]), 2),
-                    "close": round(float(row["Close"]), 2),
+                    # keep full cent-level precision (rounded to 4dp only to
+                    # strip yfinance float noise) so tiny VIX moves are not
+                    # rounded into +0.00 before the 30m math runs
+                    "open": round(float(row["Open"]), 4),
+                    "high": round(float(row["High"]), 4),
+                    "low": round(float(row["Low"]), 4),
+                    "close": round(float(row["Close"]), 4),
                     "datetime": ts,
                 }
             )
@@ -119,17 +122,20 @@ def latest_price_and_change(ticker, candles):
     return last, chg, round(chg / pc * 100, 2)
 
 
-def rolling_movement(candles, n=ROLLUP_CANDLES):
+def rolling_movement(candles, n=ROLLUP_CANDLES, decimals=2):
     if len(candles) < 2:
         return None, None, None, None
     recent = candles[-n:] if len(candles) >= n else candles
     start = recent[0]["close"]
     end = recent[-1]["close"]
-    chg = round(end - start, 2)
-    pct = round(chg / start * 100, 2) if start else None
+    chg_raw = end - start
+    # pct uses the unrounded change; chg/rng round to the requested precision
+    # (fine for SPY at 2dp, VIX at 3dp).
+    chg = round(chg_raw, decimals)
+    pct = round(chg_raw / start * 100, 2) if start else None
     hi = max(c["high"] for c in recent)
     lo = min(c["low"] for c in recent)
-    rng = round(hi - lo, 2)
+    rng = round(hi - lo, decimals)
     return chg, pct, rng, round(rng / start * 100, 2) if start else None
 
 
@@ -197,7 +203,10 @@ class DataFetcher(QObject):
         spy_val, spy_chg, spy_pct = latest_price_and_change("SPY", spy)
         vix_val, vix_chg, vix_pct = latest_price_and_change("^VIX", vix)
         s30c, s30p, s30r, s30rp = rolling_movement(spy)
-        v30c, v30p, _, _ = rolling_movement(vix)
+        # VIX sits at ~15-20 where a cent move can round to 0.00 at 2dp;
+        # use 3dp so real drift is visible and relation() can flag a
+        # micro-divergence instead of swallowing it.
+        v30c, v30p, _, _ = rolling_movement(vix, decimals=3)
         rel, rel_detail = relation(s30c, v30c)
         return {
             "spy": spy,
@@ -286,7 +295,11 @@ class CandlestickCanvas(FigureCanvasQTAgg):
                 edgecolor=color,
                 linewidth=0.5,
             )
-        self.ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+        # Candles carry ET-aware timestamps, but matplotlib's date2num
+        # converts them to UTC ordinals, so the bare formatter labels the
+        # axis UTC (+4h vs the ET footer). Pin tz to US/Eastern so the
+        # chart axis matches the status bar.
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=TIMEZONE))
         self.ax.xaxis.set_major_locator(mdates.AutoDateLocator())
         self.fig.autofmt_xdate(rotation=0, ha="center")
         self.fig.tight_layout()
@@ -410,10 +423,10 @@ class MainWindow(QMainWindow):
         self._update_stats(d)
 
     def _update_stats(self, d):
-        def fmt_chg(v):
+        def fmt_chg(v, decimals=2):
             if v is None:
                 return "—"
-            return f"{'+' if v >= 0 else ''}{v:.2f}"
+            return f"{'+' if v >= 0 else ''}{v:.{decimals}f}"
 
         def fmt_pct(v):
             if v is None:
@@ -433,7 +446,7 @@ class MainWindow(QMainWindow):
         rel_detail = d.get("relation_detail", "")
 
         self.cards["spy30m"].set_value(fmt_chg(s30c), cls(s30c), fmt_pct(s30p))
-        self.cards["vix30m"].set_value(fmt_chg(v30c), cls(v30c), fmt_pct(v30p))
+        self.cards["vix30m"].set_value(fmt_chg(v30c, 3), cls(v30c), fmt_pct(v30p))
         range_text = f"${s30r:.2f}" if s30r is not None else "—"
         range_sub = f"{s30rp:.2f}% range" if s30rp is not None else ""
         self.cards["spy_range"].set_value(range_text, "neut", range_sub)
