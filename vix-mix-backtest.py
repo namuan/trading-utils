@@ -8,7 +8,7 @@
 # ]
 # ///
 """
-Backtest a VIX Mix-style signal against SPY or QQQ.
+Backtest a VIX Mix-style signal against any supported market ticker.
 
 The score is calculated using the shared implementation in vix-mix-signal.py.
 Bullish scores enter a long position, bearish scores exit to cash, and neutral
@@ -18,7 +18,7 @@ the next session's open.
 Usage:
 ./vix-mix-backtest.py -h
 ./vix-mix-backtest.py --symbol SPY --start 2005-01-01
-./vix-mix-backtest.py --symbol QQQ --neutral-low 30 --neutral-high 70 --fee-bps 5
+./vix-mix-backtest.py --symbol TQQQ --neutral-low 30 --neutral-high 70 --fee-bps 5
 ./vix-mix-backtest.py --symbol SPY --output-csv output/vix-mix-backtest.csv
 """
 
@@ -50,9 +50,8 @@ def parse_args():
     vix_mix_signal.add_signal_arguments(parser)
     parser.add_argument(
         "--symbol",
-        choices=("SPY", "QQQ"),
         default="SPY",
-        help="ETF to trade (default: SPY).",
+        help="Ticker to trade, such as SPY, QQQ, TQQQ, or AAPL (default: SPY).",
     )
     parser.add_argument(
         "--initial-capital",
@@ -86,17 +85,29 @@ def create_target_position(scores, neutral_low, neutral_high):
 
 
 def run_backtest(
-    signal_scores, open_prices, initial_capital, fee_bps, neutral_low, neutral_high
+    signal_scores,
+    open_prices,
+    initial_capital,
+    fee_bps,
+    neutral_low,
+    neutral_high,
+    spy_open_prices=None,
 ):
     target = create_target_position(signal_scores, neutral_low, neutral_high)
+    if spy_open_prices is None:
+        spy_open_prices = open_prices
     data = pd.concat(
-        [signal_scores.rename("score"), open_prices.rename("open")],
+        [
+            signal_scores.rename("score"),
+            open_prices.rename("open"),
+            spy_open_prices.rename("spy_open"),
+        ],
         axis=1,
         join="inner",
-    ).dropna(subset=["score", "open"])
+    ).dropna(subset=["score", "open", "spy_open"])
     if data.empty:
         raise RuntimeError(
-            "No overlapping dates with a valid VIX Mix score and trading price"
+            "No overlapping dates with a valid VIX Mix score and both trading and SPY prices"
         )
 
     data["target_position"] = target.reindex(data.index).fillna(0)
@@ -104,7 +115,9 @@ def run_backtest(
     data["turnover"] = data["position"].diff().abs()
     if len(data):
         data.iloc[0, data.columns.get_loc("turnover")] = abs(data["position"].iloc[0])
-    data["market_return"] = data["open"].pct_change().fillna(0)
+    data["market_return"] = data["open"].shift(-1) / data["open"] - 1
+    data["spy_return"] = data["spy_open"].shift(-1) / data["spy_open"] - 1
+    data = data.dropna(subset=["market_return", "spy_return"])
     data["strategy_return"] = (
         data["position"] * data["market_return"] - data["turnover"] * fee_bps / 10000
     )
@@ -113,6 +126,7 @@ def run_backtest(
     data["benchmark_equity"] = (
         initial_capital * (1 + data["benchmark_return"]).cumprod()
     )
+    data["spy_equity"] = initial_capital * (1 + data["spy_return"]).cumprod()
     return data
 
 
@@ -169,6 +183,17 @@ def main(args):
     if prices.empty or "Open" not in prices:
         raise RuntimeError(f"No opening-price data available for {args.symbol}")
     open_prices = pd.to_numeric(prices["Open"], errors="coerce").rename("open")
+    if args.symbol == "SPY":
+        spy_open_prices = open_prices
+    else:
+        spy_prices = download_ticker_data("SPY", start=args.start, end=args.end)
+        if isinstance(spy_prices.columns, pd.MultiIndex):
+            spy_prices.columns = spy_prices.columns.get_level_values(0)
+        if spy_prices.empty or "Open" not in spy_prices:
+            raise RuntimeError("No opening-price data available for SPY benchmark")
+        spy_open_prices = pd.to_numeric(spy_prices["Open"], errors="coerce").rename(
+            "spy_open"
+        )
 
     data = run_backtest(
         signal["score"],
@@ -177,12 +202,16 @@ def main(args):
         args.fee_bps,
         args.neutral_low,
         args.neutral_high,
+        spy_open_prices=spy_open_prices,
     )
     strategy_metrics = calculate_metrics(
         data, "strategy_equity", "strategy_return", args.initial_capital
     )
     benchmark_metrics = calculate_metrics(
         data, "benchmark_equity", "benchmark_return", args.initial_capital
+    )
+    spy_metrics = calculate_metrics(
+        data, "spy_equity", "spy_return", args.initial_capital
     )
     entries = (
         (data["position"] == 1) & (data["position"].shift(1).fillna(0) == 0)
@@ -200,6 +229,8 @@ def main(args):
     print_metrics("Strategy", strategy_metrics)
     print()
     print_metrics(f"Buy and hold {args.symbol}", benchmark_metrics)
+    print()
+    print_metrics("Buy and hold SPY (broad-market benchmark)", spy_metrics)
     if args.output_csv:
         data.to_csv(args.output_csv, index_label="date")
         logging.info("Saved backtest results to %s", args.output_csv)
