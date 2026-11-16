@@ -20,10 +20,14 @@ Usage:
 ./vix-mix-backtest.py --symbol SPY --start 2005-01-01
 ./vix-mix-backtest.py --symbol TQQQ --neutral-low 30 --neutral-high 70 --fee-bps 5
 ./vix-mix-backtest.py --symbol SPY --output-csv output/vix-mix-backtest.csv
+./vix-mix-backtest.py --symbol TQQQ --open
 """
 
+import html
 import importlib.util
 import logging
+import tempfile
+import webbrowser
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
 
@@ -67,6 +71,12 @@ def parse_args():
     )
     parser.add_argument(
         "--output-csv", help="Optional path to save daily backtest data as CSV."
+    )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        dest="open_report",
+        help="Open the generated HTML report in the default browser.",
     )
     return parser.parse_args()
 
@@ -167,6 +177,107 @@ def print_metrics(label, metrics):
     print(f"  Sharpe ratio:        {metrics['sharpe']:.2f}")
 
 
+def generate_equity_chart(data, symbol):
+    width, height = 960, 340
+    left, right, top, bottom = 72, 24, 24, 46
+    columns = [
+        ("strategy_equity", "VIX Mix strategy", "#16866d"),
+        ("benchmark_equity", f"Buy and hold {symbol}", "#4774c8"),
+        ("spy_equity", "Buy and hold SPY", "#d58d35"),
+    ]
+    values = np.concatenate(
+        [data[column].to_numpy(dtype=float) for column, _, _ in columns]
+    )
+    low, high = float(np.nanmin(values)), float(np.nanmax(values))
+    if high == low:
+        high = low + 1
+    plot_width, plot_height = width - left - right, height - top - bottom
+    paths = []
+    for column, label, color in columns:
+        series = data[column].to_numpy(dtype=float)
+        points = []
+        for index, value in enumerate(series):
+            x = left + plot_width * index / max(len(series) - 1, 1)
+            y = top + plot_height * (high - value) / (high - low)
+            points.append(f"{x:.1f},{y:.1f}")
+        paths.append(
+            f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" '
+            'stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
+        )
+    grid = []
+    for fraction in (0, 0.5, 1):
+        y = top + plot_height * fraction
+        value = high - (high - low) * fraction
+        grid.append(
+            f'<line x1="{left}" y1="{y:.1f}" x2="{width-right}" y2="{y:.1f}" stroke="#e1e8e4"/>'
+            f'<text x="{left-10}" y="{y+4:.1f}" text-anchor="end">${value:,.0f}</text>'
+        )
+    start = data.index[0].strftime("%Y-%m-%d")
+    end = data.index[-1].strftime("%Y-%m-%d")
+    return (
+        f'<svg class="equity-chart" viewBox="0 0 {width} {height}" role="img" '
+        'aria-label="Equity curve comparison for VIX Mix strategy and buy-and-hold benchmarks">'
+        f'{"".join(grid)}{"".join(paths)}'
+        f'<text x="{left}" y="{height-12}">{start}</text>'
+        f'<text x="{width-right}" y="{height-12}" text-anchor="end">{end}</text>'
+        "</svg>"
+    )
+
+
+def generate_html_report(data, args, metrics):
+    series_metrics = [
+        (f"VIX Mix strategy ({args.symbol})", metrics["strategy"]),
+        (f"Buy and hold {args.symbol}", metrics["symbol"]),
+        ("Buy and hold SPY", metrics["spy"]),
+    ]
+    metric_rows = []
+    for name, values in series_metrics:
+        metric_rows.append(
+            "<tr>"
+            f"<th>{html.escape(name)}</th>"
+            f"<td>${values['ending_equity']:,.2f}</td>"
+            f"<td>{values['total_return']:.2%}</td>"
+            f"<td>{values['cagr']:.2%}</td>"
+            f"<td>{values['max_drawdown']:.2%}</td>"
+            f"<td>{values['annualized_volatility']:.2%}</td>"
+            f"<td>{values['sharpe']:.2f}</td>"
+            "</tr>"
+        )
+    chart = generate_equity_chart(data, args.symbol)
+    symbol = html.escape(args.symbol)
+    report = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VIX Mix {symbol} Backtest</title>
+<style>
+:root{{--ink:#17211d;--muted:#64716c;--line:#dce5df;--surface:#fff;--background:#f3f6f4}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--background);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}}
+main{{max-width:1180px;margin:42px auto;padding:0 22px}}header,.panel{{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px;box-shadow:0 8px 30px #14231a0a}}
+h1{{margin:0 0 5px;font-size:25px}}h2{{font-size:18px;margin:0 0 14px}}.muted{{color:var(--muted)}}.panel{{margin-top:18px}}.table-wrap{{overflow-x:auto}}
+table{{width:100%;border-collapse:collapse;min-width:820px}}th,td{{padding:13px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}}th:first-child,td:first-child{{text-align:left}}thead th{{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}}tbody th{{font-weight:650}}.equity-chart{{width:100%;height:auto;overflow:visible}}.equity-chart text{{font:12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:var(--muted)}}.legend{{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;color:var(--muted);font-size:13px}}.dot{{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}}.strategy{{background:#16866d}}.asset{{background:#4774c8}}.spy{{background:#d58d35}}.note{{font-size:13px;color:var(--muted)}}
+</style>
+</head>
+<body><main>
+<header><h1>VIX Mix Backtest · {symbol}</h1><div class="muted">{data.index[0].date()} to {data.index[-1].date()} · Initial capital ${args.initial_capital:,.2f}</div>
+<p class="muted">Bullish above {args.neutral_high:g}; bearish below {args.neutral_low:g}; neutral scores hold the current position. Signals execute at the next session open. Estimated one-way fee: {args.fee_bps:g} bps.</p></header>
+<section class="panel"><h2>Equity curves</h2>{chart}<div class="legend"><span><i class="dot strategy"></i>VIX Mix strategy</span><span><i class="dot asset"></i>Buy and hold {symbol}</span><span><i class="dot spy"></i>Buy and hold SPY</span></div></section>
+<section class="panel"><h2>Performance comparison</h2><div class="table-wrap"><table><thead><tr><th>Portfolio</th><th>Ending equity</th><th>Total return</th><th>CAGR</th><th>Max drawdown</th><th>Annualized volatility</th><th>Sharpe</th></tr></thead><tbody>{''.join(metric_rows)}</tbody></table></div></section>
+<section class="panel"><p class="note">Buy-and-hold benchmarks use the same open-to-open period and dates as the strategy. The VIX Mix strategy is long-only and moves to cash on bearish signals; it does not short the traded symbol.</p></section>
+</main></body></html>"""
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        suffix=".html",
+        prefix="vix-mix-backtest-",
+        dir=tempfile.gettempdir(),
+        delete=False,
+    ) as report_file:
+        report_file.write(report)
+        return Path(report_file.name)
+
+
 def main(args):
     vix_mix_signal.validate_signal_args(args)
     if args.initial_capital <= 0:
@@ -231,6 +342,16 @@ def main(args):
     print_metrics(f"Buy and hold {args.symbol}", benchmark_metrics)
     print()
     print_metrics("Buy and hold SPY (broad-market benchmark)", spy_metrics)
+    metrics = {
+        "strategy": strategy_metrics,
+        "symbol": benchmark_metrics,
+        "spy": spy_metrics,
+    }
+    report_path = generate_html_report(data, args, metrics)
+    print(f"HTML report: {report_path}")
+    if args.open_report:
+        webbrowser.open(report_path.as_uri())
+        logging.info("Opened report in the default browser")
     if args.output_csv:
         data.to_csv(args.output_csv, index_label="date")
         logging.info("Saved backtest results to %s", args.output_csv)
