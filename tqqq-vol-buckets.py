@@ -8,7 +8,8 @@
 #   "persistent-cache@git+https://github.com/namuan/persistent-cache",
 #   "requests",
 #   "python-dotenv",
-#   "schedule"
+#   "schedule",
+#   "fin-primitives>=4.0.0"
 # ]
 # ///
 """
@@ -39,6 +40,7 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from datetime import datetime
 from pathlib import Path
 
+import fin_primitives
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -127,20 +129,21 @@ def parse_args():
 
 
 def calculate_atr(df, period=20):
-    """Calculate Average True Range"""
-    high = df["High"]
-    low = df["Low"]
-    close = df["Close"]
-    prev_close = close.shift(1)
+    """Calculate Average True Range (Wilder's ATR, as talib.ATR computes it).
 
-    tr1 = high - low
-    tr2 = abs(high - prev_close)
-    tr3 = abs(low - prev_close)
-
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.rolling(window=period).mean()
-
-    return atr
+    Seeded with the mean of the first `period` true ranges, then smoothed with
+    alpha = 1/period. A rolling mean of the true range is a different average that never
+    converges to it. Rows with a missing price are skipped and come back as NaN.
+    """
+    bars = df[["High", "Low", "Close"]].dropna()
+    atr = fin_primitives.atr(
+        bars["High"].to_numpy(dtype=float),
+        bars["Low"].to_numpy(dtype=float),
+        bars["Close"].to_numpy(dtype=float),
+        period,
+        mode="float",
+    )
+    return pd.Series(atr, index=bars.index).reindex(df.index)
 
 
 def calculate_vol_ratio(df):
@@ -271,12 +274,12 @@ def generate_telegram_alert_message(results_df, qqq_df, use_alternate):
     def format_exposure(exposure):
         if pd.isna(exposure):
             return "N/A"
-        return f"{exposure*100:.0f}%"
+        return f"{exposure * 100:.0f}%"
 
     def format_return(ret):
         if pd.isna(ret):
             return "N/A"
-        return f"{ret*100:+.2f}%"
+        return f"{ret * 100:+.2f}%"
 
     def classify_volatility(vol_ratio_value):
         if pd.isna(vol_ratio_value):
@@ -295,9 +298,9 @@ def generate_telegram_alert_message(results_df, qqq_df, use_alternate):
     elif abs(exposure_change) < 1e-9:
         action = f"HOLD current {format_exposure(current_exposure)} position"
     elif exposure_change > 0:
-        action = f"INCREASE position by {exposure_change*100:.0f}%"
+        action = f"INCREASE position by {exposure_change * 100:.0f}%"
     else:
-        action = f"DECREASE position by {abs(exposure_change)*100:.0f}%"
+        action = f"DECREASE position by {abs(exposure_change) * 100:.0f}%"
 
     if pd.isna(current_target) or pd.isna(current_exposure):
         days_until_size_up = "N/A"
@@ -349,8 +352,8 @@ def generate_telegram_alert_message(results_df, qqq_df, use_alternate):
         dd = (eq / eq.cummax() - 1).min()
 
         return (
-            f"{label}: Strategy {total_ret*100:+.1f}% | TQQQ B&H {bh_ret*100:+.1f}% | "
-            f"Sharpe {sharpe:.2f} | DD {dd*100:.1f}%"
+            f"{label}: Strategy {total_ret * 100:+.1f}% | TQQQ B&H {bh_ret * 100:+.1f}% | "
+            f"Sharpe {sharpe:.2f} | DD {dd * 100:.1f}%"
         )
 
     ytd_start = datetime(current_date.year, 1, 1)
@@ -384,7 +387,7 @@ def generate_telegram_alert_message(results_df, qqq_df, use_alternate):
         else:
             action_hint = "Hold"
         sensitivity_lines.append(
-            f"{mv*100:+.0f}% | {new_ratio:.2f}x | {format_exposure(new_target)} | {action_hint}"
+            f"{mv * 100:+.0f}% | {new_ratio:.2f}x | {format_exposure(new_target)} | {action_hint}"
         )
 
     allocation_label = f"TQQQ + {ALTERNATE_TICKER}" if use_alternate else "TQQQ + Cash"
@@ -842,7 +845,7 @@ def generate_html_report(
     fig9 = go.Figure(
         data=[
             go.Bar(
-                x=[f"{int(exp*100)}%" for exp in exposure_dist.index],
+                x=[f"{int(exp * 100)}%" for exp in exposure_dist.index],
                 y=exposure_dist_pct.values,
                 text=[f"{pct:.1f}%" for pct in exposure_dist_pct.values],
                 textposition="outside",
@@ -1169,14 +1172,14 @@ def generate_html_report(
     # Add metrics rows
     for _, row in metrics_df.iterrows():
         html_content += f"""                        <tr>
-                            <td>{row['Label']}</td>
-                            <td>{row['CAGR']}</td>
-                            <td>{row['Max DD']}</td>
-                            <td>{row['Volatility']}</td>
-                            <td>{row['Sharpe']}</td>
-                            <td>{row['Worst 1M DD']}</td>
-                            <td>{row['Worst 3M DD']}</td>
-                            <td>{row['Final Equity']}</td>
+                            <td>{row["Label"]}</td>
+                            <td>{row["CAGR"]}</td>
+                            <td>{row["Max DD"]}</td>
+                            <td>{row["Volatility"]}</td>
+                            <td>{row["Sharpe"]}</td>
+                            <td>{row["Worst 1M DD"]}</td>
+                            <td>{row["Worst 3M DD"]}</td>
+                            <td>{row["Final Equity"]}</td>
                         </tr>
 """
 

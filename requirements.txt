@@ -36,3 +36,4 @@ gradio
 seaborn
 git+https://github.com/namuan/persistent-cache
 tabulate
+fin-primitives>=4.0.0
